@@ -100,21 +100,42 @@ private partial def rewriteTMR
   let some (goalL, goalR) ← applyTransitivity goal
     | return false
 
-  -- select the correct goal based on the rewrite direction
-  let goal ← match direction with
-    | .forward => do
-      goalR.setTag tag
-      pure goalL
-    | .reverse => do
-      goalL.setTag tag
-      pure goalR
+  -- Build rules lists based on direction.
+  -- For an equivalence h : A ≈ B (with h.mp : A ≤ B and h.mpr : B ≤ A):
+  --   rw' [h]: replace A with B
+  --     - At top level for RHS: close goalR `?M ≤ A` with h.mpr (B ≤ A)
+  --     - At top level for LHS: close goalL `A ≤ ?M` with h.mp (A ≤ B)
+  --   rw' [←h]: replace B with A
+  --     - At top level for RHS: close goalR `?M ≤ B` with h.mp (A ≤ B)
+  --     - At top level for LHS: close goalL `B ≤ ?M` with h.mpr (B ≤ A)
+  -- For top-level rewrites, we use direction-specific rules to ensure correct semantics.
+  -- For nested rewrites (via monotonicity), both projections may be needed due to variance.
+  let mpRule ← `(($rule).mp)
+  let mprRule ← `(($rule).mpr)
 
-  -- try to rewrite with the given rule
-  -- First try the rule directly, then try extracting .mp or .mpr for bi-entailment
-  let rules ← match direction with
-    | .forward => pure [rule, ← `(($rule).mp)]
-    | .reverse => pure [rule, ← `(($rule).mpr)]
-  goWithAlternatives goal rules
+  -- For top level: direction-specific projections only
+  -- For nested (mono): allow both projections
+  let topRulesL ← match direction with
+    | .forward => pure [rule, mpRule]   -- A ≤ ?M needs A ≤ B (mp)
+    | .reverse => pure [rule, mprRule]  -- B ≤ ?M needs B ≤ A (mpr)
+  let topRulesR ← match direction with
+    | .forward => pure [rule, mprRule]  -- ?M ≤ A needs B ≤ A (mpr)
+    | .reverse => pure [rule, mpRule]   -- ?M ≤ B needs A ≤ B (mp)
+  -- Nested rules allow both projections due to variance
+  let nestedRules := [rule, mpRule, mprRule]
+
+  -- Try to apply the rule to either goalL or goalR
+  let state ← saveState
+  if ← goWithAlternatives goalL topRulesL nestedRules then
+    goalR.setTag tag
+    return true
+  state.restore
+
+  if ← goWithAlternatives goalR topRulesR nestedRules then
+    goalL.setTag tag
+    return true
+
+  return false
 where
   applyTransitivity (goal : MVarId) : TacticM <| Option <| MVarId × MVarId := do
     try
@@ -138,9 +159,11 @@ where
       discard <| apply' goal ``Iris.Std.Reflexive.refl
     catch _ => pure ()
 
-  go (goal : MVarId) (rules : List (TSyntax `term)) : TacticM Bool := do
+  -- `topRules`: rules to try at this level via exact/apply
+  -- `nestedRules`: rules to pass down when descending via monotonicity
+  go (goal : MVarId) (topRules nestedRules : List (TSyntax `term)) : TacticM Bool := do
     -- try to rewrite with any of the given rules
-    for rule in rules do
+    for rule in topRules do
       -- Try exact rule directly
       try
         withFocus goal <| withoutRecover <| evalTactic (← `(tactic|
@@ -159,13 +182,14 @@ where
     -- try to apply any monotonicity rule
     let state ← saveState
     if let some goals ← applyMonotonicity goal then
-      let mut rules? := some rules
+      let mut rules? := some nestedRules
 
       -- try to rewrite in exactly one subterm
+      -- For nested goals, use nestedRules for both top and nested
       for goal in goals do
         match rules? with
         | some rules =>
-          if ← go goal rules then
+          if ← go goal rules rules then
             rules? := none
         | none =>
           applyReflexivity goal
@@ -181,10 +205,10 @@ where
       applyReflexivity goal
       return false
 
-  goWithAlternatives (goal : MVarId) (rules : List (TSyntax `term)) : TacticM Bool := do
-    for rule in rules do
+  goWithAlternatives (goal : MVarId) (topRules nestedRules : List (TSyntax `term)) : TacticM Bool := do
+    for rule in topRules do
       let state ← saveState
-      if ← go goal [rule] then
+      if ← go goal [rule] nestedRules then
         return true
       state.restore
     return false

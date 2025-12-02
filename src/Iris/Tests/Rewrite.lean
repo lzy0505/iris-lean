@@ -94,6 +94,29 @@ example (h : P ⊣⊢ R) : R ∧ Q ⊢ P ∧ Q := by
 example (h : P ⊣⊢ R) : P ∧ Q ⊣⊢ R ∧ Q := by
   rw' [h]
 
+example (h : Q ⊣⊢ R) (h' : P ⊢ Q) : P ⊢ R := by
+  rw' [←h]
+  exact h'
+
+-- This correctly fails: h : R ⊣⊢ Q, ←h means replace Q with R, but there's no Q in goal P ⊢ R
+-- Uncommenting the following would cause a build error:
+-- example (h : R ⊣⊢ Q) (h' : P ⊢ Q) : P ⊢ R := by
+--   rw' [←h]  -- fails: no Q to replace
+--   exact h'
+-- Verify it fails using fail_if_success:
+example (h : R ⊣⊢ Q) (h' : P ⊢ Q) : P ⊢ R := by
+  fail_if_success rw' [←h]
+  -- Use the correct approach instead:
+  rw' [h]
+  exact h'
+
+-- Correct way: use rw' [h] to replace R with Q on the RHS
+example (h : R ⊣⊢ Q) (h' : P ⊢ Q) : P ⊢ R := by
+  rw' [h]  -- replaces R with Q, goal becomes P ⊢ Q
+  exact h'
+
+
+
 /-! ## Nested Rewriting
 
 `rw'` descends into nested structures using monotonicity rules.
