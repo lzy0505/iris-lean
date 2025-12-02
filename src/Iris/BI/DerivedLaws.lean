@@ -23,6 +23,10 @@ instance entails_antisymm [BI PROP] : Antisymmetric (α := PROP) BiEntails Entai
 instance equiv_trans [BI PROP] : Trans (α := PROP) BiEntails BiEntails BiEntails where
   trans h1 h2 := h1.trans h2
 
+instance biEntails_preorder [BI PROP] : Std.Preorder (BiEntails (PROP := PROP)) where
+  refl := BIBase.BiEntails.rfl
+  trans h1 h2 := h1.trans h2
+
 /-! # Logic -/
 
 theorem and_elim_l' [BI PROP] {P Q R : PROP} (h : P ⊢ R) : P ∧ Q ⊢ R := and_elim_l.trans h

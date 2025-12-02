@@ -110,11 +110,15 @@ private partial def rewriteTMR
       pure goalR
 
   -- try to rewrite with the given rule
-  go goal rule
+  -- First try the rule directly, then try extracting .mp or .mpr for bi-entailment
+  let rules ← match direction with
+    | .forward => pure [rule, ← `(($rule).mp)]
+    | .reverse => pure [rule, ← `(($rule).mpr)]
+  goWithAlternatives goal rules
 where
   applyTransitivity (goal : MVarId) : TacticM <| Option <| MVarId × MVarId := do
     try
-      let some <| goalL :: goalR :: [] ← apply' goal ``trans
+      let some <| goalL :: goalR :: [] ← apply' goal ``Iris.Std.Transitive.trans
         | return none
       return some (goalL, goalR)
     catch _ =>
@@ -131,42 +135,59 @@ where
 
   applyReflexivity (goal : MVarId) : TacticM Unit := do
     try
-      discard <| apply' goal ``refl
+      discard <| apply' goal ``Iris.Std.Reflexive.refl
     catch _ => pure ()
 
-  go (goal : MVarId) (rule : TSyntax `term) : TacticM Bool := do
-    -- try to rewrite with the given rule
-    try
-      withFocus goal <| withoutRecover <| evalTactic (← `(tactic|
-        exact $rule
-      ))
-      return true
-    catch _ => pure ()
+  go (goal : MVarId) (rules : List (TSyntax `term)) : TacticM Bool := do
+    -- try to rewrite with any of the given rules
+    for rule in rules do
+      -- Try exact rule directly
+      try
+        withFocus goal <| withoutRecover <| evalTactic (← `(tactic|
+          exact $rule
+        ))
+        return true
+      catch _ => pure ()
+      -- Try applying the rule (handles forall-quantified hypotheses)
+      try
+        withFocus goal <| withoutRecover <| evalTactic (← `(tactic|
+          apply $rule
+        ))
+        return true
+      catch _ => pure ()
 
     -- try to apply any monotonicity rule
     let state ← saveState
     if let some goals ← applyMonotonicity goal then
-      let mut rule? := some rule
+      let mut rules? := some rules
 
       -- try to rewrite in exactly one subterm
       for goal in goals do
-        match rule? with
-        | some rule =>
-          if ← go goal rule then
-            rule? := none
+        match rules? with
+        | some rules =>
+          if ← go goal rules then
+            rules? := none
         | none =>
           applyReflexivity goal
 
       -- if the term is unchanged, restore the state to reduce the proof term size
-      if rule?.isSome then
+      if rules?.isSome then
         state.restore
         applyReflexivity goal
 
-      return rule?.isNone
+      return rules?.isNone
     else
       -- do not rewrite in the term
       applyReflexivity goal
       return false
+
+  goWithAlternatives (goal : MVarId) (rules : List (TSyntax `term)) : TacticM Bool := do
+    for rule in rules do
+      let state ← saveState
+      if ← go goal [rule] then
+        return true
+      state.restore
+    return false
 
 
 elab "rw' " "[" rules:rwRule',*,? "]" : tactic => do
