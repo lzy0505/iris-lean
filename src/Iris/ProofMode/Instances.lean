@@ -13,18 +13,21 @@ open Iris.BI Iris.Std
 -- ## AsEmpValid
 instance (priority := default - 10) asEmpValidEmpValid1
     [BI PROP] (P : PROP) : AsEmpValid1 (⊢ P) P := ⟨by simp⟩
+-- set_option synthInstance.checkSynthOrder false in
 instance (priority := default + 10) asEmpValidEmpValid2
     [BI PROP] (P : PROP) : AsEmpValid2 (⊢ P) P := AsEmpValid1.to2
 
-/- This instance should always have lower priority than [asEmpValidEmpValid1].
-   Otherwise [⊢ P] would be posed as [emp -∗ P] -/
-instance (priority := default - 20) asEmpValid1_entails [BI PROP] (P Q : PROP) : AsEmpValid1 (P ⊢ Q) iprop(P -∗ Q) where
+instance asEmpValid1_entails [BI PROP] (P Q : PROP) : AsEmpValid1 (P ⊢ Q) iprop(P -∗ Q) where
   as_emp_valid := ⟨entails_wand, wand_entails⟩
+/- This instance should always have lower priority than [asEmpValidEmpValid2].
+   Otherwise [⊢ P] would be posed as [emp -∗ P] -/
+-- set_option synthInstance.checkSynthOrder false in
 instance asEmpValid2_entails [BI PROP] (P Q : PROP) : AsEmpValid2 (P ⊢ Q) iprop(P -∗ Q) :=
   AsEmpValid1.to2
 
 instance asEmpValid1_equiv [BI PROP] (P Q : PROP) : AsEmpValid1 (P ⊣⊢ Q) iprop(P ∗-∗ Q) where
   as_emp_valid := ⟨equiv_wandIff, wandIff_equiv⟩
+-- set_option synthInstance.checkSynthOrder false in
 instance asEmpValid2_equiv [BI PROP] (P Q : PROP) : AsEmpValid2 (P ⊣⊢ Q) iprop(P ∗-∗ Q) :=
   AsEmpValid1.to2
 
@@ -43,7 +46,7 @@ instance asEmpValid2_forall [BI PROP] {α : Type _} (φ : α → Prop) (P : α �
 -- ## IntoEmpValid
 
 /- NOTE: we don't want to have these three instances,
-    because we want the resolution to fall back to [AsEmpValid1] with [intoEmpValid_here] -/
+    because we want the resolution to fall back to [AsEmpValid2] with [intoEmpValid_here] -/
 -- instance intoEmpValid_emp_entails [BI PROP] (P : PROP) : IntoEmpValid (⊢ P) iprop(P) where
 --   into_emp_valid := id
 -- instance intoEmpValid_entails [BI PROP] (P Q : PROP) : IntoEmpValid (P ⊢ Q) iprop(P -∗ Q) where
@@ -51,8 +54,9 @@ instance asEmpValid2_forall [BI PROP] {α : Type _} (φ : α → Prop) (P : α �
 -- instance intoEmpValid_equiv [BI PROP] (P Q : PROP) : IntoEmpValid (P ⊣⊢ Q) iprop(P ∗-∗ Q) where
 --   into_emp_valid := equiv_wandIff
 
-set_option synthInstance.checkSynthOrder false in
-instance intoEmpValid_here [BI PROP] (φ : Prop) (P : PROP) [h : AsEmpValid1 φ P] :
+-- set_option synthInstance.checkSynthOrder false in
+-- Back to [AsEmpValid2] because we know [φ]
+instance intoEmpValid_here [BI PROP] (φ : Prop) (P : PROP) [h : AsEmpValid2 φ P] :
     IntoEmpValid φ P where
   into_emp_valid := h.as_emp_valid.mp
 

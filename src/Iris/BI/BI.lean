@@ -17,8 +17,7 @@ theorem liftRel_eq : liftRel (@Eq α) A B ↔ A = B := by
   simp [liftRel, forall_and, iff_def, funext_iff]
 
 /-- Require that a separation logic with carrier type `PROP` fulfills all necessary axioms. -/
--- [PROP] is marked with [outParam] for better metavariable resolution
-class BI (PROP : outParam (Type _)) extends COFE PROP, BI.BIBase PROP where
+class BI (PROP : Type _) extends COFE PROP, BI.BIBase PROP where
   Equiv P Q := P ⊣⊢ Q
 
   entails_preorder : Preorder Entails
