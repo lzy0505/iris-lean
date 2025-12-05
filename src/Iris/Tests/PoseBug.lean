@@ -10,6 +10,7 @@ open Iris.BI Iris.ProofMode
 -- set_option trace.Meta.synthInstance true in #synth (AsEmpValid2 (?_ ⊢ Q) R)
 
 -- This should work - direct entailment
+
 theorem test_pose_direct [BI PROP] (Q R : PROP) (H : Q ⊢ R) : Q ⊢ R := by
   iintro HQ
   ipose H as HR
@@ -54,14 +55,15 @@ theorem test_pose_impl_forall [BI PROP] (cond : A → Prop) (Q R : A → PROP) (
 theorem HH [BI PROP] (cond : A → Prop) (Q R : A → PROP) : ∀ (a': A) , cond a' → (Q a' ⊢ R a') := by sorry
 
 -- TODO: This test has issues with metavar unification for dependent types
--- set_option pp.explicit true in
+set_option pp.explicit true in
 theorem test_pose_impl_forall_global [BI PROP] (cond : A → Prop) (Q R : A → PROP) (a: A) (Hcond : cond a)
 : Q a ⊢ R a := by
   istart
   iintro HQ
 
   -- set_option pp.explicit true in
-  set_option trace.Meta.synthInstance true in ipose (HH cond Q) as HR
+  -- set_option trace.Meta.synthInstance true in
+  ipose (HH cond Q) as HR
   · exact Hcond
   · iapply HR with HQ
 

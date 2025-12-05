@@ -117,7 +117,6 @@ elab "iapply" colGt pmt:pmTerm : tactic => do
         then q($e ⊢ $A1 -∗ $A2) else q($e ⊢ $goal)
 
       let expr ← mkAppM' (← elabTerm pmt.term (some expected)) #[]
-
       let goals ← IO.mkRef #[]
       let ⟨hyp, pf⟩ ← iPoseCore bi expr pmt.terms goals
 

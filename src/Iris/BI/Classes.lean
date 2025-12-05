@@ -27,6 +27,7 @@ class Intuitionistic [BI PROP] (P : PROP) where
   intuitionistic : P ⊢ □ P
 export Intuitionistic (intuitionistic)
 
+-- set_option trace.Meta.synthInstance true in
 /-- Require that the proposition `P` does not depend on the step index -/
 class Timeless [BI PROP] (P : PROP) where
   timeless : ⊢ ▷ P ∨ ◇ P

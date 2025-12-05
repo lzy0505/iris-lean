@@ -15,6 +15,10 @@ theorem pose {PROP} [BI PROP] {P Q R : PROP}
     (H1 : P ∗ Q ⊢ R) (H2 : ⊢ Q) : P ⊢ R :=
   sep_emp.mpr.trans <| (sep_mono_r H2).trans H1
 
+theorem emp_wand {PROP} [BI PROP] {P : PROP}: (emp ⊢ P) → (⊢ P) := by
+ intros H
+ assumption
+
 /-- Instantiate Iris-level forall with `x`.
   - `Q` is `∀ x, P x`
 -/
@@ -38,8 +42,21 @@ partial def instantiateForalls {prop : Q(Type u)} (bi : Q(BI $prop)) (hyp : Q($p
     let pf' ← mkAppM ``pose_forall #[texpr, Φ, pf]
     return ← instantiateForalls bi res pf' terms.tail
   else
-    let pf ← mkAppM ``as_emp_valid_1 #[hyp, pf]
-    return ⟨hyp, pf⟩
+    let pf'Ty ← inferType pf
+    if let some #[_, _, hh, (P : Q($prop))] := (← whnfR pf'Ty).appM? ``Entails then
+      if (← whnfR hh).isAppOfArity ``BI.emp 2 then
+        -- special case for `emp ⊢ P`
+        let pf' : Expr ← mkAppM ``emp_wand #[pf]
+        let pf ← mkAppM ``as_emp_valid_1 #[P, pf']
+        return ⟨P, pf⟩
+      else
+      -- case for `P ⊢ Q`
+      let pf ← mkAppM ``as_emp_valid_1 #[hyp, pf]
+      return ⟨hyp, pf⟩
+    else
+      -- case for `⊢ P`
+      let pf ← mkAppM ``as_emp_valid_1 #[hyp, pf]
+      return ⟨hyp, pf⟩
 
 /-- Process Lean-level foralls/implications in the type of `val`.
 
@@ -119,7 +136,7 @@ partial def synthIntoEmpValid {prop : Q(Type u)} (bi : Q(BI $prop))
 
   -- Base case: try to synthesize directly (handles ⊢ P, P ⊢ Q, P ⊣⊢ Q)
   try
-    synthInstance q(IntoEmpValid $φ $P)
+    synthInstance q(@IntoEmpValid $φ $prop $P $bi)
   catch _ =>
     throwError "ipose: cannot find IntoEmpValid instance for {φ}"
 
@@ -141,7 +158,6 @@ def iPoseCore {prop : Q(Type u)} (bi : Q(BI $prop)) (val : Expr) (terms : List T
     (goals : IO.Ref (Array MVarId)) : TacticM (Q($prop) × Expr) := do
   let hyp ← mkFreshExprMVarQ q($prop)
   let (v, p) ← handleDependentArrows bi val goals
-
   -- if
   let _ ← synthIntoEmpValid bi p hyp goals
   -- if let some _ ← try? <| synthIntoEmpValid bi p hyp goals then

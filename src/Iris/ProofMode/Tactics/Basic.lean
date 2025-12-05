@@ -23,13 +23,15 @@ def istart (mvar : MVarId) : MetaM (MVarId × IrisGoal) := mvar.withContext do
   let prop ← mkFreshExprMVarQ q(Type u)
   let P ← mkFreshExprMVarQ q($prop)
   let bi ← mkFreshExprMVarQ q(BI $prop)
-  let _ ← synthInstanceQ q(ProofMode.AsEmpValid2 $goal $P)
+  let tc ← synthInstanceQ q(ProofMode.AsEmpValid2 $goal $P)
 
   let irisGoal := { u, prop, bi, hyps := .mkEmp bi, goal := P, .. }
   let subgoal : Quoted q(⊢ $P) ←
     mkFreshExprSyntheticOpaqueMVar (IrisGoal.toExpr irisGoal) (← mvar.getTag)
-  mvar.assign q(ProofMode.as_emp_valid_2 $goal $subgoal)
+  mvar.assign q(@ProofMode.as_emp_valid_2 $prop $P $bi $goal $tc $subgoal)
   pure (subgoal.mvarId!, irisGoal)
+  -- else
+  --   throwError "istart: not an Iris entailment"
 
 elab "istart" : tactic => do
   let (mvar, _) ← istart (← getMainGoal)

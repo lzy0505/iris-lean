@@ -13,21 +13,19 @@ open Iris.BI Iris.Std
 -- ## AsEmpValid
 instance (priority := default - 10) asEmpValidEmpValid1
     [BI PROP] (P : PROP) : AsEmpValid1 (⊢ P) P := ⟨by simp⟩
--- set_option synthInstance.checkSynthOrder false in
+set_option synthInstance.checkSynthOrder false in
 instance (priority := default + 10) asEmpValidEmpValid2
     [BI PROP] (P : PROP) : AsEmpValid2 (⊢ P) P := AsEmpValid1.to2
 
 instance asEmpValid1_entails [BI PROP] (P Q : PROP) : AsEmpValid1 (P ⊢ Q) iprop(P -∗ Q) where
   as_emp_valid := ⟨entails_wand, wand_entails⟩
-/- This instance should always have lower priority than [asEmpValidEmpValid2].
-   Otherwise [⊢ P] would be posed as [emp -∗ P] -/
--- set_option synthInstance.checkSynthOrder false in
+set_option synthInstance.checkSynthOrder false in
 instance asEmpValid2_entails [BI PROP] (P Q : PROP) : AsEmpValid2 (P ⊢ Q) iprop(P -∗ Q) :=
   AsEmpValid1.to2
 
 instance asEmpValid1_equiv [BI PROP] (P Q : PROP) : AsEmpValid1 (P ⊣⊢ Q) iprop(P ∗-∗ Q) where
   as_emp_valid := ⟨equiv_wandIff, wandIff_equiv⟩
--- set_option synthInstance.checkSynthOrder false in
+set_option synthInstance.checkSynthOrder false in
 instance asEmpValid2_equiv [BI PROP] (P Q : PROP) : AsEmpValid2 (P ⊣⊢ Q) iprop(P ∗-∗ Q) :=
   AsEmpValid1.to2
 

@@ -278,7 +278,7 @@ theorem later_affine [BI PROP] [BIAffine PROP] (P Q : PROP) : ⊢ (▷ P → Q) 
   iintro H HP
   iapply H with HP
 
-theorem exact_lean [BI PROP] (Q : PROP) (H : ⊢ Q) : ⊢ Q := by
+theorem exact_lean [BI PROP] (Q : PROP) (H : emp ⊢ Q) : ⊢ Q := by
   istart
   iapply H
 
