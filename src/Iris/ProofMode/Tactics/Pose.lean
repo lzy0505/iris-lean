@@ -12,8 +12,8 @@ namespace Iris.ProofMode
 open Lean Elab Tactic Meta Qq BI Std
 
 theorem pose {PROP} [BI PROP] {P Q R : PROP}
-    (H1 : P ∗ Q ⊢ R) (H2 : ⊢ Q) : P ⊢ R :=
-  sep_emp.mpr.trans <| (sep_mono_r H2).trans H1
+    (H1 : P ∗ □ Q ⊢ R) (H2 : ⊢ Q) : P ⊢ R :=
+  sep_emp.mpr.trans <| (sep_mono_r (intuitionistically_emp.2.trans (intuitionistically_mono H2))).trans H1
 
 theorem emp_wand {PROP} [BI PROP] {P : PROP}: (emp ⊢ P) → (⊢ P) := by
  intros H
@@ -161,7 +161,9 @@ def iPoseCore {prop : Q(Type u)} (bi : Q(BI $prop)) (val : Expr) (terms : List T
   -- if
   let _ ← synthIntoEmpValid bi p hyp goals
   -- if let some _ ← try? <| synthIntoEmpValid bi p hyp goals then
-  return ← instantiateForalls bi hyp v terms
+  let ⟨hyp, pf⟩ ← instantiateForalls bi hyp v terms
+  --  mkAppM ``pose #[m, pf]
+  return ⟨hyp, pf⟩
 
   -- else
   --   throwError "ipose: {val} is not an Iris entailment\n  p = {p}\n"
@@ -173,58 +175,15 @@ elab "ipose" colGt pmt:pmTerm "as" pat:(colGt icasesPat) : tactic => do
 
   mvar.withContext do
     let g ← instantiateMVars <| ← mvar.getType
-    let some { prop, bi, hyps, goal, .. } := parseIrisGoal? g | throwError "not in proof mode"
+    let some { bi, hyps, goal, .. } := parseIrisGoal? g | throwError "not in proof mode"
 
     let goals ← IO.mkRef #[]
 
-    -- withNewLocalInstances #[bi] 0 do
-
-    -- Elaborate the term to handle both local variables and global constants/theorems
-    -- First try normal elaboration
-
-    -- Try to resolve as identifier (local or global constant)
-        -- let termId := pmt.term.raw.getId
     let val ← elabTerm pmt.term none true
-
-      --     if !termId.isAnonymous then
-      --   -- Check for local variable first
-      --       if let some ldecl := (← getLCtx).findFromUserName? termId then
-      --         pure ldecl.toExpr
-      --       else if let some resolvedName ← try? <| resolveGlobalConstNoOverload pmt.term then
-      --   -- Global constant - build with fresh mvars, bypassing instance synthesis
-      --   -- logInfo "global"
-      --         let e ← mkConstWithFreshMVarLevels resolvedName
-      --         let eType ← inferType e
-      --         let (args, _, _) ← forallMetaTelescope eType
-      --         pure <| mkAppN e args
-      --       else
-      --   -- Unknown identifier
-      --         throwError "ipose: unknown identifier {termId}"
-      --     else
-      -- -- Complex term - use normal elaboration
-      --       -- let e ←
-      --       elabTerm pmt.term none true
-            -- let ty ← inferType e
-            -- throwError "ipose: term too complex {e}"
-    -- After elaboration, assign BI instance mvars to the goal's BI, then synthesize others
-    -- for mvarId in (← getMVars val) do
-    --   if !(← mvarId.isAssigned) then
-    --     let mvarType ← instantiateMVars (← mvarId.getDecl).type
-    --     if mvarType.isAppOf ``BI then
-    --       mvarId.assign bi
-    -- Now try to synthesize remaining instance mvars (with BI now known)
-    -- for mvarId in (← getMVars val) do
-    --   if !(← mvarId.isAssigned) then
-    --     let mvarDecl ← mvarId.getDecl
-    --     if let .synthetic := mvarDecl.kind then
-    --       let mvarType ← instantiateMVars mvarDecl.type
-    --       try
-    --         let inst ← synthInstance mvarType
-    --         mvarId.assign inst
-    --       catch _ => pure ()
     let val ← instantiateMVars val
     let ⟨hyp, pf⟩ := ← iPoseCore bi val pmt.terms goals
 
-    let m ← iCasesCore bi hyps goal q(false) hyp hyp ⟨⟩ pat (λ hyps => goalTracker goals .anonymous hyps goal)
+    let m ← iCasesCore bi hyps goal q(true) q(intuitionistically $hyp) hyp ⟨⟩ pat (λ hyps => goalTracker goals .anonymous hyps goal)
+
     mvar.assign <| ← mkAppM ``pose #[m, pf]
     replaceMainGoal (← goals.get).toList

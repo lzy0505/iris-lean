@@ -9,6 +9,11 @@ import Iris.ProofMode
 namespace Iris.Tests
 open Iris.BI
 
+-- variable (PROP) [bi: BI PROP] (Q: PROP) in
+-- set_option trace.Meta.synthInstance true in
+-- #synth (@ProofMode.IntoAnd PROP true bi iprop(@wandIff PROP (bi.toBIBase) Q Q) iprop(Q -∗ Q) iprop(Q -∗ Q))
+
+
 /- This file contains tests with various scenarios for all available tactics. -/
 
 -- start stop
@@ -29,6 +34,8 @@ theorem rename [BI PROP] (Q : PROP) : Q ⊢ Q := by
 theorem rename_by_type [BI PROP] (Q : PROP) : □ P ∗ Q ⊢ Q := by
   iintro ⟨_HP, HQ⟩
   irename: Q => H
+
+
   iexact H
 
 theorem rename_twice [BI PROP] (Q : PROP) : Q ⊢ Q := by
@@ -116,7 +123,7 @@ theorem pure [BI PROP] [BIAffine PROP] (Q : PROP) : ⊢ ⌜φ⌝ -∗ Q -∗ Q :
 
 theorem pattern [BI PROP] (Q : PROP) : □ (P1 ∨ P2) ∗ Q ⊢ Q := by
   iintro ⟨□(_HP1 | _HP2), HQ⟩
-  <;> iexact HQ
+    <;> iexact HQ
 
 theorem multiple_spatial [BI PROP] (Q : PROP) : ⊢ <affine> P -∗ Q -∗ Q := by
   iintro _HP HQ
@@ -128,7 +135,7 @@ theorem multiple_intuitionistic [BI PROP] (Q : PROP) : ⊢ □ P -∗ □ Q -∗
 
 theorem multiple_patterns [BI PROP] (Q : PROP) : ⊢ □ (P1 ∧ P2) -∗ Q ∨ Q -∗ Q := by
   iintro □⟨_HP1, ∗_HP2⟩ (HQ | HQ)
-  <;> iexact HQ
+    <;> iexact HQ
 
 end intro
 
@@ -359,6 +366,7 @@ theorem apply_lean [BI PROP] (P Q : PROP) (H : P ⊢ Q) : ⊢ P -∗ Q := by
 theorem apply_forall [BI PROP] (P Q : α → PROP) (a b : α) (H : ⊢ ∀ x, ∀ y, P x -∗ Q y) : P a ⊢ Q b := by
   iintro HP
   ipose H $! a, b as H'
+  -- FIXME
   iapply H' with HP
 
 theorem apply_forall_intuitionistic [BI PROP] (P Q : α → PROP) (a b : α) (H : ⊢ □ ∀ x, ∀ y, P x -∗ Q y) : P a ⊢ Q b := by
@@ -674,6 +682,14 @@ theorem clear [BI PROP] (P Q : PROP) : ⊢ P -∗ <affine> Q -∗ P := by
 theorem and [BI PROP] (Q : PROP) : □ (P1 ∧ P2 ∧ Q) ⊢ Q := by
   iintro □HP
   icases HP with ⟨_HP1, _HP2, HQ⟩
+  iexact HQ
+
+theorem and' [BI PROP] (P1 P2 Q : PROP) : (⊢ P1 ∗-∗ P2) → ⊢ Q := by
+  intros H
+  istart
+  ipose H as H
+
+  set_option trace.Meta.synthInstance true in icases H with ⟨_HP1, _HP2⟩
   iexact HQ
 
 theorem and_intuitionistic [BI PROP] (Q : PROP) : □ P ∧ Q ⊢ Q := by
