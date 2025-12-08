@@ -15,6 +15,8 @@ theorem test_pose_direct [BI PROP] (Q R : PROP) (H : Q ⊢ R) : Q ⊢ R := by
   iintro HQ
   ipose H as HR
   iapply HR with HQ
+  iexact HQ
+
 
 -- This works - Lean implication wrapping entailment
 theorem test_pose_impl [BI PROP] (cond : Prop) (Q R : PROP) (Hcond : cond) (H : cond → (Q ⊢ R)) : Q ⊢ R := by
@@ -23,6 +25,7 @@ theorem test_pose_impl [BI PROP] (cond : Prop) (Q R : PROP) (Hcond : cond) (H : 
   ipose H as HR
   exact Hcond
   iapply HR with HQ
+  iexact HQ
 
 -- Test with nested implications
 theorem test_pose_nested [BI PROP] (c1 c2 : Prop) (Q R : PROP) (Hc1 : c1) (Hc2 : c2)
@@ -33,6 +36,7 @@ theorem test_pose_nested [BI PROP] (c1 c2 : Prop) (Q R : PROP) (Hc1 : c1) (Hc2 :
   · exact Hc1
   · exact Hc2
   iapply HR with HQ
+  iexact HQ
 
 -- Test: what about the emp-entailment form?
 theorem test_pose_emp [BI PROP] (cond : Prop) (Q : PROP) (Hcond : cond) (H : cond → (⊢ Q)) : ⊢ Q := by
@@ -49,7 +53,7 @@ theorem test_pose_impl_forall [BI PROP] (cond : A → Prop) (Q R : A → PROP) (
   ipose HH as HR
   · exact Hcond
   iapply HR with HQ
-
+  iexact HQ
 
 -- Global theorem with BI PROP that needs to be instantiated
 theorem HH [BI PROP] (cond : A → Prop) (Q R : A → PROP) : ∀ (a': A) , cond a' → (Q a' ⊢ R a') := by sorry
@@ -66,5 +70,6 @@ theorem test_pose_impl_forall_global [BI PROP] (cond : A → Prop) (Q R : A → 
   ipose (HH cond Q) as HR
   · exact Hcond
   · iapply HR with HQ
+    iexact HQ
 
 end Iris.Tests.PoseBug
