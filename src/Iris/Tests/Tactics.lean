@@ -366,13 +366,17 @@ theorem apply_lean [BI PROP] (P Q : PROP) (H : P ⊢ Q) : ⊢ P -∗ Q := by
 theorem apply_forall [BI PROP] (P Q : α → PROP) (a b : α) (H : ⊢ ∀ x, ∀ y, P x -∗ Q y) : P a ⊢ Q b := by
   iintro HP
   ipose H $! a, b as H'
-  -- FIXME
   iapply H' with HP
+  -- FIXME: shouldn't need this
+  iexact HP
 
 theorem apply_forall_intuitionistic [BI PROP] (P Q : α → PROP) (a b : α) (H : ⊢ □ ∀ x, ∀ y, P x -∗ Q y) : P a ⊢ Q b := by
   iintro HP
   ipose H $! a, b as H'
   iapply H' with HP
+  -- FIXME: shoudn't have the extra box in H'
+  iexact HP
+
 
 end pose
 
@@ -684,13 +688,13 @@ theorem and [BI PROP] (Q : PROP) : □ (P1 ∧ P2 ∧ Q) ⊢ Q := by
   icases HP with ⟨_HP1, _HP2, HQ⟩
   iexact HQ
 
-theorem and' [BI PROP] (P1 P2 Q : PROP) : (⊢ P1 ∗-∗ P2) → ⊢ Q := by
+theorem wand_iff [BI PROP] (P1 P2 : PROP) : (⊢ P1 ∗-∗ P2) → ⊢ P1 -∗ P2 := by
   intros H
   istart
   ipose H as H
+  icases H with ⟨_HP1, _HP2⟩
+  iexact _HP1
 
-  set_option trace.Meta.synthInstance true in icases H with ⟨_HP1, _HP2⟩
-  iexact HQ
 
 theorem and_intuitionistic [BI PROP] (Q : PROP) : □ P ∧ Q ⊢ Q := by
   iintro HPQ

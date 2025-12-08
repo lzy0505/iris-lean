@@ -138,8 +138,8 @@ macro_rules
   | `(iprop(False)) => ``(BIBase.pure False)
   | `(iprop(¬$P))   => ``(iprop($P → False))
 
-def iff     [BIBase PROP] (P Q : PROP) : PROP := iprop((P → Q) ∧ (Q → P))
-def wandIff [BIBase PROP] (P Q : PROP) : PROP := iprop((P -∗ Q) ∧ (Q -∗ P))
+@[reducible] def iff     [BIBase PROP] (P Q : PROP) : PROP := iprop((P → Q) ∧ (Q → P))
+@[reducible] def wandIff [BIBase PROP] (P Q : PROP) : PROP := iprop((P -∗ Q) ∧ (Q -∗ P))
 
 macro_rules
   | `(iprop($P ↔ $Q))   => ``(iff iprop($P) iprop($Q))

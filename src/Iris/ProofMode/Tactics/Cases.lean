@@ -444,12 +444,10 @@ partial def iCasesCore
     else
       let A1 ← mkFreshExprMVarQ q($prop)
       let A2 ← mkFreshExprMVarQ q($prop)
-      logInfo m!"A' {A'}"
-      let A'unfolded : Q($prop) ← whnfR A'
-      logInfo m!"A' unfolded {A'unfolded}"
+      let A'reduced : Q($prop) ← whnfR A'
       let inst ← try? (α := Q(IntoAnd $p $A' $A1 $A2)) do
         unless arg matches .clear || args matches [.clear] || p.constName! == ``true do failure
-        synthInstanceQ q(IntoAnd $p $A'unfolded $A1 $A2)
+        synthInstanceQ q(IntoAnd $p $A'reduced $A1 $A2)
       if let (.clear, some inst) := (arg, inst) then
         iCasesAndLR bi P Q A' A1 A2 p inst (right := true) fun B B' h =>
           iCasesCore hyps Q p B B' h (.conjunction args) @k

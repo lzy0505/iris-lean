@@ -3,10 +3,8 @@ Copyright (c) 2025 Oliver Soeser. All rights reserved.
 Released under Apache 2.0 license as described in the file LICENSE.
 Authors: Oliver Soeser
 -/
-import Iris.ProofMode.Patterns.ProofModeTerm
 import Iris.ProofMode.Tactics.Cases
-import Iris.ProofMode.Instances
-import Iris.Std
+import Iris.ProofMode.Tactics.Specialize
 
 namespace Iris.ProofMode
 open Lean Elab Tactic Meta Qq BI Std
@@ -15,22 +13,32 @@ theorem pose {PROP} [BI PROP] {P Q R : PROP}
     (H1 : P ∗ □ Q ⊢ R) (H2 : ⊢ Q) : P ⊢ R :=
   sep_emp.mpr.trans <| (sep_mono_r (intuitionistically_emp.2.trans (intuitionistically_mono H2))).trans H1
 
+/-- Pose a hypothesis from the Iris context, keeping its persistence flag.
+
+    Given `H1 : P ⊢ P' ∗ □?p Q` (from removing/specializing a hypothesis) and
+    `H2 : P' ∗ □?p Q ⊢ R` (from continuing the proof with the posed hypothesis),
+    produces `P ⊢ R`. -/
+theorem pose_hyp [BI PROP] {P P' : PROP} {p : Bool} {Q R : PROP}
+    (H1 : P ⊢ P' ∗ □?p Q) (H2 : P' ∗ □?p Q ⊢ R) : P ⊢ R :=
+  H1.trans H2
+
+/-! ## iPoseLean: Lean hypothesis posing logic -/
+
+/-- Convert a Lean hypothesis `⊢ P` into the form `e ⊢ e ∗ □ P`.
+    This allows treating Lean hypotheses uniformly with Iris hypotheses. -/
+theorem pose_lean [BI PROP] {e P : PROP} (h : ⊢ P) : e ⊢ e ∗ □ P :=
+  sep_emp.mpr.trans <| sep_mono_r <| intuitionistically_emp.2.trans (intuitionistically_mono h)
+
 theorem emp_wand {PROP} [BI PROP] {P : PROP}: (emp ⊢ P) → (⊢ P) := by
  intros H
  assumption
 
-/-- Instantiate Iris-level forall with `x`.
-  - `Q` is `∀ x, P x`
--/
+/-- Instantiate Iris-level forall with `x`. -/
 theorem pose_forall [BI PROP] (x : α) (P : α → PROP) {Q : PROP}
     [H1 : IntoForall Q P] (H2 : ⊢ Q) : ⊢ P x :=
   Entails.trans H2 <| H1.into_forall.trans <| forall_elim x
 
-/-- Instantiate Iris-level foralls in `hyp` with the given `terms`.
-    - `hyp`: The Iris hypothesis type (e.g., `P -∗ Q` or `∀ x, P x`)
-    - `pf`: A proof that can convert to `⊢ hyp` via `AsEmpValid1`
-           (e.g., `pf : P ⊢ Q` when `hyp = P -∗ Q`)
-    - Returns: `(final_hyp, proof of ⊢ final_hyp)` -/
+/-- Instantiate Iris-level foralls in `hyp` with the given `terms`. -/
 partial def instantiateForalls {prop : Q(Type u)} (bi : Q(BI $prop)) (hyp : Q($prop))
     (pf : Expr) (terms : List Term) : TacticM (Expr × Expr) := do
   if let some t := terms.head? then
@@ -58,23 +66,7 @@ partial def instantiateForalls {prop : Q(Type u)} (bi : Q(BI $prop)) (hyp : Q($p
       let pf ← mkAppM ``as_emp_valid_1 #[hyp, pf]
       return ⟨hyp, pf⟩
 
-/-- Process Lean-level foralls/implications in the type of `val`.
-
-    For each `∀` binder in the type:
-    - If the binder type is `Prop` (a Lean implication like `cond → ...`),
-      creates a metavar and adds it as a proof obligation goal
-    - If the binder type is a type parameter (like `∀ (x : A), ...`),
-      creates a metavar but does NOT add it as a goal
-
-    Parameters:
-    - `val`: The proof term whose type contains foralls
-    - `goals`: Accumulator for Prop-typed proof obligations
-
-    Returns: `(applied_val, final_type)` where `val` has been applied to
-    fresh metavars for all forall binders
-
-    Example: If `val : ∀ (x : A), cond x → (P x ⊢ Q x)`, returns
-    `(val ?x ?h, P ?x ⊢ Q ?x)` with `?h : cond ?x` added to goals -/
+/-- Process Lean-level foralls/implications in the type of `val`. -/
 partial def handleDependentArrows {prop : Q(Type u)} (bi : Q(BI $prop)) (val : Expr) (goals : IO.Ref (Array MVarId)) : TacticM (Expr × Q(Prop)) := do
   let p : Q(Prop) ← inferType val
   if let .forallE _ binderType _ _ := p then
@@ -82,91 +74,87 @@ partial def handleDependentArrows {prop : Q(Type u)} (bi : Q(BI $prop)) (val : E
     let val' := mkApp val m
     let binderTypeType ← inferType binderType
     -- Only add as goal if binderType is Prop (i.e., this is a Lean implication)
-    -- For type parameters (Sort u), we just use metavars without adding goals
     if binderTypeType.isProp then
       goals.modify (·.push m.mvarId!)
     return ← handleDependentArrows bi val' goals
   else
     return (val, p)
 
-
-
-/-- Synthesize an `IntoEmpValid φ P` instance, recursively handling:
-    - `let` bindings (zeta-reduce)
-    - Implications `φ → ψ` (using `intoEmpValid_impl`)
-    - Foralls `∀ x, φ x` (using `intoEmpValid_forall`)
-    - Base cases `⊢ P`, `P ⊢ Q`, `P ⊣⊢ Q` (direct synthesis)
-
-    Returns: proof of `IntoEmpValid φ P` (as Expr, to avoid Qq type issues with whnf)
--/
+/-- Synthesize an `IntoEmpValid φ P` instance, recursively handling implications and foralls. -/
 partial def synthIntoEmpValid {prop : Q(Type u)} (bi : Q(BI $prop))
     (φ : Q(Prop)) (P : Q($prop)) (goals : IO.Ref (Array MVarId)) : MetaM Expr := do
-  -- First, zeta-reduce any let bindings
   let φReduced ← whnf φ
-  -- logInfo m!"reduced: {φReduced}"
 
   -- Check for implication (non-dependent arrow): φ → ψ
   if let .forallE _name binderType body .default := φReduced then
     if !body.hasLooseBVars then
-      -- Non-dependent: this is an implication φ → ψ
       let φ' := binderType
       let ψ := body
-      -- Create a metavar for the premise φ and add it as a goal
       let hφ ← mkFreshExprMVar φ'
       goals.modify (·.push hφ.mvarId!)
-      -- Recursively synthesize IntoEmpValid for ψ
       let innerInst ← synthIntoEmpValid bi ψ P goals
-      -- Build intoEmpValid_impl instance
       return ← mkAppOptM ``intoEmpValid_impl #[prop, bi, P, φ', ψ, hφ, innerInst]
 
   -- Check for forall (dependent): ∀ x : A, φ x
   if let .forallE name binderType body _ := φReduced then
-    -- Dependent forall: ∀ x : A, φ x
     let A := binderType
-    -- Create a fresh metavar for x : A
     let x ← mkFreshExprMVar A
-    -- Substitute x into the body to get φ x
     let φx := body.instantiate1 x
-    -- Recursively synthesize IntoEmpValid for φ x
     let innerInst ← synthIntoEmpValid bi φx P goals
-    -- Build intoEmpValid_forall instance
-    -- We need: intoEmpValid_forall [BI PROP] (P : PROP) {α : Sort _} (φ : α → Prop) (x : α) [h : IntoEmpValid (φ x) P]
     let φFn := Expr.lam name binderType body .default
     return ← mkAppOptM ``intoEmpValid_forall #[prop, bi, P, A, φFn, x, innerInst]
 
-  -- Base case: try to synthesize directly (handles ⊢ P, P ⊢ Q, P ⊣⊢ Q)
+  -- Base case: try to synthesize directly
   try
     synthInstance q(@IntoEmpValid $φ $prop $P $bi)
   catch _ =>
     throwError "ipose: cannot find IntoEmpValid instance for {φ}"
 
-
-
-/-- Core logic for `ipose`: converts a Lean proof into an Iris hypothesis.
-
-    Parameters:
-    - `val`: The Lean proof term to pose (e.g., a proof of `P ⊢ Q` or `cond → (P ⊢ Q)`)
-    - `terms`: Optional terms to instantiate Iris-level foralls (from `ipose H x y as HR`)
-    - `goals`: Accumulator for proof obligations from Lean implications
-
-    Returns: `(hyp, pf)` where:
-    - `hyp`: The Iris hypothesis type (e.g., `P -∗ Q`)
-    - `pf`: A proof of `⊢ hyp`
-
-    Example: If `val : P ⊢ Q`, returns `(P -∗ Q, proof of ⊢ P -∗ Q)` -/
-def iPoseCore {prop : Q(Type u)} (bi : Q(BI $prop)) (val : Expr) (terms : List Term)
+/-- Convert a Lean proof to an Iris hypothesis. Returns `(hyp, pf : ⊢ hyp)`. -/
+def iPoseLean {prop : Q(Type u)} (bi : Q(BI $prop)) (val : Expr) (terms : List Term)
     (goals : IO.Ref (Array MVarId)) : TacticM (Q($prop) × Expr) := do
   let hyp ← mkFreshExprMVarQ q($prop)
   let (v, p) ← handleDependentArrows bi val goals
-  -- if
   let _ ← synthIntoEmpValid bi p hyp goals
-  -- if let some _ ← try? <| synthIntoEmpValid bi p hyp goals then
   let ⟨hyp, pf⟩ ← instantiateForalls bi hyp v terms
-  --  mkAppM ``pose #[m, pf]
   return ⟨hyp, pf⟩
 
-  -- else
-  --   throwError "ipose: {val} is not an Iris entailment\n  p = {p}\n"
+variable {prop : Q(Type u)} {bi : Q(BI $prop)} in
+/-- Pose a hypothesis from the Iris context. -/
+def iPoseHypCore {e : Q($prop)}
+    (hyps : Hyps bi e) (uniq : Name) (terms : List Term) (spats : List SpecPat)
+    (addGoal : ∀ {e'}, Name → Hyps bi e' → (goal : Q($prop)) → MetaM Q($e' ⊢ $goal)) :
+    TacticM (SpecializeState bi e) := do
+  let ⟨e', hyps', _out, out', b, _, pf⟩ := hyps.remove false uniq
+  let state : SpecializeState bi e := { e := e', hyps := hyps', b, out := out', pf := q(($pf).1) }
+  let state ← liftM <| terms.foldlM SpecializeState.process1 state
+  let state ← state.processSpats spats addGoal
+  return state
+
+/-- Core logic for posing a Lean proof as an Iris hypothesis. -/
+def iPoseLeanCore {prop : Q(Type u)} (bi : Q(BI $prop)) {e : Q($prop)}
+    (hyps : Hyps bi e) (val : Expr) (terms : List Term) (spats : List SpecPat)
+    (goals : IO.Ref (Array MVarId))
+    (addGoal : ∀ {e'}, Name → Hyps bi e' → (goal : Q($prop)) → MetaM Q($e' ⊢ $goal)) :
+    TacticM (SpecializeState bi e) := do
+  let ⟨(hyp : Q($prop)), (pf : Q(⊢ $hyp))⟩ ← iPoseLean bi val terms goals
+  let state : SpecializeState bi e := {
+    e := e, hyps := hyps, b := q(true), out := hyp, pf := q(pose_lean $pf)
+  }
+  let state ← state.processSpats spats addGoal
+  return state
+
+variable {prop : Q(Type u)} {bi : Q(BI $prop)} in
+/-- Unified core logic for `ipose`: handles both Lean and Iris context hypotheses. -/
+def iPoseCore {e : Q($prop)}
+    (hyps : Hyps bi e) (pmt : PMTerm) (goals : IO.Ref (Array MVarId)) :
+    TacticM (SpecializeState bi e) := do
+  if let some uniq ← try? do pure (← hyps.findWithInfo ⟨pmt.term⟩) then
+    iPoseHypCore hyps uniq pmt.terms pmt.spats (goalTracker goals)
+  else
+    let val ← elabTerm pmt.term none true
+    let val ← instantiateMVars val
+    iPoseLeanCore bi hyps val pmt.terms pmt.spats goals (goalTracker goals)
 
 elab "ipose" colGt pmt:pmTerm "as" pat:(colGt icasesPat) : tactic => do
   let pmt ← liftMacroM <| PMTerm.parse pmt
@@ -179,11 +167,11 @@ elab "ipose" colGt pmt:pmTerm "as" pat:(colGt icasesPat) : tactic => do
 
     let goals ← IO.mkRef #[]
 
-    let val ← elabTerm pmt.term none true
-    let val ← instantiateMVars val
-    let ⟨hyp, pf⟩ := ← iPoseCore bi val pmt.terms goals
+    -- Both Lean and Iris hypotheses now return SpecializeState
+    let { hyps := hyps', b, out, pf, .. } ← iPoseCore hyps pmt goals
+    let ⟨ehyp, _⟩ := mkIntuitionisticIf bi b out
+    let m ← iCasesCore bi hyps' goal b ehyp out ⟨⟩ pat
+      (fun hyps => goalTracker goals .anonymous hyps goal)
+    mvar.assign q(pose_hyp $pf $m)
 
-    let m ← iCasesCore bi hyps goal q(true) q(intuitionistically $hyp) hyp ⟨⟩ pat (λ hyps => goalTracker goals .anonymous hyps goal)
-
-    mvar.assign <| ← mkAppM ``pose #[m, pf]
     replaceMainGoal (← goals.get).toList
