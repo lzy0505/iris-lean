@@ -13,16 +13,12 @@ theorem pose {PROP} [BI PROP] {P Q R : PROP}
     (H1 : P ∗ □ Q ⊢ R) (H2 : ⊢ Q) : P ⊢ R :=
   sep_emp.mpr.trans <| (sep_mono_r (intuitionistically_emp.2.trans (intuitionistically_mono H2))).trans H1
 
-/-- Pose a hypothesis from the Iris context, keeping its persistence flag.
-
-    Given `H1 : P ⊢ P' ∗ □?p Q` (from removing/specializing a hypothesis) and
-    `H2 : P' ∗ □?p Q ⊢ R` (from continuing the proof with the posed hypothesis),
-    produces `P ⊢ R`. -/
+/-- Pose a hypothesis `Q` from the Iris context, keeping its persistence flag. -/
 theorem pose_hyp [BI PROP] {P P' : PROP} {p : Bool} {Q R : PROP}
     (H1 : P ⊢ P' ∗ □?p Q) (H2 : P' ∗ □?p Q ⊢ R) : P ⊢ R :=
   H1.trans H2
 
-/-! ## iPoseLean: Lean hypothesis posing logic -/
+/-! ## iPoseLean -/
 
 /-- Convert a Lean hypothesis `⊢ P` into the form `e ⊢ e ∗ □ P`.
     This allows treating Lean hypotheses uniformly with Iris hypotheses. -/

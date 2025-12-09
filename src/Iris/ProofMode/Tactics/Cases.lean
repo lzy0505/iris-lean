@@ -34,7 +34,6 @@ This handles two cases:
 - If `A'` is `emp`, removes the trivial hypothesis and continues with `k`.
 
 **Parameters:**
-- `bi`: The BI (bunched implications) instance for the proposition type
 - `hyps`: The current hypothesis context
 - `Q`: The goal proposition to prove
 - `A'`: The hypothesis being destructed
@@ -80,7 +79,6 @@ Given a hypothesis `A'` that can be decomposed via `IntoExists A' Φ`, this intr
 variable of type `α` and continues case analysis on `Φ x`.
 
 **Parameters:**
-- `_bi`: The BI instance (unused but kept for consistency)
 - `P`: The remaining hypotheses proposition
 - `Q`: The goal proposition to prove
 - `A'`: The existential hypothesis being destructed
@@ -148,7 +146,6 @@ This is used when the pattern is `[_ H]` or `[H _]`, where one component of the 
 is not needed.
 
 **Parameters:**
-- `_bi`: The BI instance (unused but kept for consistency)
 - `P`: The remaining hypotheses proposition
 - `Q`: The goal proposition to prove
 - `A'`: The conjunction hypothesis being destructed
@@ -200,7 +197,6 @@ For spatial hypotheses, uses `IntoSep` to split `A'` into `A1 ∗ A2`.
 For intuitionistic hypotheses, uses `IntoAnd` to split `□ A'` into `□ A1` and `□ A2`.
 
 **Parameters:**
-- `bi`: The BI instance for the proposition type
 - `hyps`: The current hypothesis context
 - `Q`: The goal proposition to prove
 - `A'`: The conjunction hypothesis being destructed
@@ -250,41 +246,34 @@ theorem or_elim_intuitionistic [BI PROP] {P A Q A1 A2 : PROP} [IntoOr A A1 A2]
     (h1 : P ∗ □ A1 ⊢ Q) (h2 : P ∗ □ A2 ⊢ Q) : P ∗ □ A ⊢ Q := or_elim_spatial h1 h2
 
 /--
-Handles case analysis on a disjunction hypothesis.
-
-Uses `IntoOr` to decompose `A'` into `A1 ∨ A2`, then creates two subgoals:
-one where `A1` holds and one where `A2` holds.
+Decompose `A` into `A1 ∨ A2`, then create two subgoals for `A1` and `A2`
 
 **Parameters:**
-- `_bi`: The BI instance (unused but kept for consistency)
-- `P`: The remaining hypotheses proposition
-- `Q`: The goal proposition to prove
-- `A'`: The disjunction hypothesis being destructed
-- `p`: Whether the hypothesis is intuitionistic (`true`) or spatial (`false`)
-- `k1`: Continuation for the left branch (when `A1` holds)
-- `k2`: Continuation for the right branch (when `A2` holds)
+- `P`: The remaining hypotheses
+- `Q`: The goal
+- `A`: The disjunction hypothesis being destructed
+- `p`: Whether `A` is intuitionistic
+- `k1`: Continuation for `A1`
+- `k2`: Continuation for `A2`
 
-**Returns:** A proof of `P ∗ □?p A' ⊢ Q`
-
-**Example:** For hypothesis `H : P ∨ Q`, the pattern `icases H with [H1 | H2]`
-creates two goals: one with `H1 : P` and one with `H2 : Q`.
+**Returns:** A proof of `P ∗ □?p A ⊢ Q`
 -/
-def iCasesOr {prop : Q(Type u)} (_bi : Q(BI $prop)) (P Q A' : Q($prop)) (p : Q(Bool))
+def iCasesOr {prop : Q(Type u)} (_bi : Q(BI $prop)) (P Q A : Q($prop)) (p : Q(Bool))
     (k1 k2 : (B B' : Q($prop)) → (_ : $B =Q iprop(□?$p $B')) → MetaM Q($P ∗ $B ⊢ $Q)) :
-    MetaM (Q($P ∗ □?$p $A' ⊢ $Q)) := do
+    MetaM (Q($P ∗ □?$p $A ⊢ $Q)) := do
   let A1 ← mkFreshExprMVarQ q($prop)
   let A2 ← mkFreshExprMVarQ q($prop)
-  let _ ← synthInstanceQ q(IntoOr $A' $A1 $A2)
+  let _ ← synthInstanceQ q(IntoOr $A $A1 $A2)
   if p.constName! == ``true then
     have : $p =Q true := ⟨⟩
     let pf1 ← k1 q(iprop(□ $A1)) A1 ⟨⟩
     let pf2 ← k2 q(iprop(□ $A2)) A2 ⟨⟩
-    return q(or_elim_intuitionistic (A := $A') $pf1 $pf2)
+    return q(or_elim_intuitionistic (A := $A) $pf1 $pf2)
   else
     have : $p =Q false := ⟨⟩
     let pf1 ← k1 A1 A1 ⟨⟩
     let pf2 ← k2 A2 A2 ⟨⟩
-    return q(or_elim_spatial (A := $A') $pf1 $pf2)
+    return q(or_elim_spatial (A := $A) $pf1 $pf2)
 
 /-- Converts a spatial hypothesis to intuitionistic form using `IntoPersistently`. -/
 theorem intuitionistic_elim_spatial [BI PROP] {A A' Q : PROP}
@@ -302,30 +291,26 @@ Uses `IntoPersistently` to convert the hypothesis to intuitionistic form `□ B'
 For spatial hypotheses, requires either `Affine A'` or `Absorbing Q`.
 
 **Parameters:**
-- `_bi`: The BI instance (unused but kept for consistency)
 - `P`: The remaining hypotheses proposition
 - `Q`: The goal proposition to prove
-- `A'`: The hypothesis being made intuitionistic
+- `A`: The hypothesis being made intuitionistic
 - `p`: Whether the hypothesis is already intuitionistic (`true`) or spatial (`false`)
 - `k`: Continuation for processing the resulting intuitionistic hypothesis
 
 **Returns:** A proof of `P ∗ □?p A' ⊢ Q`
-
-**Example:** For hypothesis `H : P` where `P` is persistent, the pattern `icases H with #H'`
-moves `H` to the intuitionistic context as `H' : □ P`.
 -/
-def iCasesIntuitionistic {prop : Q(Type u)} (_bi : Q(BI $prop)) (P Q A' : Q($prop)) (p : Q(Bool))
-    (k : (B' : Q($prop)) → MetaM Q($P ∗ □ $B' ⊢ $Q)) :
-    MetaM (Q($P ∗ □?$p $A' ⊢ $Q)) := do
-  let B' ← mkFreshExprMVarQ q($prop)
-  let _ ← synthInstanceQ q(IntoPersistently $p $A' $B')
+def iCasesIntuitionistic {prop : Q(Type u)} (_bi : Q(BI $prop)) (P Q A : Q($prop)) (p : Q(Bool))
+    (k : (B : Q($prop)) → MetaM Q($P ∗ □ $B ⊢ $Q)) :
+    MetaM (Q($P ∗ □?$p $A ⊢ $Q)) := do
+  let B ← mkFreshExprMVarQ q($prop)
+  let _ ← synthInstanceQ q(IntoPersistently $p $A $B)
   if p.constName! == ``true then
     have : $p =Q true := ⟨⟩
-    return q(intuitionistic_elim_intuitionistic $(← k B'))
+    return q(intuitionistic_elim_intuitionistic $(← k B))
   else
     have : $p =Q false := ⟨⟩
-    let _ ← synthInstanceQ q(TCOr (Affine $A') (Absorbing $Q))
-    return q(intuitionistic_elim_spatial (A := $A') $(← k B'))
+    let _ ← synthInstanceQ q(TCOr (Affine $A) (Absorbing $Q))
+    return q(intuitionistic_elim_spatial (A := $A) $(← k B))
 
 /-- Converts a spatial hypothesis to a different spatial form using `FromAffinely`. -/
 theorem spatial_elim_spatial [BI PROP] {A A' Q : PROP} [FromAffinely A' A false]
@@ -336,73 +321,48 @@ theorem spatial_elim_intuitionistic [BI PROP] {A A' Q : PROP} [FromAffinely A' A
     (h : P ∗ A' ⊢ Q) : P ∗ □ A ⊢ Q := (replaces_r (from_affine (p := true))).apply h
 
 /--
-Handles the `-` pattern modifier, which marks a hypothesis as spatial.
-
-Uses `FromAffinely` to convert the hypothesis from intuitionistic to spatial form.
+Uses `FromAffinely` to convert the hypothesis `A` from intuitionistic to spatial form.
 
 **Parameters:**
-- `_bi`: The BI instance (unused but kept for consistency)
-- `P`: The remaining hypotheses proposition
-- `Q`: The goal proposition to prove
-- `A'`: The hypothesis being made spatial
-- `p`: Whether the hypothesis is intuitionistic (`true`) or already spatial (`false`)
-- `k`: Continuation for processing the resulting spatial hypothesis
+- `P`: The remaining hypotheses
+- `Q`: The goal
+- `A`: The hypothesis being made spatial
+- `p`: Whether `A` is intuitionistic
+- `k`: Function that destructs `Q` into `P ∗ A'` for some `A'`
 
-**Returns:** A proof of `P ∗ □?p A' ⊢ Q`
 
-**Example:** For intuitionistic hypothesis `H : □ P`, the pattern `icases H with -H'`
-moves `H` to the spatial context as `H' : P`.
+**Returns:** A proof of `P ∗ □?p A ⊢ Q`
 -/
-def iCasesSpatial {prop : Q(Type u)} (_bi : Q(BI $prop)) (P Q A' : Q($prop)) (p : Q(Bool))
-    (k : (B' : Q($prop)) → MetaM Q($P ∗ $B' ⊢ $Q)) :
-    MetaM (Q($P ∗ □?$p $A' ⊢ $Q)) := do
-  let B' ← mkFreshExprMVarQ q($prop)
-  let _ ← synthInstanceQ q(FromAffinely $B' $A' $p)
+def iCasesSpatial {prop : Q(Type u)} (_bi : Q(BI $prop)) (P Q A : Q($prop)) (p : Q(Bool))
+    (k : (B : Q($prop)) → MetaM Q($P ∗ $B ⊢ $Q)) :
+    MetaM (Q($P ∗ □?$p $A ⊢ $Q)) := do
+  let A' ← mkFreshExprMVarQ q($prop)
+  let _ ← synthInstanceQ q(FromAffinely $A' $A $p)
   if p.constName! == ``true then
     have : $p =Q true := ⟨⟩
-    return q(spatial_elim_intuitionistic $(← k B'))
+    return q(spatial_elim_intuitionistic $(← k A'))
   else
     have : $p =Q false := ⟨⟩
-    return q(spatial_elim_spatial (A := $A') $(← k B'))
+    return q(spatial_elim_spatial (A := $A) $(← k A'))
 
 /-- Eliminates `emp` on the left of a separating conjunction: `emp ∗ A ⊢ Q` reduces to `A ⊢ Q`. -/
 theorem of_emp_sep [BI PROP] {A Q : PROP} (h : A ⊢ Q) : emp ∗ A ⊢ Q := emp_sep.1.trans h
 
 variable {u : Level} {prop : Q(Type u)} (bi : Q(BI $prop)) in
 /--
-Core recursive function for case analysis on Iris proof mode hypotheses.
-
 This function processes an `iCasesPat` pattern and performs the corresponding
-destructions on a hypothesis. It handles all pattern types including:
-- Simple naming (`.one name`)
-- Clearing (`.clear`)
-- Conjunctions (`.conjunction`): splits `∗` or `∧`, handles `∃`
-- Disjunctions (`.disjunction`): splits `∨` into multiple goals
-- Pure patterns (`.pure`): moves hypothesis to Lean context
-- Intuitionistic (`.intuitionistic`): applies `#` modifier
-- Spatial (`.spatial`): applies `-` modifier
+destructions on a hypothesis.
 
 **Parameters:**
-- `bi`: The BI instance for the proposition type
-- `hyps`: The current hypothesis context (excluding the hypothesis being destructed)
-- `Q`: The goal proposition to prove
-- `p`: Whether the hypothesis is intuitionistic (`true`) or spatial (`false`)
-- `A`: The full hypothesis type (including `□` wrapper if intuitionistic)
-- `A'`: The unwrapped hypothesis type
-- `pat`: The pattern to apply
-- `k`: Continuation that produces a proof given the final hypothesis context
+- `hyps`: The current hypothesis context `P` (excluding the hypothesis being destructed)
+- `Q`: The goal
+- `A`: The hypothesis to destruct, including `□?p` wrapper
+- `p`: Whether `A` is intuitionistic
+- `A'`: The unwrapped `A`
+- `pat`: The pattern to process
+- `k`: Continuation that prduce the proof `P ⊢ Q` for any `P`
 
-**Returns:** A proof of `P ∗ A ⊢ Q` where `P` represents `hyps`
-
-**Example patterns:**
-- `H` → names the hypothesis `H`
-- `[H1 H2]` → splits a conjunction into `H1` and `H2`
-- `[H1 | H2]` → case splits a disjunction
-- `[x H]` → introduces existential witness `x` with body `H`
-- `%H` → moves `H` to the Lean context as a pure fact
-- `#H` → makes `H` intuitionistic
-- `-H` → makes `H` spatial
-- `_` → clears the hypothesis
+**Returns:** A proof of `P ∗ A ⊢ Q`
 -/
 partial def iCasesCore
     {P} (hyps : Hyps bi P) (Q : Q($prop)) (p : Q(Bool))
@@ -481,39 +441,15 @@ partial def iCasesCore
 /--
 Performs case analysis on an Iris proof mode hypothesis.
 
-**Syntax:** `icases H with pat`
-
 **Parameters:**
 - `hyp`: The name of the hypothesis to destruct
 - `pat`: The pattern describing how to destruct the hypothesis
-
-**Pattern syntax:**
-- `H` — rename the hypothesis to `H`
-- `_` — clear/discard the hypothesis
-- `[H1 H2]` — split a separating conjunction `P ∗ Q` into `H1 : P` and `H2 : Q`
-- `[H1 | H2]` — case split a disjunction `P ∨ Q` into two goals
-- `[x H]` — introduce existential `∃ x, P x` with witness `x` and body `H`
-- `%H` — move a pure hypothesis to the Lean context
-- `#H` — make the hypothesis intuitionistic (move to `□` context)
-- `-H` — make the hypothesis spatial (remove from `□` context)
-- `[]` — eliminate `False` or `emp`
-
-Patterns can be nested: `[x [H1 H2]]` destructs `∃ x, P ∗ Q`.
-
-**Examples:**
-```
-icases H with [H1 H2]       -- split H : P ∗ Q
-icases H with [x Hx]        -- intro H : ∃ x, P x
-icases H with [H1 | H2]     -- case split H : P ∨ Q
-icases H with #H'           -- make H intuitionistic
-icases H with [[a b] [c d]] -- nested destruction
-```
 -/
 elab "icases" colGt hyp:ident "with" colGt pat:icasesPat : tactic => do
   -- parse syntax
   let pat ← liftMacroM <| iCasesPat.parse pat
 
-  let (mvar, { u, prop, bi, e, hyps, goal }) ← istart (← getMainGoal)
+  let (mvar, { u, bi, hyps, goal, .. }) ← istart (← getMainGoal)
   mvar.withContext do
 
   let uniq ← hyps.findWithInfo hyp
