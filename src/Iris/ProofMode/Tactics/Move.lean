@@ -13,12 +13,12 @@ def Replaces [BI PROP] (K A B : PROP) := (B -∗ K) ⊢ (A -∗ K)
 
 theorem replaces_r [BI PROP] {K P Q Q' : PROP} (h : Replaces K Q Q') :
     Replaces K iprop(P ∗ Q) iprop(P ∗ Q') :=
-  wand_intro <| sep_assoc.2.trans <| wand_elim <|
-  (wand_intro <| sep_assoc.1.trans wand_elim_l).trans h
+  wand_intro <| (BI.equiv_entails.mp sep_assoc).2.trans <| wand_elim <|
+  (wand_intro <| (BI.equiv_entails.mp sep_assoc).1.trans wand_elim_l).trans h
 
 theorem replaces_l [BI PROP] {K P P' Q : PROP} (h : Replaces K P P') :
     Replaces K iprop(P ∗ Q) iprop(P' ∗ Q) :=
-  (wand_mono_l sep_comm.1).trans <| (replaces_r h).trans (wand_mono_l sep_comm.1)
+  (wand_mono_l (BI.equiv_entails.mp sep_comm).1).trans <| (replaces_r h).trans (wand_mono_l (BI.equiv_entails.mp sep_comm).1)
 
 theorem Replaces.apply [BI PROP] {P P' Q : PROP}
     (h : Replaces Q P P') (h_entails : P' ⊢ Q) : P ⊢ Q :=
@@ -59,10 +59,10 @@ theorem to_persistent_spatial [BI PROP] {P P' Q : PROP}
     [hP : IntoPersistently false P P'] [or : TCOr (Affine P) (Absorbing Q)] :
     Replaces Q P iprop(□ P') :=
   match or with
-  | TCOr.l => wand_mono_l <| (affine_affinely P).2.trans (affinely_mono hP.1)
+  | TCOr.l => wand_mono_l <| (BI.equiv_entails.mp (affine_affinely P)).2.trans (affinely_mono hP.1)
   | TCOr.r =>
-    wand_intro <| (sep_mono_r <| hP.1.trans absorbingly_intuitionistically.2).trans <|
-    absorbingly_sep_r.1.trans <| (absorbingly_mono wand_elim_l).trans absorbing
+    wand_intro <| (sep_mono_r <| hP.1.trans (BI.equiv_entails.mp absorbingly_intuitionistically).2).trans <|
+    (BI.equiv_entails.mp absorbingly_sep_r).1.trans <| (absorbingly_mono wand_elim_l).trans absorbing
 
 theorem to_persistent_intuitionistic [BI PROP] {P P' Q : PROP}
     [hP : IntoPersistently true P P'] : Replaces Q iprop(□ P) iprop(□ P') :=

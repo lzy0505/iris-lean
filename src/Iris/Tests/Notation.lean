@@ -3,7 +3,7 @@ Copyright (c) 2022 Lars König. All rights reserved.
 Released under Apache 2.0 license as described in the file LICENSE.
 Authors: Lars König
 -/
-import Iris.BI.BIBase
+import Iris.BI.DerivedLaws
 
 namespace Iris.Tests
 open Iris.BI
@@ -11,7 +11,7 @@ open Iris.BI
 /-! This file contains tests for the predefined separation logic notations. -/
 
 variable (p : Bool) (φ : Prop)
-variable [BIBase PROP] (P Q R : PROP) (Ψ : Nat → PROP) (Φ : Nat → Nat → PROP)
+variable [BI PROP] (P Q R : PROP) (Ψ : Nat → PROP) (Φ : Nat → Nat → PROP)
 
 /-! ## Interface -/
 

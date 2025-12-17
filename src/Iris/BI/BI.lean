@@ -1,7 +1,7 @@
 /-
 Copyright (c) 2022 Lars König. All rights reserved.
 Released under Apache 2.0 license as described in the file LICENSE.
-Authors: Lars König, Mario Carneiro
+Authors: Lars König, Mario Carneiro, Zongyuan Liu
 -/
 import Iris.Algebra.OFE
 import Iris.BI.BIBase
@@ -18,10 +18,10 @@ theorem liftRel_eq : liftRel (@Eq α) A B ↔ A = B := by
 
 /-- Require that a separation logic with carrier type `PROP` fulfills all necessary axioms. -/
 class BI (PROP : Type _) extends COFE PROP, BI.BIBase PROP where
-  Equiv P Q := P ⊣⊢ Q
 
   entails_preorder : Preorder Entails
-  equiv_iff {P Q : PROP} : (P ≡ Q) ↔ P ⊣⊢ Q := by simp
+
+  equiv_entails {P Q : PROP} : (P ≡ Q) ↔ (P ⊢ Q) ∧ (Q ⊢ P) := by simp
 
   and_ne : OFE.NonExpansive₂ and
   or_ne : OFE.NonExpansive₂ or
@@ -54,7 +54,8 @@ class BI (PROP : Type _) extends COFE PROP, BI.BIBase PROP where
   sExists_elim {Φ : PROP → Prop} {Q : PROP} : (∀ p, Φ p → p ⊢ Q) → sExists Φ ⊢ Q
 
   sep_mono {P P' Q Q' : PROP} : (P ⊢ Q) → (P' ⊢ Q') → P ∗ P' ⊢ Q ∗ Q'
-  emp_sep {P : PROP} : emp ∗ P ⊣⊢ P
+  emp_sep_1 {P : PROP} : emp ∗ P ⊢ P
+  emp_sep_2 {P : PROP} : P ⊢ emp ∗ P
   sep_symm {P Q : PROP} : P ∗ Q ⊢ Q ∗ P
   sep_assoc_l {P Q R : PROP} : (P ∗ Q) ∗ R ⊢ P ∗ (Q ∗ R)
 
@@ -74,11 +75,15 @@ class BI (PROP : Type _) extends COFE PROP, BI.BIBase PROP where
 
   later_sForall_2 {Φ : PROP → Prop} : (∀ p, ⌜Φ p⌝ → ▷ p) ⊢ ▷ sForall Φ
   later_sExists_false {Φ : PROP → Prop} : (▷ sExists Φ) ⊢ ▷ False ∨ ∃ p, ⌜Φ p⌝ ∧ ▷ p
-  later_sep {P Q : PROP} : ▷ (P ∗ Q) ⊣⊢ ▷ P ∗ ▷ Q
-  later_persistently {P : PROP} : ▷ <pers> P ⊣⊢ <pers> ▷ P
+  later_sep_1 {P Q : PROP} : ▷ (P ∗ Q) ⊢ ▷ P ∗ ▷ Q
+  later_sep_2 {P Q : PROP} :   ▷ P ∗ ▷ Q ⊢ ▷ (P ∗ Q)
+  later_persistently_1 {P : PROP} : ▷ <pers> P ⊢ <pers> ▷ P
+  later_persistently_2 {P : PROP} : <pers> ▷ P ⊢ ▷ <pers> P
   later_false_em {P : PROP} : ▷ P ⊢ ▷ False ∨ (▷ False → P)
 
 namespace BI
+
+abbrev BiEquiv [BI PROP] (P Q : PROP) : Prop := OFE.Equiv P Q
 
 attribute [instance] BI.entails_preorder
 
@@ -89,20 +94,11 @@ theorem BIBase.Entails.trans [BI PROP] {P Q R : PROP} (h1 : P ⊢ Q) (h2 : Q ⊢
 
 theorem BIBase.Entails.of_eq [BI PROP] {P Q : PROP} (h : P = Q) : P ⊢ Q := h ▸ .rfl
 
-@[simp] theorem BIBase.BiEntails.rfl [BI PROP] {P : PROP} : P ⊣⊢ P := ⟨.rfl, .rfl⟩
-
-theorem BIBase.BiEntails.of_eq [BI PROP] {P Q : PROP} (h : P = Q) : P ⊣⊢ Q := h ▸ .rfl
-
-theorem BIBase.BiEntails.symm [BI PROP] {P Q : PROP} (h : P ⊣⊢ Q) : Q ⊣⊢ P := ⟨h.2, h.1⟩
-
-theorem BIBase.BiEntails.trans [BI PROP] {P Q R : PROP} (h1 : P ⊣⊢ Q) (h2 : Q ⊣⊢ R) : P ⊣⊢ R :=
-  ⟨h1.1.trans h2.1, h2.2.trans h1.2⟩
-
 export BIBase (
   Entails emp pure and or imp sForall sExists «forall» «exists» sep wand
   persistently BiEntails iff wandIff affinely absorbingly
   intuitionistically later persistentlyIf affinelyIf absorbinglyIf
-  intuitionisticallyIf bigAnd bigOr bigSep Entails.trans BiEntails.trans)
+  intuitionisticallyIf bigAnd bigOr bigSep Entails.trans)
 
 attribute [rw_mono_rule] BI.sep_mono
 attribute [rw_mono_rule] BI.persistently_mono

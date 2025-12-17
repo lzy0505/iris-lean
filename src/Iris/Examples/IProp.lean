@@ -30,8 +30,8 @@ example : ⊢ |==> ∃ (γ0 γ1 : GName) (s0 s1 : String),
   let v1 : F0.ap (IProp GF) := toAgree ⟨"string1"⟩
 
   -- Allocate the resources
-  refine emp_sep.mpr.trans <| (sep_mono (iOwn_alloc v1 (fun _ => trivial)) .rfl).trans ?_
-  refine emp_sep.mpr.trans <| (sep_mono (iOwn_alloc v0 (fun _ => trivial)) .rfl).trans ?_
+  refine (BI.equiv_entails.mp emp_sep).2.trans <| (sep_mono (iOwn_alloc v1 (fun _ => trivial)) .rfl).trans ?_
+  refine (BI.equiv_entails.mp emp_sep).2.trans <| (sep_mono (iOwn_alloc v0 (fun _ => trivial)) .rfl).trans ?_
 
   -- Eliminate the bupds (by hand, until iMod is implemented)
   refine BIUpdate.frame_r.trans ?_

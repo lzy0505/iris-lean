@@ -185,7 +185,7 @@ instance later_contractive : OFE.Contractive UPred.later (α := UPred M) where
 
 instance : BI (UPred M) where
   entails_preorder := inferInstance
-  equiv_iff {P Q} := by
+  equiv_entails {P Q} := by
     constructor <;> intro HE
     · constructor <;> intro n x Hv H <;> apply uPred_holds_ne _ (Nat.le_refl n) Hv H
       · exact fun n' x a => HE.symm n' x
@@ -268,12 +268,12 @@ instance : BI (UPred M) where
     refine ⟨x1, x2, HE, H1 _ _ ?_ Hx1, H2 _ _ ?_ Hx2⟩
     · exact CMRA.validN_op_left (HE.validN.1 Hv)
     · exact CMRA.validN_op_right (HE.validN.1 Hv)
-  emp_sep {P} := by
-    constructor
-    · intro _ _ _ ⟨x1, x2, HE1, _, HE2⟩
-      exact P.mono HE2 ⟨x1, HE1.trans CMRA.op_commN⟩ (Nat.le_refl _)
-    · intro _ x _ H
-      exact ⟨_, _, UCMRA.unit_left_id.symm.dist, ⟨⟩, H⟩
+  emp_sep_1 {P} := by
+    intro _ _ _ ⟨x1, x2, HE1, _, HE2⟩
+    exact P.mono HE2 ⟨x1, HE1.trans CMRA.op_commN⟩ (Nat.le_refl _)
+  emp_sep_2 {P} := by
+    intro _ x _ H
+    exact ⟨_, _, UCMRA.unit_left_id.symm.dist, ⟨⟩, H⟩
   sep_symm _ _ Hv := fun ⟨x1, x2, HE, HP, HQ⟩ => by
     refine ⟨x2, x1, ?_, HQ, HP⟩
     exact HE.trans CMRA.comm.dist
@@ -315,16 +315,19 @@ instance : BI (UPred M) where
     | n+1, x, Hx, ⟨p', Hp', H⟩ => by
       refine .inr ⟨later p', ⟨p', ?_⟩, H⟩
       ext n x; exact and_iff_right Hp'
-  later_sep {P Q} := by
-    constructor <;> rintro (_ | n) x Hv H
+  later_sep_1 {P Q} := by
+    rintro (_ | n) x Hv H
     · exact ⟨UCMRA.unit, x, UCMRA.unit_left_id.dist.symm, trivial, trivial⟩
     · let ⟨x1, x2, H1, H2, H3⟩ := H
       let ⟨y1, y2, H1', H2', H3'⟩ := CMRA.extend (CMRA.validN_succ Hv) H1
       exact ⟨y1, y2, H1'.dist, (uPred_ne H2').mpr H2, (uPred_ne H3').mpr H3⟩
+  later_sep_2 {P Q} := by
+    rintro (_ | n) x Hv H
     · trivial
     · let ⟨x1, x2, H1, H2, H3⟩ := H
       exact ⟨x1, x2, H1.lt (Nat.lt_add_one _), H2, H3⟩
-  later_persistently := ⟨Std.refl, Std.refl⟩
+  later_persistently_1 := Std.refl
+  later_persistently_2 := Std.refl
   later_false_em {P} := fun
     | 0, _, _, _ => .inl trivial
     | n+1, x, Hv, H => .inr fun
@@ -374,7 +377,7 @@ instance : BIPlainly (UPred M) where
     exact H
   emp_intro _ _ _ _ := trivial
   plainly_absorb := sep_elim_l
-  later_plainly := ⟨Std.refl, Std.refl⟩
+  later_plainly := BI.equiv_entails.mpr ⟨Std.refl, Std.refl⟩
 
 instance : BIPlainlyExists (UPred M) where
   plainly_sExists_1 _ _ _ := fun ⟨_, hp⟩ => ⟨_, ⟨_, rfl⟩, hp⟩
@@ -408,7 +411,7 @@ instance : BIBUpdatePlainly (UPred M) where
 theorem ownM_valid (m : M) : ownM m ⊢ cmraValid m := fun _ _ h hp => hp.validN h
 
 theorem ownM_op (m1 m2 : M) : ownM (m1 • m2) ⊣⊢ ownM m1 ∗ ownM m2 := by
-  constructor
+  apply BI.equiv_entails.mpr; constructor
   · intro n x Hv ⟨z, Hz⟩
     refine ⟨m1, m2 • z, ?_, .rfl, CMRA.incN_op_left n m2 z⟩
     exact Hz.trans CMRA.assoc.symm.dist
@@ -424,7 +427,7 @@ theorem ownM_op (m1 m2 : M) : ownM (m1 • m2) ⊣⊢ ownM m1 ∗ ownM m2 := by
       _ ≡{n}≡ (m1 • m2) • (w1 • w2) := CMRA.comm.op_r.dist
 
 theorem ownM_eqv {m1 m2 : M} (H : m1 ≡ m2) : ownM m1 ⊣⊢ ownM m2 :=
-  ⟨fun _ _ _ => (CMRA.incN_iff_left H.dist).mp, fun _ _ _ => (CMRA.incN_iff_left H.dist).mpr⟩
+  BI.equiv_entails.mpr ⟨fun _ _ _ => (CMRA.incN_iff_left H.dist).mp, fun _ _ _ => (CMRA.incN_iff_left H.dist).mpr⟩
 
 theorem ownM_always_invalid_elim (m : M) (H : ∀ n, ¬✓{n} m) : (cmraValid m : UPred M) ⊢ False :=
   fun n _ _ => H n
@@ -463,7 +466,7 @@ instance : Persistent (ownM (CMRA.core a) : UPred M) where
   persistent := by
     refine .trans (persistently_ownM_core _) ?_
     refine persistently_mono ?_
-    refine equiv_iff.mp ?_ |>.mp
+    refine (BI.equiv_entails.mp ?_).1
     refine OFE.NonExpansive.eqv ?_
     exact CMRA.core_idem a
 

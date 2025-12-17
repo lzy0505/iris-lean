@@ -20,11 +20,11 @@ theorem false_elim_intuitionistic [BI PROP] {P Q : PROP} : P ∗ □ False ⊢ Q
   wand_elim' <| intuitionistically_elim.trans false_elim
 
 /-- Introduces `emp` on the right of a separating conjunction: `P ∗ emp ⊢ Q` reduces to `P ⊢ Q`. -/
-theorem sep_emp_intro_spatial [BI PROP] {P Q : PROP} (h : P ⊢ Q) : P ∗ emp ⊢ Q := sep_emp.1.trans h
+theorem sep_emp_intro_spatial [BI PROP] {P Q : PROP} (h : P ⊢ Q) : P ∗ emp ⊢ Q := (BI.equiv_entails.mp sep_emp).1.trans h
 
 /-- Introduces `□ emp` on the right of a separating conjunction: `P ∗ □ emp ⊢ Q` reduces to `P ⊢ Q`. -/
 theorem sep_emp_intro_intuitionistic [BI PROP] {P Q : PROP}
-    (h : P ⊢ Q) : P ∗ □ emp ⊢ Q := (sep_mono_r intuitionistically_emp.1).trans <| sep_emp.1.trans h
+    (h : P ⊢ Q) : P ∗ □ emp ⊢ Q := (sep_mono_r (BI.equiv_entails.mp intuitionistically_emp).1).trans <| (BI.equiv_entails.mp sep_emp).1.trans h
 
 /--
 Handles case analysis on an empty conjunction pattern (i.e., `[]`).
@@ -66,7 +66,7 @@ def iCasesEmptyConj {prop : Q(Type u)} (bi : Q(BI $prop))
 /-- Eliminates an existential in a spatial hypothesis using `IntoExists`. -/
 theorem exists_elim_spatial [BI PROP] {P A Q : PROP} {Φ : α → PROP} [inst : IntoExists A Φ]
     (h : ∀ a, P ∗ Φ a ⊢ Q) : P ∗ A ⊢ Q :=
-  (sep_mono_r inst.1).trans <| sep_exists_l.1.trans (exists_elim h)
+  (sep_mono_r inst.1).trans <| (BI.equiv_entails.mp sep_exists_l).1.trans (exists_elim h)
 
 /-- Eliminates an existential in an intuitionistic hypothesis using `IntoExists`. -/
 theorem exists_elim_intuitionistic [BI PROP] {P A Q : PROP} {Φ : α → PROP} [IntoExists A Φ]
@@ -182,13 +182,13 @@ def iCasesAndLR {prop : Q(Type u)} (_bi : Q(BI $prop)) (P Q A' A1 A2 : Q($prop))
 /-- Eliminates a separating conjunction in a spatial hypothesis, splitting it into two parts. -/
 theorem sep_elim_spatial [BI PROP] {P A Q A1 A2 : PROP} [inst : IntoSep A A1 A2]
     (h : P ∗ A1 ⊢ A2 -∗ Q) : P ∗ A ⊢ Q :=
-  (sep_mono_r inst.1).trans <| sep_assoc.2.trans <| wand_elim h
+  (sep_mono_r inst.1).trans <| (BI.equiv_entails.mp sep_assoc).2.trans <| wand_elim h
 
 /-- Eliminates an intuitionistic conjunction, splitting it into two intuitionistic hypotheses. -/
 theorem and_elim_intuitionistic [BI PROP] {P A Q A1 A2 : PROP} [inst : IntoAnd true A A1 A2]
     (h : P ∗ □ A1 ⊢ □ A2 -∗ Q) : P ∗ □ A ⊢ Q :=
-  (sep_mono_r <| inst.1.trans intuitionistically_and_sep.1).trans <|
-  sep_assoc.2.trans <| wand_elim h
+  (sep_mono_r <| inst.1.trans (BI.equiv_entails.mp intuitionistically_and_sep).1).trans <|
+  (BI.equiv_entails.mp sep_assoc).2.trans <| wand_elim h
 
 /--
 Handles case analysis on a separating conjunction or intuitionistic conjunction.
@@ -239,7 +239,7 @@ def iCasesSep {prop : Q(Type u)} (bi : Q(BI $prop))
 /-- Eliminates a disjunction in a spatial hypothesis, creating two subgoals. -/
 theorem or_elim_spatial [BI PROP] {P A Q A1 A2 : PROP} [inst : IntoOr A A1 A2]
     (h1 : P ∗ A1 ⊢ Q) (h2 : P ∗ A2 ⊢ Q) : P ∗ A ⊢ Q :=
-  (sep_mono_r inst.1).trans <| BI.sep_or_l.1.trans <| or_elim h1 h2
+  (sep_mono_r inst.1).trans <| (BI.equiv_entails.mp BI.sep_or_l).1.trans <| or_elim h1 h2
 
 /-- Eliminates a disjunction in an intuitionistic hypothesis, creating two subgoals. -/
 theorem or_elim_intuitionistic [BI PROP] {P A Q A1 A2 : PROP} [IntoOr A A1 A2]
@@ -346,7 +346,7 @@ def iCasesSpatial {prop : Q(Type u)} (_bi : Q(BI $prop)) (P Q A : Q($prop)) (p :
     return q(spatial_elim_spatial (A := $A) $(← k A'))
 
 /-- Eliminates `emp` on the left of a separating conjunction: `emp ∗ A ⊢ Q` reduces to `A ⊢ Q`. -/
-theorem of_emp_sep [BI PROP] {A Q : PROP} (h : A ⊢ Q) : emp ∗ A ⊢ Q := emp_sep.1.trans h
+theorem of_emp_sep [BI PROP] {A Q : PROP} (h : A ⊢ Q) : emp ∗ A ⊢ Q := (BI.equiv_entails.mp emp_sep).1.trans h
 
 variable {u : Level} {prop : Q(Type u)} (bi : Q(BI $prop)) in
 /--
@@ -459,5 +459,5 @@ elab "icases" colGt hyp:ident "with" colGt pat:icasesPat : tactic => do
   let goals ← IO.mkRef #[]
   let pf2 ← iCasesCore bi hyps' goal b A A' h pat (λ hyps => goalTracker goals .anonymous hyps goal)
 
-  mvar.assign q(($pf).1.trans $pf2)
+  mvar.assign q((BI.equiv_entails.mp $pf).1.trans $pf2)
   replaceMainGoal (← goals.get).toList

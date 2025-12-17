@@ -45,7 +45,7 @@ def AgreeString (S : String) : UPred (Option (Agree (LeibnizO String))) := UPred
 example : AgreeString "I <3 iris-lean!" ⊢ (AgreeString "I don't :<" -∗ False) := by
   iintro H H2
   istop
-  apply (UPred.ownM_op _ _).2.trans    -- Combine ghost state
+  apply (BI.equiv_entails.mp (UPred.ownM_op _ _)).2.trans    -- Combine ghost state
   apply (UPred.ownM_valid _).trans     -- Reduce to invalidity
   apply UPred.ownM_always_invalid_elim -- The resource is invalid
   apply MyR_always_invalid; simp       -- Simplify

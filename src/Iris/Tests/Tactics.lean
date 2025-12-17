@@ -291,7 +291,7 @@ theorem exact_lean [BI PROP] (Q : PROP) (H : emp ⊢ Q) : ⊢ Q := by
 
 theorem exact_lean' [BI PROP] (Q : PROP) : Q ⊢ (emp ∗ Q) ∗ emp := by
   istart
-  iapply (wand_intro sep_emp.mpr)
+  iapply (wand_intro (BI.equiv_entails.mp sep_emp).2)
 
 theorem exact_lean'' [BI PROP] (Q : PROP) (H : 0 = 0 → ⊢ Q) : ⊢ Q := by
   istart
@@ -311,7 +311,7 @@ theorem apply_lean' [BI PROP] (P Q : PROP) (H : ⊢ P -∗ Q) (HP : ⊢ P) : ⊢
 theorem apply_lean'' [BI PROP] (P Q : PROP) (H1 : P ⊢ Q) (H2 : Q ⊢ R) : P ⊢ R := by
   istart
   iintro HP
-  iapply (wand_intro (emp_sep.mp.trans H2))
+  iapply (wand_intro ((BI.equiv_entails.mp emp_sep).1.trans H2))
   iapply H1 with HP
 
 theorem multiple_lean [BI PROP] (P Q R : PROP) (H : P ⊢ Q -∗ R) (HP : ⊢ P) : ⊢ Q -∗ R := by

@@ -13,13 +13,13 @@ open Lean Elab Tactic Meta Qq BI Std
 theorem pure_elim_spatial [BI PROP] {P P' A Q : PROP} {φ : Prop}
     [hA : IntoPure A φ] [or : TCOr (Affine A) (Absorbing Q)]
     (h : P ⊣⊢ P' ∗ A) (h_entails : φ → P' ⊢ Q) : P ⊢ Q :=
-  h.1.trans <| match or with
+  (BI.equiv_entails.mp h).1.trans <| match or with
   | TCOr.l =>
-    (sep_mono_r <| (affine_affinely A).2.trans (affinely_mono hA.1)).trans <|
-    persistent_and_affinely_sep_r.2.trans (pure_elim_r h_entails)
+    (sep_mono_r <| (BI.equiv_entails.mp (affine_affinely A)).2.trans (affinely_mono hA.1)).trans <|
+    (BI.equiv_entails.mp persistent_and_affinely_sep_r).2.trans (pure_elim_r h_entails)
   | TCOr.r =>
     (sep_mono_r <| hA.1.trans absorbingly_affinely_intro_of_persistent).trans <|
-    absorbingly_sep_lr.2.trans <| persistent_and_affinely_sep_r.2.trans <|
+    (BI.equiv_entails.mp absorbingly_sep_lr).2.trans <| (BI.equiv_entails.mp persistent_and_affinely_sep_r).2.trans <|
     pure_elim_r fun hφ => (absorbingly_mono <| h_entails hφ).trans absorbing
 
 theorem pure_elim_intuitionistic [BI PROP] {P P' A Q : PROP} {φ : Prop}
@@ -79,7 +79,7 @@ elab "iemp_intro" : tactic => do
 
 theorem pure_intro_affine [BI PROP] {Q : PROP} {φ : Prop}
     [h : FromPure true Q φ] [Affine P] (hφ : φ) : P ⊢ Q :=
-  (affine.trans (eq_true hφ ▸ affinely_true.2)).trans h.1
+  (affine.trans (eq_true hφ ▸ (BI.equiv_entails.mp affinely_true).2)).trans h.1
 
 theorem pure_intro_spatial [BI PROP] {Q : PROP} {φ : Prop}
     [h : FromPure false Q φ] (hφ : φ) : P ⊢ Q :=

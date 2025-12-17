@@ -16,23 +16,23 @@ open BI
 
 -- Intuitionistic
 instance emp_intuitionistic [BI PROP] : Intuitionistic iprop(emp : PROP) where
-  intuitionistic := intuitionistically_emp.2
+  intuitionistic := (BI.equiv_entails.mp intuitionistically_emp).2
 
 instance and_intuitionistic [BI PROP] (P Q : PROP) [Intuitionistic P] [Intuitionistic Q] :
     Intuitionistic iprop(P ∧ Q) where
-  intuitionistic := (and_mono intuitionistic intuitionistic).trans intuitionistically_and.2
+  intuitionistic := (and_mono intuitionistic intuitionistic).trans (BI.equiv_entails.mp intuitionistically_and).2
 
 instance or_intuitionistic [BI PROP] (P Q : PROP) [Intuitionistic P] [Intuitionistic Q] :
     Intuitionistic iprop(P ∨ Q) where
-  intuitionistic := (or_mono intuitionistic intuitionistic).trans intuitionistically_or.2
+  intuitionistic := (or_mono intuitionistic intuitionistic).trans (BI.equiv_entails.mp intuitionistically_or).2
 
 instance exists_intuitionistic [BI PROP] (Φ : α → PROP) [∀ x, Intuitionistic (Φ x)] :
     Intuitionistic iprop(∃ x, Φ x) where
-  intuitionistic := (exists_mono fun _ => intuitionistic).trans intuitionistically_exists.2
+  intuitionistic := (exists_mono fun _ => intuitionistic).trans (BI.equiv_entails.mp intuitionistically_exists).2
 
 instance sep_intuitionistic [BI PROP] (P Q : PROP) [Intuitionistic P] [Intuitionistic Q] :
     Intuitionistic iprop(P ∗ Q) where
   intuitionistic := (sep_mono intuitionistic intuitionistic).trans intuitionistically_sep_2
 
 instance intuitionistically_intuitionistic [BI PROP] (P : PROP) : Intuitionistic iprop(□ P) where
-  intuitionistic := intuitionistically_idem.2
+  intuitionistic := (BI.equiv_entails.mp intuitionistically_idem).2

@@ -174,17 +174,15 @@ def EmpValid [BIBase PROP] (P: PROP) := iprop(emp ⊢ P)
 
 /-- Entailment on separation logic propositions with an empty context. -/
 macro:25 "⊢ " P:term:25 : term => ``(EmpValid iprop($P))
-/-- Bidirectional entailment on separation logic propositions. -/
-macro:25 P:term:29 " ⊣⊢ " Q:term:29 : term => ``(BiEntails iprop($P) iprop($Q))
 
--- delab_rule BIBase.Entails
---   | `($_ iprop(emp) $P) => do ``(emp ⊢ $(← unpackIprop P))
+-- /-- Bidirectional entailment on separation logic propositions. -/
+-- macro:25 P:term:29 " ⊣⊢ " Q:term:29 : term => ``(BiEntails iprop($P) iprop($Q))
+-- delab_rule BIBase.BiEntails
+--   | `($_ $P $Q) => do ``($(← unpackIprop P) ⊣⊢ $(← unpackIprop Q))
 
 delab_rule BIBase.EmpValid
   | `($_ $P) => do ``(⊢ $(← unpackIprop P))
 
-delab_rule BIBase.BiEntails
-  | `($_ $P $Q) => do ``($(← unpackIprop P) ⊣⊢ $(← unpackIprop Q))
 
 macro_rules
   | `(iprop(<affine> $P)) => ``(affinely iprop($P))

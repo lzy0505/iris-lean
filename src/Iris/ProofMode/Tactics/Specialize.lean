@@ -20,11 +20,11 @@ structure SpecializeState {prop : Q(Type u)} (bi : Q(BI $prop)) (orig : Q($prop)
 theorem specialize_wand [BI PROP] {q p : Bool} {A1 A2 A3 Q P1 P2 : PROP}
     (h1 : A1 ⊢ A2 ∗ □?q Q) (h2 : A2 ⊣⊢ A3 ∗ □?p P1)
     [inst : IntoWand q p Q P1 P2] : A1 ⊢ A3 ∗ □?(p && q) P2 := by
-  refine h1.trans <| (sep_mono_l h2.1).trans <| sep_assoc.1.trans (sep_mono_r ?_)
+  refine h1.trans <| (sep_mono_l (BI.equiv_entails.mp h2).1).trans <| (BI.equiv_entails.mp sep_assoc).1.trans (sep_mono_r ?_)
   cases p with
   | false => exact (sep_mono_r inst.1).trans wand_elim_r
   | true => exact
-    (sep_mono intuitionisticallyIf_intutitionistically.2 intuitionisticallyIf_idem.2).trans <|
+    (sep_mono (BI.equiv_entails.mp intuitionisticallyIf_intutitionistically).2 (BI.equiv_entails.mp intuitionisticallyIf_idem).2).trans <|
     intuitionisticallyIf_sep_2.trans <| intuitionisticallyIf_mono <| wand_elim' inst.1
 
 theorem specialize_forall [BI PROP] {p : Bool} {A1 A2 P : PROP} {α : Sort _} {Φ : α → PROP}
@@ -43,7 +43,7 @@ theorem specialize_wand_split [BI PROP] {p : Bool} {orig e e' er R P Q : PROP}
     (h1 : orig ⊢ e ∗ □?p R) (h2 : e ⊣⊢ e' ∗ er) (h3 : er ⊢ P)
     [inst : IntoWand p false R P Q] : orig ⊢ e' ∗ □?p Q := by
   -- inst.into_wand : □?p R ⊢ P -∗ Q
-  refine h1.trans <| (sep_mono_l h2.1).trans <| sep_assoc.1.trans <| sep_mono_r ?_
+  refine h1.trans <| (sep_mono_l (BI.equiv_entails.mp h2).1).trans <| (BI.equiv_entails.mp sep_assoc).1.trans <| sep_mono_r ?_
   -- Goal: er ∗ □?p R ⊢ □?p Q
   cases p with
   | false =>
@@ -162,7 +162,7 @@ elab "ispecialize" hyp:ident args:(colGt term:max)* " as " name:binderIdent : ta
   let (nameTo, nameRef) ← getFreshName name
   let ⟨_, hyps', _, out', b, _, pf⟩ := hyps.remove (hyp.getId == nameTo) uniq
 
-  let state := { hyps := hyps', out := out', b, pf := q(($pf).1), .. }
+  let state := { hyps := hyps', out := out', b, pf := q((BI.equiv_entails.mp $pf).1), .. }
 
   -- specialize hypothesis using process1 (handles both forall and wand args)
   let { e := ehyps, hyps, out, b, pf } ← liftM <| args.foldlM SpecializeState.process1 state

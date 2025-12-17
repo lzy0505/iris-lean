@@ -12,7 +12,7 @@ open Lean Elab Tactic Meta Qq BI Std
 
 theorem clear_spatial [BI PROP] {P P' A Q : PROP} [TCOr (Affine A) (Absorbing Q)]
     (h_rem : P ⊣⊢ P' ∗ A) (h : P' ⊢ Q) : P ⊢ Q :=
-  h_rem.1.trans <| (sep_mono_l h).trans sep_elim_l
+  (BI.equiv_entails.mp h_rem).1.trans <| (sep_mono_l h).trans sep_elim_l
 
 theorem clear_intuitionistic [BI PROP] {P P' A Q : PROP}
     (h_rem : P ⊣⊢ P' ∗ □ A) (h : P' ⊢ Q) : P ⊢ Q := clear_spatial h_rem h

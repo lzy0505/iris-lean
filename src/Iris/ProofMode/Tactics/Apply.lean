@@ -17,10 +17,10 @@ theorem apply' [BI PROP] {P Q1 Q2 R : PROP} (p : Bool)
 theorem rec_apply' [BI PROP] {P Q P' Q' Q1 Q2 R : PROP} (p : Bool)
     (inst : IntoWand p false Q Q1 Q2) (h1 : P ⊣⊢ P' ∗ Q') (h2 : Q' ⊢ Q1) (h3 : P' ∗ Q2 ⊢ R)
     : P ∗ □?p Q ⊢ R :=
-  (sep_congr h1 .rfl).mp.trans <| sep_assoc.mp.trans <| (sep_mono_r <| apply' p inst h2).trans h3
+  (BI.equiv_entails.mp (sep_congr h1 .rfl)).1.trans <| (BI.equiv_entails.mp sep_assoc).1.trans <| (sep_mono_r <| apply' p inst h2).trans h3
 
 theorem apply_lean [BI PROP] {P Q R : PROP} (h1 : ⊢ Q) (h2 : P ∗ Q ⊢ R) : P ⊢ R :=
-  sep_emp.mpr.trans <| (sep_mono_r h1).trans h2
+  (BI.equiv_entails.mp sep_emp).2.trans <| (sep_mono_r h1).trans h2
 
 /-- Connect the result of `iPoseCore` (which gives `e ⊢ e' ∗ □?b out`) with `iApplyCore`
     (which gives `e' ∗ □?b out ⊢ goal`). -/

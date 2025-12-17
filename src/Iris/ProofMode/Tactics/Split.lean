@@ -87,7 +87,7 @@ def Hyps.split {prop : Q(Type u)} (bi : Q(BI $prop)) (toRight : Name → Name �
 
 theorem sep_split [BI PROP] {P P1 P2 Q Q1 Q2 : PROP} [inst : FromSep Q Q1 Q2]
     (h : P ⊣⊢ P1 ∗ P2) (h1 : P1 ⊢ Q1) (h2 : P2 ⊢ Q2) : P ⊢ Q :=
-  h.1.trans <| (sep_mono h1 h2).trans inst.1
+  (BI.equiv_entails.mp h).1.trans <| (sep_mono h1 h2).trans inst.1
 
 inductive splitSide where
 | splitLeft | splitRight

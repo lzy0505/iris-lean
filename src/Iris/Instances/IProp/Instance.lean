@@ -304,7 +304,7 @@ theorem iOwn_cmraValid {a : F.ap (IProp GF)} : iOwn γ a ⊢ UPred.cmraValid a :
   simp [iSingleton] at h_at_γ; trivial
 
 theorem iOwn_cmraValid_op {a1 a2 : F.ap (IProp GF)} : iOwn γ a1 ∗ iOwn γ a2 ⊢ UPred.cmraValid (a1 • a2) :=
-  iOwn_op.mpr.trans iOwn_cmraValid
+  (BI.equiv_entails.mp iOwn_op).2.trans iOwn_cmraValid
 
 theorem iOwn_valid_r {a : F.ap (IProp GF)} : iOwn γ a ⊢ iOwn γ a ∗ UPred.cmraValid a :=
   BI.persistent_entails_l iOwn_cmraValid
@@ -317,7 +317,7 @@ instance {a : F.ap (IProp GF)} [CMRA.CoreId a] : BI.Persistent (iOwn γ a) where
     simp [iOwn]
     refine (UPred.persistently_ownM_core _).trans ?_
     refine persistently_mono ?_
-    refine equiv_iff.mp ?_ |>.mp
+    refine (BI.equiv_entails.mp ?_).1
     refine NonExpansive.eqv ?_
     apply CMRA.core_eqv_self
 

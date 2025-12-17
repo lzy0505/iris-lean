@@ -1,7 +1,7 @@
 /-
 Copyright (c) 2022 Lars König. All rights reserved.
 Released under Apache 2.0 license as described in the file LICENSE.
-Authors: Lars König, Mario Carneiro, Markus de Medeiros
+Authors: Lars König, Mario Carneiro, Markus de Medeiros, Zongyuan Liu
 -/
 import Iris.BI.Classes
 import Iris.BI.Extensions
@@ -9,9 +9,28 @@ import Iris.BI.BI
 import Iris.Std.Classes
 import Iris.Std.Rewrite
 import Iris.Std.TC
+import Iris.Std.DelabRule
+import Iris.Algebra.Monoid
 
 namespace Iris.BI
 open Iris.Std BI
+
+/-- Bidirectional entailment on separation logic propositions. -/
+local macro:25 P:term:29 " ⊣⊢ " Q:term:29 : term => ``(BI.BiEquiv iprop($P) iprop($Q))
+
+--  Notation "P ⊢ Q" := (bi_entails (PROP:=uPredI M) P Q).
+
+delab_rule BI.BiEquiv
+  | `($_ $P $Q) => do ``($(← unpackIprop P) ⊣⊢ $(← unpackIprop Q))
+
+@[simp] theorem BiEquiv.rfl [BI PROP] {P : PROP} : P ⊣⊢ P := OFE.Equiv.rfl
+
+theorem BiEquiv.of_eq [BI PROP] {P Q : PROP} (h : P = Q) : P ⊣⊢ Q := h ▸ .rfl
+
+theorem BiEquiv.symm [BI PROP] {P Q : PROP} (h : P ⊣⊢ Q) : Q ⊣⊢ P := OFE.Equiv.symm h
+
+theorem BiEquiv.trans [BI PROP] {P Q R : PROP} (h1 : P ⊣⊢ Q) (h2 : Q ⊣⊢ R) : P ⊣⊢ R :=
+  OFE.Equiv.trans h1 h2
 
 /-! # Entails -/
 
@@ -20,12 +39,6 @@ instance entails_trans [BI PROP] : Trans (α := PROP) Entails Entails Entails wh
 instance entails_antisymm [BI PROP] : Antisymmetric (α := PROP) BiEntails Entails where
   antisymm h1 h2 := ⟨h1, h2⟩
 
-instance equiv_trans [BI PROP] : Trans (α := PROP) BiEntails BiEntails BiEntails where
-  trans h1 h2 := h1.trans h2
-
-instance biEntails_preorder [BI PROP] : Std.Preorder (BiEntails (PROP := PROP)) where
-  refl := BIBase.BiEntails.rfl
-  trans h1 h2 := h1.trans h2
 
 /-! # Logic -/
 
@@ -68,7 +81,7 @@ theorem and_mono_r [BI PROP] {P Q Q' : PROP} (h : Q ⊢ Q') : P ∧ Q ⊢ P ∧ 
 
 @[rw_mono_rule]
 theorem and_congr [BI PROP] {P P' Q Q' : PROP} (h1 : P ⊣⊢ Q) (h2 : P' ⊣⊢ Q') : P ∧ P' ⊣⊢ Q ∧ Q' :=
-  ⟨and_mono h1.1 h2.1, and_mono h1.2 h2.2⟩
+  @OFE.NonExpansive₂.eqv _ _ _ _ _ _ _ BI.and_ne _ _ h1 _ _ h2
 
 theorem and_congr_l [BI PROP] {P P' Q : PROP} (h : P ⊣⊢ P') : P ∧ Q ⊣⊢ P' ∧ Q := and_congr h .rfl
 
@@ -84,7 +97,7 @@ theorem or_mono_r [BI PROP] {P Q Q' : PROP} (h : Q ⊢ Q') : P ∨ Q ⊢ P ∨ Q
 
 @[rw_mono_rule]
 theorem or_congr [BI PROP] {P P' Q Q' : PROP} (h1 : P ⊣⊢ Q) (h2 : P' ⊣⊢ Q') : P ∨ P' ⊣⊢ Q ∨ Q' :=
-  ⟨or_mono h1.1 h2.1, or_mono h1.2 h2.2⟩
+  @OFE.NonExpansive₂.eqv _ _ _ _ _ _ _ BI.or_ne _ _ h1 _ _ h2
 
 theorem or_congr_l [BI PROP] {P P' Q : PROP} (h : P ⊣⊢ P') : P ∨ Q ⊣⊢ P' ∨ Q := or_congr h .rfl
 
@@ -101,7 +114,7 @@ theorem imp_mono_r [BI PROP] {P Q Q' : PROP} (h : Q ⊢ Q') : (P → Q) ⊢ (P �
 @[rw_mono_rule]
 theorem imp_congr [BI PROP] {P P' Q Q' : PROP}
     (h1 : P ⊣⊢ Q) (h2 : P' ⊣⊢ Q') : (P → P') ⊣⊢ (Q → Q') :=
-  ⟨imp_mono h1.2 h2.1, imp_mono h1.1 h2.2⟩
+  @OFE.NonExpansive₂.eqv _ _ _ _ _ _ _ BI.imp_ne _ _ h1 _ _ h2
 
 theorem imp_congr_l [BI PROP] {P P' Q : PROP} (h : P ⊣⊢ P') : (P → Q) ⊣⊢ (P' → Q) :=
   imp_congr h .rfl
@@ -124,7 +137,7 @@ theorem forall_mono [BI PROP] {Φ Ψ : α → PROP} (h : ∀ a, Φ a ⊢ Ψ a) :
 
 @[rw_mono_rule]
 theorem forall_congr [BI PROP] {Φ Ψ : α → PROP} (h : ∀ a, Φ a ⊣⊢ Ψ a) : (∀ a, Φ a) ⊣⊢ ∀ a, Ψ a :=
-  ⟨forall_mono fun a => (h a).1, forall_mono fun a => (h a).2⟩
+  OFE.equiv_dist.mpr fun _ => forall_ne fun a => (h a).dist
 
 theorem exists_ne [BI PROP] {Φ Ψ : α → PROP} (h : ∀ a, Φ a ≡{n}≡ Ψ a) :
     iprop(∃ a, Φ a) ≡{n}≡ iprop(∃ a, Ψ a) := sExists_ne <| by
@@ -142,62 +155,62 @@ theorem exists_mono [BI PROP] {Φ Ψ : α → PROP} (h : ∀ a, Φ a ⊢ Ψ a) :
 
 @[rw_mono_rule]
 theorem exists_congr [BI PROP] {Φ Ψ : α → PROP} (h : ∀ a, Φ a ⊣⊢ Ψ a) : (∃ a, Φ a) ⊣⊢ ∃ a, Ψ a :=
-  ⟨exists_mono fun a => (h a).1, exists_mono fun a => (h a).2⟩
+  OFE.equiv_dist.mpr fun _ => exists_ne fun a => (h a).dist
 
-theorem and_self [BI PROP] {P : PROP} : P ∧ P ⊣⊢ P := ⟨and_elim_l, and_intro .rfl .rfl⟩
-instance [BI PROP] : Idempotent (α := PROP) BiEntails and := ⟨and_self⟩
+theorem and_self [BI PROP] {P : PROP} : P ∧ P ⊣⊢ P := BI.equiv_entails.mpr ⟨and_elim_l, and_intro .rfl .rfl⟩
+instance [BI PROP] : Idempotent (α := PROP) BiEquiv and := ⟨and_self⟩
 
-theorem or_self [BI PROP] {P : PROP} : P ∨ P ⊣⊢ P := ⟨or_elim .rfl .rfl, or_intro_l⟩
-instance [BI PROP] : Idempotent (α := PROP) BiEntails or := ⟨or_self⟩
+theorem or_self [BI PROP] {P : PROP} : P ∨ P ⊣⊢ P := BI.equiv_entails.mpr ⟨or_elim .rfl .rfl, or_intro_l⟩
+instance [BI PROP] : Idempotent (α := PROP) BiEquiv or := ⟨or_self⟩
 
-theorem and_comm [BI PROP] {P Q : PROP} : P ∧ Q ⊣⊢ Q ∧ P := ⟨and_symm, and_symm⟩
-instance [BI PROP] : Commutative (α := PROP) BiEntails and := ⟨and_comm⟩
+theorem and_comm [BI PROP] {P Q : PROP} : P ∧ Q ⊣⊢ Q ∧ P := BI.equiv_entails.mpr ⟨and_symm, and_symm⟩
+instance [BI PROP] : Commutative (α := PROP) BiEquiv and := ⟨and_comm⟩
 
-theorem or_comm [BI PROP] {P Q : PROP} : P ∨ Q ⊣⊢ Q ∨ P := ⟨or_symm, or_symm⟩
-instance [BI PROP] : Commutative (α := PROP) BiEntails or := ⟨or_comm⟩
+theorem or_comm [BI PROP] {P Q : PROP} : P ∨ Q ⊣⊢ Q ∨ P := BI.equiv_entails.mpr ⟨or_symm, or_symm⟩
+instance [BI PROP] : Commutative (α := PROP) BiEquiv or := ⟨or_comm⟩
 
 theorem true_and [BI PROP] {P : PROP} : True ∧ P ⊣⊢ P :=
-  ⟨and_elim_r, and_intro (pure_intro trivial) .rfl⟩
-instance [BI PROP] : LeftId (α := PROP) BiEntails iprop(True) and := ⟨true_and⟩
+  BI.equiv_entails.mpr ⟨and_elim_r, and_intro (pure_intro trivial) .rfl⟩
+instance [BI PROP] : LeftId (α := PROP) BiEquiv iprop(True) and := ⟨true_and⟩
 
 theorem and_true [BI PROP] {P : PROP} : P ∧ True ⊣⊢ P := and_comm.trans true_and
-instance [BI PROP] : RightId (α := PROP) BiEntails iprop(True) and := ⟨and_true⟩
+instance [BI PROP] : RightId (α := PROP) BiEquiv iprop(True) and := ⟨and_true⟩
 
-theorem false_and [BI PROP] {P : PROP} : False ∧ P ⊣⊢ False := ⟨and_elim_l, false_elim⟩
+theorem false_and [BI PROP] {P : PROP} : False ∧ P ⊣⊢ False := BI.equiv_entails.mpr ⟨and_elim_l, false_elim⟩
 
 theorem and_false [BI PROP] {P : PROP} : P ∧ False ⊣⊢ False := and_comm.trans false_and
 
-theorem true_or [BI PROP] {P : PROP} : True ∨ P ⊣⊢ True := ⟨true_intro, or_intro_l⟩
+theorem true_or [BI PROP] {P : PROP} : True ∨ P ⊣⊢ True := BI.equiv_entails.mpr ⟨true_intro, or_intro_l⟩
 
 theorem or_true [BI PROP] {P : PROP} : P ∨ True ⊣⊢ True := or_comm.trans true_or
 
-theorem false_or [BI PROP] {P : PROP} : False ∨ P ⊣⊢ P := ⟨or_elim false_elim .rfl, or_intro_r⟩
-instance [BI PROP] : LeftId (α := PROP) BiEntails iprop(False) or := ⟨false_or⟩
+theorem false_or [BI PROP] {P : PROP} : False ∨ P ⊣⊢ P := BI.equiv_entails.mpr ⟨or_elim false_elim .rfl, or_intro_r⟩
+instance [BI PROP] : LeftId (α := PROP) BiEquiv iprop(False) or := ⟨false_or⟩
 
 theorem or_false [BI PROP] {P : PROP} : P ∨ False ⊣⊢ P := or_comm.trans false_or
-instance [BI PROP] : RightId (α := PROP) BiEntails iprop(False) or := ⟨or_false⟩
+instance [BI PROP] : RightId (α := PROP) BiEquiv iprop(False) or := ⟨or_false⟩
 
 theorem and_assoc [BI PROP] {P Q R : PROP} : (P ∧ Q) ∧ R ⊣⊢ P ∧ Q ∧ R :=
-  ⟨and_intro (and_elim_l' and_elim_l) (and_mono_l and_elim_r),
+  BI.equiv_entails.mpr ⟨and_intro (and_elim_l' and_elim_l) (and_mono_l and_elim_r),
    and_intro (and_mono_r and_elim_l) (and_elim_r' and_elim_r)⟩
 
 theorem or_assoc [BI PROP] {P Q R : PROP} : (P ∨ Q) ∨ R ⊣⊢ P ∨ Q ∨ R :=
-  ⟨or_elim (or_mono_r or_intro_l) (or_intro_r' or_intro_r),
+  BI.equiv_entails.mpr ⟨or_elim (or_mono_r or_intro_l) (or_intro_r' or_intro_r),
    or_elim (or_intro_l' or_intro_l) (or_mono_l or_intro_r)⟩
 
 theorem true_imp [BI PROP] {P : PROP} : (True → P) ⊣⊢ P :=
-  ⟨and_true.2.trans imp_elim_l, imp_intro and_elim_l⟩
-instance [BI PROP] : LeftId (α := PROP) BiEntails iprop(True) and := ⟨true_and⟩
+  BI.equiv_entails.mpr ⟨(BI.equiv_entails.mp and_true).2.trans imp_elim_l, imp_intro and_elim_l⟩
+instance [BI PROP] : LeftId (α := PROP) BiEquiv iprop(True) and := ⟨true_and⟩
 
 theorem imp_self [BI PROP] {P Q : PROP} : Q ⊢ P → P := imp_intro and_elim_r
 
 theorem imp_trans [BI PROP] {P Q R : PROP} : (P → Q) ∧ (Q → R) ⊢ P → R :=
-  imp_intro' <| and_assoc.2.trans <| (and_mono_l imp_elim_r).trans imp_elim_r
+  imp_intro' <| (BI.equiv_entails.mp and_assoc).2.trans <| (and_mono_l imp_elim_r).trans imp_elim_r
 
 theorem false_imp [BI PROP] {P : PROP} : (False → P) ⊣⊢ True :=
-  ⟨true_intro, imp_intro <| and_elim_r.trans false_elim⟩
+  BI.equiv_entails.mpr ⟨true_intro, imp_intro <| and_elim_r.trans false_elim⟩
 
-instance [BI PROP] : LawfulBigOp and (iprop(True) : PROP) BiEntails where
+instance [BI PROP] : LawfulBigOp and (iprop(True) : PROP) BiEquiv where
   refl := .rfl
   symm h := h.symm
   trans h1 h2 := h1.trans h2
@@ -209,19 +222,20 @@ instance [BI PROP] : LawfulBigOp and (iprop(True) : PROP) BiEntails where
 theorem and_left_comm [BI PROP] {P Q R : PROP} : P ∧ Q ∧ R ⊣⊢ Q ∧ P ∧ R :=
   and_assoc.symm.trans <| (and_congr_l and_comm).trans and_assoc
 
-instance [BI PROP] : Associative (α := PROP) BiEntails and := ⟨and_assoc⟩
+instance [BI PROP] : Associative (α := PROP) BiEquiv and := ⟨and_assoc⟩
 
 theorem and_or_l [BI PROP] {P Q R : PROP} : P ∧ (Q ∨ R) ⊣⊢ P ∧ Q ∨ P ∧ R :=
-  ⟨imp_elim' <| or_elim (imp_intro' or_intro_l) (imp_intro' or_intro_r),
+  BI.equiv_entails.mpr ⟨imp_elim' <| or_elim (imp_intro' or_intro_l) (imp_intro' or_intro_r),
    and_intro (or_elim and_elim_l and_elim_l)
     (or_elim (or_intro_l' and_elim_r) (or_intro_r' and_elim_r))⟩
 
 theorem and_exists_l [BI PROP] {P : PROP} {Ψ : α → PROP} : P ∧ (∃ a, Ψ a) ⊣⊢ ∃ a, P ∧ Ψ a :=
-  ⟨imp_elim' <| exists_elim fun _ =>
+  BI.equiv_entails.mpr ⟨imp_elim' <| exists_elim fun _ =>
     imp_intro' (exists_intro (Ψ := fun a => iprop(P ∧ Ψ a)) _),
    exists_elim fun _ => and_mono_r (exists_intro _)⟩
 
 theorem or_eq_ite [BI PROP] {P Q : PROP} : P ∨ Q ⊣⊢ ∃ (b : Bool), if b then P else Q := by
+  apply BI.equiv_entails.mpr
   constructor
   · apply or_elim
     · exact exists_intro (Ψ := fun b => if b = true then P else Q) true
@@ -239,7 +253,7 @@ theorem sep_mono_r [BI PROP] {P Q Q' : PROP} (h : Q ⊢ Q') : P ∗ Q ⊢ P ∗ 
 
 @[rw_mono_rule]
 theorem sep_congr [BI PROP] {P P' Q Q' : PROP} (h1 : P ⊣⊢ Q) (h2 : P' ⊣⊢ Q') :
-    (P ∗ P') ⊣⊢ (Q ∗ Q') := ⟨sep_mono h1.1 h2.1, sep_mono h1.2 h2.2⟩
+    (P ∗ P') ⊣⊢ (Q ∗ Q') := BI.equiv_entails.mpr ⟨sep_mono (BI.equiv_entails.mp h1).1 (BI.equiv_entails.mp h2).1, sep_mono (BI.equiv_entails.mp h1).2 (BI.equiv_entails.mp h2).2⟩
 
 theorem sep_congr_l [BI PROP] {P P' Q : PROP} (h : P ⊣⊢ P') : P ∗ Q ⊣⊢ P' ∗ Q := sep_congr h .rfl
 
@@ -255,7 +269,7 @@ theorem wand_mono_r [BI PROP] {P Q Q' : PROP} (h : Q ⊢ Q') : (P -∗ Q) ⊢ P 
 
 @[rw_mono_rule]
 theorem wand_congr [BI PROP] {P P' Q Q' : PROP} (h1 : P ⊣⊢ Q) (h2 : P' ⊣⊢ Q') :
-    (P -∗ P') ⊣⊢ (Q -∗ Q') := ⟨wand_mono h1.2 h2.1, wand_mono h1.1 h2.2⟩
+    (P -∗ P') ⊣⊢ (Q -∗ Q') := BI.equiv_entails.mpr ⟨wand_mono (BI.equiv_entails.mp h1).2 (BI.equiv_entails.mp h2).1, wand_mono (BI.equiv_entails.mp h1).1 (BI.equiv_entails.mp h2).2⟩
 
 theorem wand_congr_l [BI PROP] {P P' Q : PROP} (h : P ⊣⊢ P') : (P -∗ Q) ⊣⊢ (P' -∗ Q) :=
   wand_congr h .rfl
@@ -263,13 +277,13 @@ theorem wand_congr_l [BI PROP] {P P' Q : PROP} (h : P ⊣⊢ P') : (P -∗ Q) �
 theorem wand_congr_r [BI PROP] {P Q Q' : PROP} (h : Q ⊣⊢ Q') : (P -∗ Q) ⊣⊢ (P -∗ Q') :=
   wand_congr .rfl h
 
-theorem sep_comm [BI PROP] {P Q : PROP} : P ∗ Q ⊣⊢ Q ∗ P := ⟨sep_symm, sep_symm⟩
-instance [BI PROP] : Commutative (α := PROP) BiEntails sep := ⟨sep_comm⟩
+theorem sep_comm [BI PROP] {P Q : PROP} : P ∗ Q ⊣⊢ Q ∗ P := BI.equiv_entails.mpr ⟨sep_symm, sep_symm⟩
+instance [BI PROP] : Commutative (α := PROP) BiEquiv sep := ⟨sep_comm⟩
 
 theorem sep_assoc [BI PROP] {P Q R : PROP} : (P ∗ Q) ∗ R ⊣⊢ P ∗ Q ∗ R :=
-  ⟨sep_assoc_l, (sep_comm.trans <| sep_congr_l sep_comm).1.trans <|
-    sep_assoc_l.trans (sep_comm.trans <| sep_congr_r sep_comm).2⟩
-instance [BI PROP] : Associative (α := PROP) BiEntails sep := ⟨sep_assoc⟩
+  BI.equiv_entails.mpr ⟨sep_assoc_l, (BI.equiv_entails.mp (sep_comm.trans <| sep_congr_l sep_comm)).1.trans <|
+    sep_assoc_l.trans (BI.equiv_entails.mp (sep_comm.trans <| sep_congr_r sep_comm)).2⟩
+instance [BI PROP] : Associative (α := PROP) BiEquiv sep := ⟨sep_assoc⟩
 
 theorem sep_left_comm [BI PROP] {P Q R : PROP} : P ∗ Q ∗ R ⊣⊢ Q ∗ P ∗ R :=
   sep_assoc.symm.trans <| (sep_congr_l sep_comm).trans sep_assoc
@@ -280,12 +294,14 @@ theorem sep_right_comm [BI PROP] {P Q R : PROP} : (P ∗ Q) ∗ R ⊣⊢ (P ∗ 
 theorem sep_sep_sep_comm [BI PROP] {P Q R S : PROP} : (P ∗ Q) ∗ (R ∗ S) ⊣⊢ (P ∗ R) ∗ (Q ∗ S) :=
   sep_assoc.trans <| (sep_congr_r sep_left_comm).trans sep_assoc.symm
 
-instance [BI PROP] : LeftId (α := PROP) BiEntails emp sep := ⟨emp_sep⟩
+theorem emp_sep [BI PROP] {P : PROP} : emp ∗ P ⊣⊢ P := BI.equiv_entails.mpr ⟨emp_sep_1, emp_sep_2⟩
+
+instance [BI PROP] : LeftId (α := PROP) BiEquiv emp sep := ⟨emp_sep⟩
 
 theorem sep_emp [BI PROP] {P : PROP} : P ∗ emp ⊣⊢ P := sep_comm.trans emp_sep
-instance [BI PROP] : RightId (α := PROP) BiEntails emp sep := ⟨sep_emp⟩
+instance [BI PROP] : RightId (α := PROP) BiEquiv emp sep := ⟨sep_emp⟩
 
-instance [BI PROP] : LawfulBigOp sep (emp : PROP) BiEntails where
+instance [BI PROP] : LawfulBigOp sep (emp : PROP) BiEquiv where
   refl := .rfl
   symm h := h.symm
   trans h1 h2 := h1.trans h2
@@ -294,7 +310,7 @@ instance [BI PROP] : LawfulBigOp sep (emp : PROP) BiEntails where
   left_id := emp_sep
   congr_l := sep_congr_l
 
-theorem true_sep_2 [BI PROP] {P : PROP} : P ⊢ True ∗ P := emp_sep.2.trans (sep_mono_l true_intro)
+theorem true_sep_2 [BI PROP] {P : PROP} : P ⊢ True ∗ P := (BI.equiv_entails.mp emp_sep).2.trans (sep_mono_l true_intro)
 
 theorem wand_intro' [BI PROP] {P Q R : PROP} (h : Q ∗ P ⊢ R) : P ⊢ Q -∗ R :=
   wand_intro <| sep_symm.trans h
@@ -307,21 +323,21 @@ theorem wand_elim_l [BI PROP] {P Q : PROP} : (P -∗ Q) ∗ P ⊢ Q := wand_elim
 theorem wand_elim_r [BI PROP] {P Q : PROP} : P ∗ (P -∗ Q) ⊢ Q := wand_elim' .rfl
 
 theorem sep_or_l [BI PROP] {P Q R : PROP} : P ∗ (Q ∨ R) ⊣⊢ (P ∗ Q) ∨ (P ∗ R) :=
-  ⟨wand_elim' <| or_elim (wand_intro' or_intro_l) (wand_intro' or_intro_r),
+  BI.equiv_entails.mpr ⟨wand_elim' <| or_elim (wand_intro' or_intro_l) (wand_intro' or_intro_r),
    or_elim (sep_mono_r or_intro_l) (sep_mono_r or_intro_r)⟩
 
 theorem sep_or_r [BI PROP] {P Q R : PROP} : (P ∨ Q) ∗ R ⊣⊢ (P ∗ R) ∨ (Q ∗ R) :=
   sep_comm.trans <| sep_or_l.trans (or_congr sep_comm sep_comm)
 
 theorem sep_exists_l [BI PROP] {P : PROP} {Ψ : α → PROP} : P ∗ (∃ a, Ψ a) ⊣⊢ ∃ a, P ∗ Ψ a :=
-  ⟨wand_elim' <| exists_elim fun _ =>
+  BI.equiv_entails.mpr ⟨wand_elim' <| exists_elim fun _ =>
     wand_intro' (exists_intro (Ψ := fun a => iprop(P ∗ Ψ a)) _),
    exists_elim fun _ => sep_mono_r (exists_intro _)⟩
 
 theorem sep_exists_r [BI PROP] {Φ : α → PROP} {Q : PROP} : (∃ a, Φ a) ∗ Q ⊣⊢ ∃ a, Φ a ∗ Q :=
   sep_comm.trans <| sep_exists_l.trans <| exists_congr fun _ => sep_comm
 
-theorem wand_rfl [BI PROP] {P : PROP} : ⊢ P -∗ P := wand_intro emp_sep.1
+theorem wand_rfl [BI PROP] {P : PROP} : ⊢ P -∗ P := wand_intro (BI.equiv_entails.mp emp_sep).1
 
 @[rw_mono_rule]
 theorem wandIff_congr [BI PROP] {P P' Q Q' : PROP} (h1 : P ⊣⊢ Q) (h2 : P' ⊣⊢ Q') :
@@ -336,66 +352,70 @@ theorem wandIff_congr_r [BI PROP] {P Q Q' : PROP} (h : Q ⊣⊢ Q') : (P ∗-∗
 theorem wandIff_refl [BI PROP] {P : PROP} : ⊢ P ∗-∗ P := and_intro wand_rfl wand_rfl
 
 theorem wand_entails [BI PROP] {P Q : PROP} (h : ⊢ P -∗ Q) : P ⊢ Q :=
-  emp_sep.2.trans (wand_elim h)
+  (BI.equiv_entails.mp emp_sep).2.trans (wand_elim h)
 
 theorem entails_wand [BI PROP] {P Q : PROP} (h : P ⊢ Q) : ⊢ P -∗ Q :=
-  wand_intro (emp_sep.1.trans h)
+  wand_intro ((BI.equiv_entails.mp emp_sep).1.trans h)
 
 theorem equiv_wandIff [BI PROP] {P Q : PROP} (h : P ⊣⊢ Q) : ⊢ P ∗-∗ Q :=
-  wandIff_refl.trans (wandIff_congr_l h).2
+  wandIff_refl.trans (BI.equiv_entails.mp (wandIff_congr_l h)).2
 
 theorem wandIff_equiv [BI PROP] {P Q : PROP} (h : ⊢ P ∗-∗ Q) : P ⊣⊢ Q :=
-  ⟨wand_entails (h.trans and_elim_l), wand_entails (h.trans and_elim_r)⟩
+  BI.equiv_entails.mpr ⟨wand_entails (h.trans and_elim_l), wand_entails (h.trans and_elim_r)⟩
 
 /-! # Pure -/
 
 theorem pure_elim [BI PROP] (φ : Prop) {Q R : PROP} (h1 : Q ⊢ ⌜φ⌝) (h2 : φ → Q ⊢ R) : Q ⊢ R :=
-  (and_self (PROP := PROP)).2.trans <| imp_elim <| h1.trans <| pure_elim' fun h =>
+  (BI.equiv_entails.mp (and_self (PROP := PROP))).2.trans <| imp_elim <| h1.trans <| pure_elim' fun h =>
     imp_intro' <| and_elim_l.trans (h2 h)
 
 theorem pure_mono [BI PROP] {φ1 φ2 : Prop} (h : φ1 → φ2) : ⌜φ1⌝ ⊢ (⌜φ2⌝ : PROP) :=
   pure_elim' <| pure_intro ∘ h
 
 theorem pure_congr [BI PROP] {φ1 φ2 : Prop} (h : φ1 ↔ φ2) : ⌜φ1⌝ ⊣⊢ (⌜φ2⌝ : PROP) :=
-  ⟨pure_mono h.1,pure_mono h.2⟩
+  BI.equiv_entails.mpr ⟨pure_mono h.1, pure_mono h.2⟩
 
 theorem pure_elim_l [BI PROP] {φ : Prop} {Q R : PROP} (h : φ → Q ⊢ R) : ⌜φ⌝ ∧ Q ⊢ R :=
   pure_elim _ and_elim_l <| and_elim_r' ∘ h
 
 theorem pure_elim_r [BI PROP] {φ : Prop} {Q R : PROP} (h : φ → Q ⊢ R) : Q ∧ ⌜φ⌝ ⊢ R :=
-  and_comm.1.trans (pure_elim_l h)
+  (BI.equiv_entails.mp and_comm).1.trans (pure_elim_l h)
 
 theorem pure_true [BI PROP] {φ : Prop} (h : φ) : ⌜φ⌝ ⊣⊢ (True : PROP) := eq_true h ▸ .rfl
 
 theorem pure_and [BI PROP] {φ1 φ2 : Prop} : ⌜φ1⌝ ∧ (⌜φ2⌝ : PROP) ⊣⊢ ⌜φ1 ∧ φ2⌝ :=
-  ⟨pure_elim φ1 and_elim_l fun h => and_elim_r' <| pure_mono <| And.intro h,
+  BI.equiv_entails.mpr ⟨pure_elim φ1 and_elim_l fun h => and_elim_r' <| pure_mono <| And.intro h,
    and_intro (pure_mono And.left) (pure_mono And.right)⟩
 
 theorem pure_or [BI PROP] {φ1 φ2 : Prop} : ⌜φ1⌝ ∨ (⌜φ2⌝ : PROP) ⊣⊢ ⌜φ1 ∨ φ2⌝ :=
-  ⟨or_elim (pure_mono Or.inl) (pure_mono Or.inr),
+  BI.equiv_entails.mpr ⟨or_elim (pure_mono Or.inl) (pure_mono Or.inr),
    pure_elim' (·.elim (or_intro_l' ∘ pure_intro) (or_intro_r' ∘ pure_intro))⟩
 
 theorem pure_imp_2 [BI PROP] {φ1 φ2 : Prop} : ⌜φ1 → φ2⌝ ⊢ (⌜φ1⌝ → ⌜φ2⌝ : PROP) :=
-  imp_intro <| pure_and.1.trans <| pure_mono (And.elim id)
+  imp_intro <| (BI.equiv_entails.mp pure_and).1.trans <| pure_mono (And.elim id)
 
 theorem pure_imp [BI PROP] {φ1 φ2 : Prop} : (⌜φ1⌝ → ⌜φ2⌝ : PROP) ⊣⊢ ⌜φ1 → φ2⌝ := by
-  refine ⟨?_, pure_imp_2⟩
-  by_cases h : φ1
-  · exact (mp .rfl (pure_intro h)).trans (pure_mono fun h _ => h)
-  · exact pure_intro h.elim
+  apply BI.equiv_entails.mpr
+  constructor
+  · by_cases h : φ1
+    · exact (mp .rfl (pure_intro h)).trans (pure_mono fun h _ => h)
+    · exact pure_intro h.elim
+  · exact pure_imp_2
 
 theorem pure_forall_2 [BI PROP] {φ : α → Prop} : ⌜∀ x, φ x⌝ ⊢ ∀ x, (⌜φ x⌝ : PROP) :=
   forall_intro fun _ => pure_mono (· _)
 
 theorem pure_forall [BI PROP] {φ : α → Prop} : (∀ x, (⌜φ x⌝ : PROP)) ⊣⊢ ⌜∀ x, φ x⌝ := by
-  refine ⟨?_, pure_forall_2⟩
-  by_cases h : ∃ x, ¬φ x
-  · let ⟨x, h⟩ := h
-    exact (forall_elim x).trans (pure_mono h.elim)
-  · exact pure_intro fun x => Classical.not_not.1 <| mt (⟨x, ·⟩) h
+  apply BI.equiv_entails.mpr
+  constructor
+  · by_cases h : ∃ x, ¬φ x
+    · let ⟨x, h⟩ := h
+      exact (forall_elim x).trans (pure_mono h.elim)
+    · exact pure_intro fun x => Classical.not_not.1 <| mt (⟨x, ·⟩) h
+  · exact pure_forall_2
 
 theorem pure_exists [BI PROP] {φ : α → Prop} : (∃ x, ⌜φ x⌝ : PROP) ⊣⊢ ⌜∃ x, φ x⌝ :=
-  ⟨exists_elim fun a => pure_mono (⟨a, ·⟩),
+  BI.equiv_entails.mpr ⟨exists_elim fun a => pure_mono (⟨a, ·⟩),
    pure_elim' fun ⟨x, h⟩ => (pure_intro h).trans (exists_intro' x .rfl)⟩
 
 /-! # Affine -/
@@ -418,7 +438,7 @@ theorem affinely_idem [BI PROP] {P : PROP} : <affine> <affine> P ⊣⊢ <affine>
   and_assoc.symm.trans (and_congr_l and_self)
 
 theorem affinely_intro' [BI PROP] {P Q : PROP} (h : P ⊢ <affine> Q) :
-    <affine> P ⊢ <affine> Q := (affinely_mono h).trans affinely_idem.1
+    <affine> P ⊢ <affine> Q := (affinely_mono h).trans (BI.equiv_entails.mp affinely_idem).1
 
 theorem affinely_false [BI PROP] : <affine> False ⊣⊢ (False : PROP) := and_false
 
@@ -432,7 +452,7 @@ theorem affinely_and [BI PROP] {P Q : PROP} : <affine> (P ∧ Q) ⊣⊢ <affine>
 
 theorem affinely_sep_2 [BI PROP] {P Q : PROP} : <affine> P ∗ <affine> Q ⊢ <affine> (P ∗ Q) :=
   and_intro
-    (sep_mono affinely_elim_emp affinely_elim_emp |>.trans sep_emp.1)
+    (sep_mono affinely_elim_emp affinely_elim_emp |>.trans (BI.equiv_entails.mp sep_emp).1)
     (sep_mono affinely_elim affinely_elim)
 
 theorem affinely_sep_r [BI PROP] [BIPositive PROP] {P Q : PROP} :
@@ -441,7 +461,7 @@ theorem affinely_sep_r [BI PROP] [BIPositive PROP] {P Q : PROP} :
 
 theorem affinely_sep [BI PROP] [BIPositive PROP] {P Q : PROP} :
     <affine> (P ∗ Q) ⊣⊢ <affine> P ∗ <affine> Q :=
-  ⟨affinely_idem.2.trans <| (affinely_mono affinely_sep_r).trans affinely_sep_l, affinely_sep_2⟩
+  BI.equiv_entails.mpr ⟨(BI.equiv_entails.mp affinely_idem).2.trans <| (affinely_mono affinely_sep_r).trans affinely_sep_l, affinely_sep_2⟩
 
 theorem affinely_forall_1 [BI PROP] {Φ : α → PROP} : <affine> (∀ a, Φ a) ⊢ ∀ a, <affine> (Φ a) :=
   forall_intro fun a => affinely_mono (forall_elim a)
@@ -450,7 +470,7 @@ theorem affinely_exists [BI PROP] {Φ : α → PROP} : <affine> (∃ a, Φ a) �
   and_exists_l
 
 theorem affinely_true [BI PROP] : <affine> True ⊣⊢ (emp : PROP) :=
-  ⟨and_elim_l, and_intro .rfl true_intro⟩
+  BI.equiv_entails.mpr ⟨and_elim_l, and_intro .rfl true_intro⟩
 
 theorem affinely_and_l [BI PROP] {P Q : PROP} : <affine> P ∧ Q ⊣⊢ <affine> (P ∧ Q) := and_assoc
 
@@ -487,7 +507,7 @@ instance exists_affine [BI PROP] (Φ : α → PROP) [∀ x, Affine (Φ x)] : Aff
   affine := exists_elim fun _ => affine
 
 instance sep_affine [BI PROP] (P Q : PROP) [Affine P] [Affine Q] : Affine iprop(P ∗ Q) where
-  affine := (sep_mono affine affine).trans sep_emp.1
+  affine := (sep_mono affine affine).trans (BI.equiv_entails.mp sep_emp).1
 
 instance affinely_affine [BI PROP] (P : PROP) : Affine iprop(<affine> P) where
   affine := affinely_elim_emp
@@ -507,16 +527,16 @@ theorem absorbingly_intro [BI PROP] {P : PROP} : P ⊢ <absorb> P := true_sep_2
 theorem absorbingly_mono [BI PROP] {P Q : PROP} : (P ⊢ Q) → <absorb> P ⊢ <absorb> Q := sep_mono_r
 
 theorem absorbingly_idem [BI PROP] {P : PROP} : <absorb> <absorb> P ⊣⊢ <absorb> P :=
-  ⟨sep_assoc.2.trans (sep_mono_l true_intro), absorbingly_intro⟩
+  BI.equiv_entails.mpr ⟨(BI.equiv_entails.mp sep_assoc).2.trans (sep_mono_l true_intro), absorbingly_intro⟩
 
 instance absorbingly_absorbing [BI PROP] (P : PROP) : Absorbing iprop(<absorb> P) where
-  absorbing := absorbingly_idem.1
+  absorbing := (BI.equiv_entails.mp absorbingly_idem).1
 
 theorem absorbingly_pure {φ : Prop} [BI PROP] : <absorb> ⌜φ⌝ ⊣⊢ (⌜φ⌝ : PROP) :=
-  ⟨wand_elim' <| pure_elim' fun h => wand_intro' <| pure_intro h, absorbingly_intro⟩
+  BI.equiv_entails.mpr ⟨wand_elim' <| pure_elim' fun h => wand_intro' <| pure_intro h, absorbingly_intro⟩
 
 instance pureAbsorbing (φ : Prop) [BI PROP] : Absorbing (PROP := PROP) iprop(⌜φ⌝) where
-  absorbing := absorbingly_pure.1
+  absorbing := (BI.equiv_entails.mp absorbingly_pure).1
 
 theorem absorbingly_true [BI PROP] : <absorb> True ⊣⊢ (True : PROP) := absorbingly_pure
 
@@ -531,7 +551,8 @@ theorem absorbingly_forall_1 [BI PROP] {Φ : α → PROP} : <absorb> (∀ a, Φ 
 
 theorem absorbingly_exists [BI PROP] {Φ : α → PROP} :
     <absorb> (∃ a, Φ a) ⊣⊢ ∃ a, <absorb> (Φ a) := by
-  simp [absorbingly, sep_exists_l]
+  simp [absorbingly]
+  exact sep_exists_l
 
 theorem absorbingly_sep [BI PROP] {P Q : PROP} : <absorb> (P ∗ Q) ⊣⊢ <absorb> P ∗ <absorb> Q :=
   absorbingly_idem.symm.trans <| (sep_congr_r sep_left_comm).trans sep_assoc.symm
@@ -539,7 +560,7 @@ theorem absorbingly_sep [BI PROP] {P Q : PROP} : <absorb> (P ∗ Q) ⊣⊢ <abso
 theorem absorbingly_emp [BI PROP] : <absorb> (emp : PROP) ⊣⊢ True := sep_emp
 
 theorem absorbingly_wand_1 [BI PROP] {P Q : PROP} : <absorb> (P -∗ Q) ⊢ <absorb> P -∗ <absorb> Q :=
-  wand_intro' <| absorbingly_sep.2.trans <| absorbingly_mono wand_elim_r
+  wand_intro' <| (BI.equiv_entails.mp absorbingly_sep).2.trans <| absorbingly_mono wand_elim_r
 
 theorem absorbingly_sep_l [BI PROP] {P Q : PROP} : <absorb> P ∗ Q ⊣⊢ <absorb> (P ∗ Q) := sep_assoc
 
@@ -556,7 +577,7 @@ theorem affinely_absorbingly [BI PROP] [BIPositive PROP] {P : PROP} :
 /-! # Absorbing instances -/
 
 instance pure_absorbing [BI PROP] (φ : Prop) : Absorbing iprop(⌜φ⌝ : PROP) where
-  absorbing := absorbingly_pure.1
+  absorbing := (BI.equiv_entails.mp absorbingly_pure).1
 
 instance and_absorbing [BI PROP] (P Q : PROP) [Absorbing P] [Absorbing Q] :
     Absorbing iprop(P ∧ Q) where
@@ -564,7 +585,7 @@ instance and_absorbing [BI PROP] (P Q : PROP) [Absorbing P] [Absorbing Q] :
 
 instance or_absorbing [BI PROP] (P Q : PROP) [Absorbing P] [Absorbing Q] :
     Absorbing iprop(P ∨ Q) where
-  absorbing := absorbingly_or.1.trans (or_mono absorbing absorbing)
+  absorbing := (BI.equiv_entails.mp absorbingly_or).1.trans (or_mono absorbing absorbing)
 
 instance forall_absorbing [BI PROP] (Φ : α → PROP) [∀ x, Absorbing (Φ x)] :
     Absorbing iprop(∀ x, Φ x) where
@@ -572,22 +593,22 @@ instance forall_absorbing [BI PROP] (Φ : α → PROP) [∀ x, Absorbing (Φ x)]
 
 instance exists_absorbing [BI PROP] (Φ : α → PROP) [∀ x, Absorbing (Φ x)] :
     Absorbing iprop(∃ x, Φ x) where
-  absorbing := absorbingly_exists.1.trans (exists_mono fun _ => absorbing)
+  absorbing := (BI.equiv_entails.mp absorbingly_exists).1.trans (exists_mono fun _ => absorbing)
 
 instance sep_absorbing_l [BI PROP] (P Q : PROP) [Absorbing P] : Absorbing iprop(P ∗ Q) where
-  absorbing := absorbingly_sep_l.2.trans (sep_mono_l absorbing)
+  absorbing := (BI.equiv_entails.mp absorbingly_sep_l).2.trans (sep_mono_l absorbing)
 
 instance sep_absorbing_r [BI PROP] (P Q : PROP) [Absorbing Q] : Absorbing iprop(P ∗ Q) where
-  absorbing := absorbingly_sep_r.2.trans (sep_mono_r absorbing)
+  absorbing := (BI.equiv_entails.mp absorbingly_sep_r).2.trans (sep_mono_r absorbing)
 
 instance (priority := default + 10) biaffine_absorbing [BI PROP] [BIAffine PROP]
     (P : PROP) : Absorbing P where
-  absorbing := (sep_mono_l affine).trans emp_sep.1
+  absorbing := (sep_mono_l affine).trans (BI.equiv_entails.mp emp_sep).1
 
 /-! # Affine / Absorbing Propositions -/
 
 theorem affine_affinely [BI PROP] (P : PROP) [Affine P] : <affine> P ⊣⊢ P :=
-  ⟨affinely_elim, and_intro affine .rfl⟩
+  BI.equiv_entails.mpr ⟨affinely_elim, and_intro affine .rfl⟩
 
 theorem biaffine_iff_true_emp [BI PROP] : BIAffine PROP ↔ (True : PROP) ⊢ emp :=
   ⟨fun _ => affine, fun h => ⟨fun _ => ⟨true_intro.trans h⟩⟩⟩
@@ -596,21 +617,21 @@ theorem biaffine_of_true_affine [BI PROP] [Affine (iprop(True) : PROP)] : BIAffi
   biaffine_iff_true_emp.2 affine
 
 theorem absorbing_absorbingly [BI PROP] {P : PROP} [Absorbing P] : <absorb> P ⊣⊢ P :=
-  ⟨absorbing, absorbingly_intro⟩
+  BI.equiv_entails.mpr ⟨absorbing, absorbingly_intro⟩
 
 theorem absorbing_of_emp_absorbing [BI PROP] [Absorbing (emp : PROP)] (P : PROP) : Absorbing P where
-  absorbing := (absorbingly_mono emp_sep.2).trans <| absorbingly_sep_l.2.trans <|
-    (sep_mono_l absorbing).trans emp_sep.1
+  absorbing := (absorbingly_mono (BI.equiv_entails.mp emp_sep).2).trans <| (BI.equiv_entails.mp absorbingly_sep_l).2.trans <|
+    (sep_mono_l absorbing).trans (BI.equiv_entails.mp emp_sep).1
 
 theorem sep_elim_l [BI PROP] {P Q : PROP} : [TCOr (Affine Q) (Absorbing P)] → P ∗ Q ⊢ P
-  | TCOr.l => (sep_mono_r affine).trans sep_emp.1
-  | TCOr.r => (sep_mono_r true_intro).trans <| sep_comm.1.trans absorbing
+  | TCOr.l => (sep_mono_r affine).trans (BI.equiv_entails.mp sep_emp).1
+  | TCOr.r => (sep_mono_r true_intro).trans <| (BI.equiv_entails.mp sep_comm).1.trans absorbing
 
 theorem sep_elim_r [BI PROP] {P Q : PROP} [TCOr (Affine P) (Absorbing Q)] : P ∗ Q ⊢ Q :=
-  sep_comm.1.trans sep_elim_l
+  (BI.equiv_entails.mp sep_comm).1.trans sep_elim_l
 
 instance wand_absorbing_l [BI PROP] (P Q : PROP) [Absorbing P] : Absorbing iprop(P -∗ Q) where
-  absorbing := wand_intro' <| sep_assoc.2.trans <| (sep_mono_l sep_elim_l).trans wand_elim_r
+  absorbing := wand_intro' <| (BI.equiv_entails.mp sep_assoc).2.trans <| (sep_mono_l sep_elim_l).trans wand_elim_r
 
 instance wand_absorbing_r [BI PROP] (P Q : PROP) [Absorbing Q] : Absorbing iprop(P -∗ Q) where
   absorbing := absorbingly_wand_1.trans (wand_mono absorbingly_intro absorbing)
@@ -620,80 +641,83 @@ theorem sep_and [BI PROP] {P Q : PROP}
   and_intro sep_elim_l sep_elim_r
 
 theorem affinely_intro [BI PROP] {P Q : PROP} [Affine P] (h : P ⊢ Q) : P ⊢ <affine> Q :=
-  (affine_affinely _).2.trans (affinely_mono h)
+  (BI.equiv_entails.mp (affine_affinely _)).2.trans (affinely_mono h)
 
 theorem emp_and [BI PROP] {P : PROP} [Affine P] : emp ∧ P ⊣⊢ P :=
-  ⟨and_elim_r, and_intro affine .rfl⟩
-instance [BI PROP] [BIAffine PROP] : LeftId (α := PROP) BiEntails emp and := ⟨emp_and⟩
+  BI.equiv_entails.mpr ⟨and_elim_r, and_intro affine .rfl⟩
+instance [BI PROP] [BIAffine PROP] : LeftId (α := PROP) BiEquiv emp and := ⟨emp_and⟩
 
 theorem and_emp [BI PROP] {P : PROP} [Affine P] : P ∧ emp ⊣⊢ P := and_comm.trans emp_and
-instance [BI PROP] [BIAffine PROP] : RightId (α := PROP) BiEntails emp and := ⟨and_emp⟩
+instance [BI PROP] [BIAffine PROP] : RightId (α := PROP) BiEquiv emp and := ⟨and_emp⟩
 
-theorem emp_or [BI PROP] {P : PROP} [Affine P] : emp ∨ P ⊣⊢ emp := ⟨or_elim .rfl affine, or_intro_l⟩
+theorem emp_or [BI PROP] {P : PROP} [Affine P] : emp ∨ P ⊣⊢ emp := BI.equiv_entails.mpr ⟨or_elim .rfl affine, or_intro_l⟩
 
 theorem or_emp [BI PROP] {P : PROP} [Affine P] : P ∨ emp ⊣⊢ emp := or_comm.trans emp_or
 
 theorem true_emp [BI PROP] [h : BIAffine PROP] : (True : PROP) ⊣⊢ emp :=
-  ⟨biaffine_iff_true_emp.1 h, true_intro⟩
+  BI.equiv_entails.mpr ⟨biaffine_iff_true_emp.1 h, true_intro⟩
 
 instance [BI PROP] [BIAffine PROP] (P : PROP) : Absorbing P where
-  absorbing := (sep_mono_l affine).trans emp_sep.1
+  absorbing := (sep_mono_l affine).trans (BI.equiv_entails.mp emp_sep).1
 
-theorem true_sep [BI PROP] {P : PROP} [Absorbing P] : True ∗ P ⊣⊢ P := ⟨absorbing, true_sep_2⟩
-instance [BI PROP] [BIAffine PROP] : LeftId (α := PROP) BiEntails iprop(True) sep := ⟨true_sep⟩
+theorem true_sep [BI PROP] {P : PROP} [Absorbing P] : True ∗ P ⊣⊢ P := BI.equiv_entails.mpr ⟨absorbing, true_sep_2⟩
+instance [BI PROP] [BIAffine PROP] : LeftId (α := PROP) BiEquiv iprop(True) sep := ⟨true_sep⟩
 
 theorem sep_true [BI PROP] {P : PROP} [Absorbing P] : P ∗ True ⊣⊢ P := sep_comm.trans true_sep
-instance [BI PROP] [BIAffine PROP] : RightId (α := PROP) BiEntails iprop(True) sep := ⟨sep_true⟩
+instance [BI PROP] [BIAffine PROP] : RightId (α := PROP) BiEquiv iprop(True) sep := ⟨sep_true⟩
 
 instance [BI PROP] [BIAffine PROP] : BIPositive PROP where
-  affinely_sep_l := (affine_affinely _).1.trans (sep_mono_l (affine_affinely _).2)
+  affinely_sep_l := (BI.equiv_entails.mp (affine_affinely _)).1.trans (sep_mono_l (BI.equiv_entails.mp (affine_affinely _)).2)
 
 theorem imp_wand_1 [BI PROP] [BIAffine PROP] {P Q : PROP} : (P → Q) ⊢ P -∗ Q :=
   wand_intro <| sep_and.trans imp_elim_l
 
 theorem pure_sep [BI PROP] {φ1 φ2 : Prop} : ⌜φ1⌝ ∗ (⌜φ2⌝ : PROP) ⊣⊢ ⌜φ1 ∧ φ2⌝ :=
-  ⟨sep_and.trans pure_and.1, pure_elim' fun ⟨a, b⟩ => by
+  BI.equiv_entails.mpr ⟨sep_and.trans (BI.equiv_entails.mp pure_and).1, pure_elim' fun ⟨a, b⟩ => by
     rw [eq_true a, eq_true b]; exact true_sep_2⟩
 
 theorem pure_wand_2 [BI PROP] {φ1 φ2 : Prop} : ⌜φ1 → φ2⌝ ⊢ (⌜φ1⌝ -∗ (⌜φ2⌝ : PROP)) :=
   pure_elim' fun a => wand_intro <| absorbing.trans (pure_mono a)
 
 theorem pure_wand [BI PROP] {φ1 φ2 : Prop} : (⌜φ1⌝ -∗ (⌜φ2⌝ : PROP)) ⊣⊢ ⌜φ1 → φ2⌝ := by
-  refine ⟨(imp_intro' ?_).trans pure_imp.1, pure_wand_2⟩
+  apply BI.equiv_entails.mpr
+  refine ⟨(imp_intro' ?_).trans (BI.equiv_entails.mp pure_imp).1, pure_wand_2⟩
   exact pure_elim_l fun h => true_sep_2.trans (eq_true h ▸ wand_elim_r)
 
 /-! # Properties of the persistence modality -/
 
 @[rw_mono_rule]
 theorem persistently_congr [BI PROP] {P P' : PROP} (h : P ⊣⊢ P') :
-    <pers> P ⊣⊢ <pers> P' := ⟨persistently_mono h.1, persistently_mono h.2⟩
+    <pers> P ⊣⊢ <pers> P' := BI.equiv_entails.mpr ⟨persistently_mono (BI.equiv_entails.mp h).1, persistently_mono (BI.equiv_entails.mp h).2⟩
 
 instance persistently_persistent [BI PROP] (P : PROP) : Persistent iprop(<pers> P) where
   persistent := persistently_idem_2
 
 theorem persistently_absorb_r [BI PROP] {P Q : PROP} : P ∗ <pers> Q ⊢ <pers> Q :=
-  sep_comm.1.trans persistently_absorb_l
+  (BI.equiv_entails.mp sep_comm).1.trans persistently_absorb_l
 
 theorem absorbingly_persistently [BI PROP] {P : PROP} : <absorb> <pers> P ⊣⊢ <pers> P :=
-  ⟨persistently_absorb_r, absorbingly_intro⟩
+  BI.equiv_entails.mpr ⟨persistently_absorb_r, absorbingly_intro⟩
 
 instance persistently_absorbing [BI PROP] (P : PROP) : Absorbing iprop(<pers> P) where
-  absorbing := absorbingly_persistently.1
+  absorbing := (BI.equiv_entails.mp absorbingly_persistently).1
 
 theorem persistently_forall_1 [BI PROP] {Ψ : α → PROP} : <pers> (∀ a, Ψ a) ⊢ ∀ a, <pers> (Ψ a) :=
   forall_intro fun x => persistently_mono (forall_elim x)
 
 theorem persistently_forall [BI PROP] [h : BIPersistentlyForall PROP] {Ψ : α → PROP} :
     <pers> (∀ a, Ψ a) ⊣⊢ ∀ a, <pers> (Ψ a) := by
+  apply BI.equiv_entails.mpr
   refine ⟨persistently_forall_1, (forall_intro fun _ => imp_intro <| pure_elim_r ?_).trans (h.1 _)⟩
   rintro ⟨_, rfl⟩; apply forall_elim
 
 theorem persistently_exists [BI PROP] {Ψ : α → PROP} : <pers> (∃ a, Ψ a) ⊣⊢ ∃ a, <pers> (Ψ a) := by
+  apply BI.equiv_entails.mpr
   refine ⟨persistently_sExists_1.trans ?_, exists_elim fun a => persistently_mono (exists_intro a)⟩
   refine exists_elim fun _ => pure_elim_l fun ⟨_, eq⟩ => eq ▸ sExists_intro ⟨_, rfl⟩
 
 theorem persistently_and [BI PROP] {P Q : PROP} : <pers> (P ∧ Q) ⊣⊢ <pers> P ∧ <pers> Q :=
-  ⟨and_intro (persistently_mono and_elim_l) (persistently_mono and_elim_r), persistently_and_2⟩
+  BI.equiv_entails.mpr ⟨and_intro (persistently_mono and_elim_l) (persistently_mono and_elim_r), persistently_and_2⟩
 
 theorem persistently_ite {p : Bool} [BI PROP] {P Q : PROP} :
     iprop(<pers> if p then P else Q) = iprop(if p then <pers> P else <pers> Q) := by
@@ -704,85 +728,86 @@ theorem persistently_or [BI PROP] {P Q : PROP} : <pers> (P ∨ Q) ⊣⊢ <pers> 
     (or_eq_ite.trans <| exists_congr fun _ => persistently_ite (PROP := PROP) ▸ .rfl).symm
 
 theorem persistently_imp_1 [BI PROP] {P Q : PROP} : <pers> (P → Q) ⊢ (<pers> P → <pers> Q) :=
-  imp_intro <| persistently_and.2.trans (persistently_mono imp_elim_l)
+  imp_intro <| (BI.equiv_entails.mp persistently_and).2.trans (persistently_mono imp_elim_l)
 
 theorem persistently_emp_intro [BI PROP] {P : PROP} : P ⊢ <pers> emp :=
-  emp_sep.2.trans <| (sep_mono_l persistently_emp_2).trans (persistently_absorb_l (Q := P))
+  (BI.equiv_entails.mp emp_sep).2.trans <| (sep_mono_l persistently_emp_2).trans (persistently_absorb_l (Q := P))
 
 theorem persistently_emp [BI PROP] : <pers> (emp : PROP) ⊣⊢ True :=
-  ⟨true_intro, persistently_emp_intro⟩
+  BI.equiv_entails.mpr ⟨true_intro, persistently_emp_intro⟩
 
 theorem persistently_true [BI PROP] : <pers> (True : PROP) ⊣⊢ True :=
-  ⟨true_intro, persistently_emp.2.trans <| persistently_mono true_intro⟩
+  BI.equiv_entails.mpr ⟨true_intro, (BI.equiv_entails.mp persistently_emp).2.trans <| persistently_mono true_intro⟩
 
 theorem persistently_affinely [BI PROP] {P : PROP} : <pers> <affine> P ⊣⊢ <pers> P :=
-  ⟨persistently_mono affinely_elim,
-   (and_intro persistently_emp_intro .rfl).trans persistently_and.2⟩
+  BI.equiv_entails.mpr ⟨persistently_mono affinely_elim,
+   (and_intro persistently_emp_intro .rfl).trans (BI.equiv_entails.mp persistently_and).2⟩
 
 theorem persistently_and_affinely_sep [BI PROP] {P Q : PROP} : <pers> P ∧ Q ⊢ <affine> P ∗ Q :=
-  (and_mono_l persistently_affinely.2).trans persistently_and_l
+  (and_mono_l (BI.equiv_entails.mp persistently_affinely).2).trans persistently_and_l
 
 theorem persistently_and_sep_assoc [BI PROP] {P Q R : PROP} :
     <pers> P ∧ (Q ∗ R) ⊣⊢ (<pers> P ∧ Q) ∗ R := by
-  constructor
+  apply BI.equiv_entails.mpr; constructor
   · refine (and_mono_l persistently_idem_2).trans <| persistently_and_affinely_sep.trans <|
-      sep_assoc.2.trans <| sep_mono_l <| and_intro ?_ ?_
+      (BI.equiv_entails.mp sep_assoc).2.trans <| sep_mono_l <| and_intro ?_ ?_
     · exact (sep_mono_l and_elim_r).trans persistently_absorb_l
-    · exact (sep_mono_l and_elim_l).trans emp_sep.1
+    · exact (sep_mono_l and_elim_l).trans (BI.equiv_entails.mp emp_sep).1
   · exact and_intro ((sep_mono_l and_elim_l).trans persistently_absorb_l) (sep_mono_l and_elim_r)
 
 theorem intuitionistically_elim [BI PROP] {P : PROP} : □ P ⊢ P :=
-  and_comm.2.trans <| persistently_and_affinely_sep.trans <| sep_emp.1.trans affinely_elim
+  (BI.equiv_entails.mp and_comm).2.trans <| persistently_and_affinely_sep.trans <| (BI.equiv_entails.mp sep_emp).1.trans affinely_elim
 
 theorem absorbingly_of_persistently [BI PROP] {P : PROP} : <pers> P ⊢ <absorb> P :=
-  and_true.2.trans <| (and_mono_r emp_sep.2).trans <| persistently_and_sep_assoc.1.trans <|
-    (sep_mono_l <| and_comm.1.trans intuitionistically_elim).trans sep_comm.1
+  (BI.equiv_entails.mp and_true).2.trans <| (and_mono_r (BI.equiv_entails.mp emp_sep).2).trans <| (BI.equiv_entails.mp persistently_and_sep_assoc).1.trans <|
+    (sep_mono_l <| (BI.equiv_entails.mp and_comm).1.trans intuitionistically_elim).trans (BI.equiv_entails.mp sep_comm).1
 
 theorem persistently_elim [BI PROP] {P : PROP} [Absorbing P] : <pers> P ⊢ P :=
   absorbingly_of_persistently.trans absorbing
 
 theorem persistently_idem [BI PROP] {P : PROP} : <pers> <pers> P ⊣⊢ <pers> P :=
-  ⟨absorbingly_of_persistently.trans absorbingly_persistently.1, persistently_idem_2⟩
+  BI.equiv_entails.mpr ⟨absorbingly_of_persistently.trans (BI.equiv_entails.mp absorbingly_persistently).1, persistently_idem_2⟩
 
 theorem persistently_intro' [BI PROP] {P Q : PROP} (h : <pers> P ⊢ Q) : <pers> P ⊢ <pers> Q :=
- persistently_idem.2.trans (persistently_mono h)
+ (BI.equiv_entails.mp persistently_idem).2.trans (persistently_mono h)
 
 theorem persistently_pure {φ : Prop} [BI PROP] : <pers> ⌜φ⌝ ⊣⊢ (⌜φ⌝ : PROP) :=
-  ⟨absorbingly_of_persistently.trans absorbingly_pure.1,
-   pure_elim' fun h => persistently_true.2.trans <| persistently_mono <| pure_intro h⟩
+  BI.equiv_entails.mpr ⟨absorbingly_of_persistently.trans (BI.equiv_entails.mp absorbingly_pure).1,
+   pure_elim' fun h => (BI.equiv_entails.mp persistently_true).2.trans <| persistently_mono <| pure_intro h⟩
 
 theorem persistently_and_imp_sep [BI PROP] {P Q : PROP} : <pers> P ∧ Q ⊢ <pers> P ∗ Q :=
-  (and_mono_r emp_sep.2).trans <| persistently_and_sep_assoc.1.trans <| sep_mono_l and_elim_l
+  (and_mono_r (BI.equiv_entails.mp emp_sep).2).trans <| (BI.equiv_entails.mp persistently_and_sep_assoc).1.trans <| sep_mono_l and_elim_l
 
 theorem and_persistently_imp_sep [BI PROP] {P Q : PROP} : P ∧ <pers> Q ⊢ P ∗ <pers> Q :=
   and_symm.trans <| persistently_and_imp_sep.trans sep_symm
 
 theorem persistently_sep_persistently [BI PROP] {P : PROP} : <pers> P ∗ <pers> P ⊣⊢ <pers> P :=
-  ⟨sep_elim_r, and_self.2.trans persistently_and_imp_sep⟩
+  BI.equiv_entails.mpr ⟨sep_elim_r, (BI.equiv_entails.mp and_self).2.trans persistently_and_imp_sep⟩
 
 theorem persistently_and_sep [BI PROP] {P Q : PROP} : <pers> (P ∧ Q) ⊢ <pers> (P ∗ Q) :=
-  persistently_and.1.trans <| (and_mono_l persistently_idem.2).trans <|
-  persistently_and.2.trans <| persistently_mono <|
-  (and_mono_r emp_sep.2).trans <| persistently_and_sep_assoc.1.trans <|
-  sep_mono_l <| and_comm.1.trans intuitionistically_elim
+  (BI.equiv_entails.mp persistently_and).1.trans <| (and_mono_l (BI.equiv_entails.mp persistently_idem).2).trans <|
+  (BI.equiv_entails.mp persistently_and).2.trans <| persistently_mono <|
+  (and_mono_r (BI.equiv_entails.mp emp_sep).2).trans <| (BI.equiv_entails.mp persistently_and_sep_assoc).1.trans <|
+  sep_mono_l <| (BI.equiv_entails.mp and_comm).1.trans intuitionistically_elim
 
 theorem persistently_and_persistently_sep [BI PROP] {P Q : PROP} :
     <pers> P ∧ <pers> Q ⊣⊢ <pers> P ∗ <pers> Q :=
-  ⟨persistently_and_imp_sep, and_intro persistently_absorb_l persistently_absorb_r⟩
+  BI.equiv_entails.mpr ⟨persistently_and_imp_sep, and_intro persistently_absorb_l persistently_absorb_r⟩
 
 theorem persistently_sep_2 [BI PROP] {P Q : PROP} : <pers> P ∗ <pers> Q ⊢ <pers> (P ∗ Q) :=
-  (persistently_and.trans persistently_and_persistently_sep).2.trans persistently_and_sep
+  (BI.equiv_entails.mp (persistently_and.trans persistently_and_persistently_sep)).2.trans persistently_and_sep
 
 theorem persistently_sep [BI PROP] [BIPositive PROP] {P Q : PROP} :
     <pers> (P ∗ Q) ⊣⊢ <pers> P ∗ <pers> Q := by
-  refine ⟨persistently_affinely.2.trans ?_, persistently_sep_2⟩
-  refine persistently_mono affinely_sep.1 |>.trans ?_ |>.trans persistently_and_persistently_sep.1
+  apply BI.equiv_entails.mpr
+  refine ⟨(BI.equiv_entails.mp persistently_affinely).2.trans ?_, persistently_sep_2⟩
+  refine persistently_mono (BI.equiv_entails.mp affinely_sep).1 |>.trans ?_ |>.trans (BI.equiv_entails.mp persistently_and_persistently_sep).1
   exact and_intro
-    (persistently_mono <| (sep_mono_r affinely_elim_emp).trans <| sep_emp.1.trans affinely_elim)
-    (persistently_mono <| (sep_mono_l affinely_elim_emp).trans <| emp_sep.1.trans affinely_elim)
+    (persistently_mono <| (sep_mono_r affinely_elim_emp).trans <| (BI.equiv_entails.mp sep_emp).1.trans affinely_elim)
+    (persistently_mono <| (sep_mono_l affinely_elim_emp).trans <| (BI.equiv_entails.mp emp_sep).1.trans affinely_elim)
 
 theorem self_sep_persistently [BI PROP] {P : PROP} : P ∗ <pers> P ⊣⊢ <pers> P :=
-  ⟨sep_elim_r, and_self.2.trans persistently_and_l⟩
+  BI.equiv_entails.mpr ⟨sep_elim_r, (BI.equiv_entails.mp and_self).2.trans persistently_and_l⟩
 
 theorem affinely_sep_persistently [BI PROP] {P : PROP} : <affine> P ∗ <pers> P ⊣⊢ <pers> P :=
   (sep_congr_r persistently_affinely.symm).trans <|
@@ -808,53 +833,54 @@ theorem persistently_emp' [BI PROP] [BIAffine PROP] : <pers> (emp : PROP) ⊣⊢
   persistently_emp.trans true_emp
 
 theorem persistently_and_iff_sep [BI PROP] [BIAffine PROP] {P Q : PROP} :
-    <pers> P ∧ Q ⊣⊢ <pers> P ∗ Q := ⟨persistently_and_imp_sep, sep_and⟩
+    <pers> P ∧ Q ⊣⊢ <pers> P ∗ Q := BI.equiv_entails.mpr ⟨persistently_and_imp_sep, sep_and⟩
 
 theorem and_persistently_iff_sep [BI PROP] [BIAffine PROP] {P Q : PROP} :
-    P ∧ <pers> Q ⊣⊢ P ∗ <pers> Q := ⟨and_persistently_imp_sep, sep_and⟩
+    P ∧ <pers> Q ⊣⊢ P ∗ <pers> Q := BI.equiv_entails.mpr ⟨and_persistently_imp_sep, sep_and⟩
 
 theorem persistently_imp_wand [BI PROP] [BIAffine PROP] {P Q : PROP} :
     <pers> (P → Q) ⊣⊢ <pers> (P -∗ Q) := by
+  apply BI.equiv_entails.mpr
   refine ⟨persistently_intro' (wand_intro ?_), persistently_imp_wand_2⟩
-  exact persistently_and_iff_sep.2.trans <| (and_mono_l persistently_elim).trans imp_elim_l
+  exact (BI.equiv_entails.mp persistently_and_iff_sep).2.trans <| (and_mono_l persistently_elim).trans imp_elim_l
 
 theorem imp_wand_persistently [BI PROP] [BIAffine PROP] {P Q : PROP} :
-    (<pers> P → Q) ⊣⊢ (<pers> P -∗ Q) := ⟨imp_wand_1, imp_wand_persistently_2⟩
+    (<pers> P → Q) ⊣⊢ (<pers> P -∗ Q) := BI.equiv_entails.mpr ⟨imp_wand_1, imp_wand_persistently_2⟩
 
 theorem wand_iff_exists_persistently [BI PROP] [BIAffine PROP] {P Q : PROP} :
     (P -∗ Q) ⊣⊢ ∃ R, R ∗ <pers> (P ∗ R → Q) := by
-  constructor
-  · refine (sep_true.2.trans ?_).trans (exists_intro iprop(P -∗ Q))
-    exact sep_mono_r <| persistently_pure.2.trans <| persistently_intro' <|
-      imp_intro <| (and_mono persistently_pure.1 wand_elim_r).trans and_elim_r
-  · exact exists_elim fun R => wand_intro' <| sep_assoc.2.trans <|
-      and_persistently_iff_sep.2.trans <| (and_mono_r persistently_elim).trans imp_elim_r
+  apply BI.equiv_entails.mpr; constructor
+  · refine ((BI.equiv_entails.mp sep_true).2.trans ?_).trans (exists_intro iprop(P -∗ Q))
+    exact sep_mono_r <| (BI.equiv_entails.mp persistently_pure).2.trans <| persistently_intro' <|
+      imp_intro <| (and_mono (BI.equiv_entails.mp persistently_pure).1 wand_elim_r).trans and_elim_r
+  · exact exists_elim fun R => wand_intro' <| (BI.equiv_entails.mp sep_assoc).2.trans <|
+      (BI.equiv_entails.mp and_persistently_iff_sep).2.trans <| (and_mono_r persistently_elim).trans imp_elim_r
 
 theorem persistently_and_emp {P : PROP} [BI PROP] : <pers> P ⊣⊢ <pers> (emp ∧ P) :=
-  ⟨(and_intro persistently_emp_intro .rfl).trans persistently_and.2,
+  BI.equiv_entails.mpr ⟨(and_intro persistently_emp_intro .rfl).trans (BI.equiv_entails.mp persistently_and).2,
    (persistently_mono and_elim_r).trans .rfl⟩
 
 theorem persistently_and_sep_elim_emp {P Q : PROP} [BI PROP] : <pers> P ∧ Q ⊢ (emp ∧ P) ∗ Q :=
-  (and_mono persistently_and_emp.1 BIBase.Entails.rfl).trans persistently_and_l
+  (and_mono (BI.equiv_entails.mp persistently_and_emp).1 BIBase.Entails.rfl).trans persistently_and_l
 
 theorem persistently_and_emp_elim {P : PROP} [BI PROP] : emp ∧ <pers> P ⊢ P :=
-  and_comm.1.trans <| persistently_and_sep_elim_emp.trans <| sep_emp.1.trans and_elim_r
+  (BI.equiv_entails.mp and_comm).1.trans <| persistently_and_sep_elim_emp.trans <| (BI.equiv_entails.mp sep_emp).1.trans and_elim_r
 
 /-! # Persistence instances -/
 
 instance pure_persistent (φ : Prop) [BI PROP] : Persistent (PROP := PROP) iprop(⌜φ⌝) where
-  persistent := persistently_pure.2
+  persistent := (BI.equiv_entails.mp persistently_pure).2
 
 instance emp_persistent [BI PROP] : Persistent (PROP := PROP) iprop(emp) where
   persistent := persistently_emp_intro
 
 instance and_persistent [BI PROP] (P Q : PROP) [Persistent P] [Persistent Q] :
     Persistent iprop(P ∧ Q) where
-  persistent := (and_mono persistent persistent).trans persistently_and.2
+  persistent := (and_mono persistent persistent).trans (BI.equiv_entails.mp persistently_and).2
 
 instance or_persistent [BI PROP] (P Q : PROP) [Persistent P] [Persistent Q] :
     Persistent iprop(P ∨ Q) where
-  persistent := (or_mono persistent persistent).trans persistently_or.2
+  persistent := (or_mono persistent persistent).trans (BI.equiv_entails.mp persistently_or).2
 
 theorem sForall_persistent [BI PROP] [h : BIPersistentlyForall PROP] (Ψ : PROP → Prop)
     (H : ∀ p, Ψ p → Persistent p) : Persistent iprop(sForall Ψ) where
@@ -938,7 +964,7 @@ theorem intuitionistically_idem [BI PROP] {P : PROP} : □ □ P ⊣⊢ □ P :=
   (affinely_congr persistently_affinely).trans (affinely_congr persistently_idem)
 
 theorem intuitionistically_intro' [BI PROP] {P Q : PROP} (h : □ P ⊢ Q) : □ P ⊢ □ Q :=
-  intuitionistically_idem.2.trans (intuitionistically_mono h)
+  (BI.equiv_entails.mp intuitionistically_idem).2.trans (intuitionistically_mono h)
 
 theorem persistently_of_intuitionistically [BI PROP] {P : PROP} : □ P ⊢ <pers> P :=
   affinely_elim
@@ -948,7 +974,7 @@ theorem intuitionistically_persistently [BI PROP] {P : PROP} : □ <pers> P ⊣�
 
 theorem intuitionistically_of_intuitionistic [BI PROP] {P : PROP} [Affine P] [Persistent P] :
     □ P ⊣⊢ P :=
-  ⟨intuitionistically_elim, (affine_affinely P).2.trans (affinely_mono persistent)⟩
+  BI.equiv_entails.mpr ⟨intuitionistically_elim, (BI.equiv_entails.mp (affine_affinely P)).2.trans (affinely_mono persistent)⟩
 
 theorem affinely_of_intuitionistically [BI PROP] {P : PROP} : □ P ⊢ <affine> P :=
   and_intro and_elim_l intuitionistically_elim
@@ -958,9 +984,9 @@ theorem intuitionistically_affinely [BI PROP] {P : PROP} : □ <affine> P ⊣⊢
 
 theorem persistently_and_intuitionistically_sep_l [BI PROP] {P Q : PROP} :
     <pers> P ∧ Q ⊣⊢ □ P ∗ Q :=
-  ⟨(and_mono_r emp_sep.2).trans <| persistently_and_sep_assoc.1.trans (sep_congr_l and_comm).2,
+  BI.equiv_entails.mpr ⟨(and_mono_r (BI.equiv_entails.mp emp_sep).2).trans <| (BI.equiv_entails.mp persistently_and_sep_assoc).1.trans (BI.equiv_entails.mp (sep_congr_l and_comm)).2,
    and_intro ((sep_mono_l affinely_elim).trans persistently_absorb_l)
-     ((sep_mono_l affinely_elim_emp).trans emp_sep.1)⟩
+     ((sep_mono_l affinely_elim_emp).trans (BI.equiv_entails.mp emp_sep).1)⟩
 
 theorem persistently_and_intuitionistically_sep_r [BI PROP] {P Q : PROP} :
     P ∧ <pers> Q ⊣⊢ P ∗ □ Q :=
@@ -976,26 +1002,26 @@ theorem intuitionistically_sep_idem [BI PROP] {P : PROP} : □ P ∗ □ P ⊣�
   and_sep_intuitionistically.symm.trans and_self
 
 theorem intuitionistically_wand [BI PROP] {P Q : PROP} : (□ P -∗ Q) ⊣⊢ (<pers> P → Q) :=
-  ⟨imp_intro <| persistently_and_intuitionistically_sep_r.1.trans wand_elim_l,
-   wand_intro <|persistently_and_intuitionistically_sep_r.2.trans imp_elim_l⟩
+  BI.equiv_entails.mpr ⟨imp_intro <| (BI.equiv_entails.mp persistently_and_intuitionistically_sep_r).1.trans wand_elim_l,
+   wand_intro <| (BI.equiv_entails.mp persistently_and_intuitionistically_sep_r).2.trans imp_elim_l⟩
 
 theorem affinely_self_sep_intuitionistically [BI PROP] {P : PROP} :
     <affine> (P ∗ □ P) ⊣⊢ □ P :=
-  ⟨affinely_mono <| (sep_mono_r persistently_of_intuitionistically).trans self_sep_persistently.1,
+  BI.equiv_entails.mpr ⟨affinely_mono <| (sep_mono_r persistently_of_intuitionistically).trans (BI.equiv_entails.mp self_sep_persistently).1,
    and_intro affinely_elim_emp <|
-   intuitionistically_sep_idem.2.trans <| sep_mono_l intuitionistically_elim⟩
+   (BI.equiv_entails.mp intuitionistically_sep_idem).2.trans <| sep_mono_l intuitionistically_elim⟩
 
 theorem intuitionistically_imp_wand_2 [BI PROP] {P Q : PROP} : □ (P -∗ Q) ⊢ □ (P → Q) :=
   affinely_mono persistently_imp_wand_2
 
 theorem imp_iff_exists_persistently [BI PROP] [BIAffine PROP] {P Q : PROP} :
     (P → Q) ⊣⊢ ∃ R, R ∧ <pers> (P ∧ R -∗ Q) := by
-  constructor
-  · refine (and_true.2.trans ?_).trans (exists_intro iprop(P → Q))
-    exact and_mono_r <| persistently_emp.2.trans <| persistently_mono <|
-      wand_intro <| emp_sep.1.trans imp_elim_r
-  · exact exists_elim fun R => imp_intro' <| and_assoc.2.trans <|
-      persistently_and_intuitionistically_sep_r.1.trans <|
+  apply BI.equiv_entails.mpr; constructor
+  · refine ((BI.equiv_entails.mp and_true).2.trans ?_).trans (exists_intro iprop(P → Q))
+    exact and_mono_r <| (BI.equiv_entails.mp persistently_emp).2.trans <| persistently_mono <|
+      wand_intro <| (BI.equiv_entails.mp emp_sep).1.trans imp_elim_r
+  · exact exists_elim fun R => imp_intro' <| (BI.equiv_entails.mp and_assoc).2.trans <|
+      (BI.equiv_entails.mp persistently_and_intuitionistically_sep_r).1.trans <|
       (sep_mono_r intuitionistically_elim).trans wand_elim_r
 
 theorem intuitionistically_iff_persistently [BI PROP] [BIAffine PROP]
@@ -1022,7 +1048,7 @@ theorem affinelyIf_mono {p : Bool} [BI PROP] {P Q : PROP}
 @[rw_mono_rule]
 theorem affinelyIf_congr {p : Bool} [BI PROP] {P Q : PROP} (h : P ⊣⊢ Q) :
     <affine>?p P ⊣⊢ <affine>?p Q :=
-  ⟨affinelyIf_mono h.1, affinelyIf_mono h.2⟩
+  BI.equiv_entails.mpr ⟨affinelyIf_mono (BI.equiv_entails.mp h).1, affinelyIf_mono (BI.equiv_entails.mp h).2⟩
 
 instance affinelyIf_affine (p : Bool) [BI PROP] (P : PROP) [Affine P] :
     Affine iprop(<affine>?p P) := by
@@ -1139,7 +1165,7 @@ theorem absorbinglyIf_mono {p : Bool} [BI PROP] {P Q : PROP} (h : P ⊢ Q) :
 @[rw_mono_rule]
 theorem absorbinglyIf_congr {p : Bool} [BI PROP] {P Q : PROP} (h : P ⊣⊢ Q) :
     <absorb>?p P ⊣⊢ <absorb>?p Q :=
-  ⟨absorbinglyIf_mono h.1, absorbinglyIf_mono h.2⟩
+  BI.equiv_entails.mpr ⟨absorbinglyIf_mono (BI.equiv_entails.mp h).1, absorbinglyIf_mono (BI.equiv_entails.mp h).2⟩
 
 instance absorbinglyIf_persistent (p : Bool) [BI PROP] (P : PROP) [Persistent P] :
     Persistent iprop(<absorb>?p P) := by
@@ -1253,7 +1279,7 @@ theorem persistentlyIf_mono {p : Bool} [BI PROP] {P Q : PROP} (h : P ⊢ Q) :
 @[rw_mono_rule]
 theorem persistentlyIf_congr {p : Bool} [BI PROP] {P Q : PROP} (h : P ⊣⊢ Q) :
     <pers>?p P ⊣⊢ <pers>?p Q :=
-  ⟨persistentlyIf_mono h.1, persistentlyIf_mono h.2⟩
+  BI.equiv_entails.mpr ⟨persistentlyIf_mono (BI.equiv_entails.mp h).1, persistentlyIf_mono (BI.equiv_entails.mp h).2⟩
 
 instance persistentlyIf_absorbing [BI PROP] (P : PROP) (p : Bool) [Absorbing P] :
     Absorbing iprop(<pers>?p P) := by
@@ -1338,7 +1364,7 @@ theorem intuitionisticallyIf_mono {p : Bool} [BI PROP] {P Q : PROP} (h : P ⊢ Q
 @[rw_mono_rule]
 theorem intuitionisticallyIf_congr {p : Bool} [BI PROP] {P Q : PROP}
     (h : P ⊣⊢ Q) : □?p P ⊣⊢ □?p Q :=
-  ⟨intuitionisticallyIf_mono h.1, intuitionisticallyIf_mono h.2⟩
+  BI.equiv_entails.mpr ⟨intuitionisticallyIf_mono (BI.equiv_entails.mp h).1, intuitionisticallyIf_mono (BI.equiv_entails.mp h).2⟩
 
 instance intuitionisticallyIf_affine (p : Bool) [BI PROP] (P : PROP) [Affine P] :
     Affine iprop(□?p P) := by
@@ -1424,8 +1450,8 @@ theorem intuitionisticallyIf_affinely {p : Bool} [BI PROP] {P : PROP} :
   match p with
   | false => .rfl
   | true =>
-    ⟨(intuitionistically_mono affinely_elim).trans (and_intro affinely_elim_emp .rfl),
-     affinely_elim.trans intuitionistically_affinely.2⟩
+    BI.equiv_entails.mpr ⟨(intuitionistically_mono affinely_elim).trans (and_intro affinely_elim_emp .rfl),
+     affinely_elim.trans (BI.equiv_entails.mp intuitionistically_affinely).2⟩
 
 theorem intuitionisticallyIf_intutitionistically {p : Bool} [BI PROP] {P : PROP} : □?p □ P ⊣⊢ □ P :=
   match p with
@@ -1440,30 +1466,30 @@ theorem affinelyIf_of_intuitionisticallyIf {p : Bool} [BI PROP] {P : PROP} : □
 /-! # Properties of persistent propositions -/
 
 theorem persistent_congr [BI PROP] {P Q : PROP} (H : P ⊣⊢ Q) : Persistent P ↔ Persistent Q :=
-  ⟨fun ⟨h⟩ => ⟨H.2.trans <| h.trans (persistently_mono H.1)⟩,
-   fun ⟨h⟩ => ⟨H.1.trans <| h.trans (persistently_mono H.2)⟩⟩
+  ⟨fun ⟨h⟩ => ⟨(BI.equiv_entails.mp H).2.trans <| h.trans (persistently_mono (BI.equiv_entails.mp H).1)⟩,
+   fun ⟨h⟩ => ⟨(BI.equiv_entails.mp H).1.trans <| h.trans (persistently_mono (BI.equiv_entails.mp H).2)⟩⟩
 
 theorem persistently_intro [BI PROP] {P : PROP} [Persistent P] : P ⊢ <pers> P := persistent
 
 theorem persistently_iff [BI PROP] {P : PROP} [Persistent P] [Absorbing P] :
-    <pers> P ⊣⊢ P := ⟨persistently_elim, persistent⟩
+    <pers> P ⊣⊢ P := BI.equiv_entails.mpr ⟨persistently_elim, persistent⟩
 
 theorem persistently_intro'' [BI PROP] {P : PROP} [Persistent P] (h : P ⊢ Q) : P ⊢ <pers> Q :=
   persistent.trans (persistently_mono h)
 
 theorem persistent_and_affinely_sep_l_1 [BI PROP] {P Q : PROP} [Persistent P] :
     P ∧ Q ⊢ <affine> P ∗ Q :=
-  (and_mono_l persistent).trans <| persistently_and_intuitionistically_sep_l.1.trans <|
+  (and_mono_l persistent).trans <| (BI.equiv_entails.mp persistently_and_intuitionistically_sep_l).1.trans <|
     sep_mono_l affinely_of_intuitionistically
 
 theorem persistent_and_affinely_sep_r_1 [BI PROP] {P Q : PROP} [Persistent Q] :
     P ∧ Q ⊢ P ∗ <affine> Q :=
-  and_comm.1.trans <| persistent_and_affinely_sep_l_1.trans sep_comm.1
+  (BI.equiv_entails.mp and_comm).1.trans <| persistent_and_affinely_sep_l_1.trans (BI.equiv_entails.mp sep_comm).1
 
 theorem persistent_and_affinely_sep_l [BI PROP] {P Q : PROP} [Persistent P] [Absorbing P] :
     P ∧ Q ⊣⊢ <affine> P ∗ Q :=
-  ⟨persistent_and_affinely_sep_l_1, (sep_mono_l <| affinely_mono persistent).trans <|
-    persistently_and_intuitionistically_sep_l.2.trans <| and_mono_l persistently_elim⟩
+  BI.equiv_entails.mpr ⟨persistent_and_affinely_sep_l_1, (sep_mono_l <| affinely_mono persistent).trans <|
+    (BI.equiv_entails.mp persistently_and_intuitionistically_sep_l).2.trans <| and_mono_l persistently_elim⟩
 
 theorem persistent_and_affinely_sep_r [BI PROP] {P Q : PROP} [Persistent Q] [Absorbing Q] :
     P ∧ Q ⊣⊢ P ∗ <affine> Q :=
@@ -1481,18 +1507,18 @@ theorem persistent_entails_l [BI PROP] {P Q : PROP} [Persistent Q] (H : P ⊢ Q)
   (and_intro .rfl H).trans persistent_and_sep_1
 
 theorem absorbingly_intuitionistically [BI PROP] {P : PROP} : <absorb> □ P ⊣⊢ <pers> P :=
-  ⟨(absorbingly_mono persistently_of_intuitionistically).trans absorbingly_persistently.1,
-   and_self.2.trans <| persistently_and_intuitionistically_sep_r.1.trans <| sep_mono_l true_intro⟩
+  BI.equiv_entails.mpr ⟨(absorbingly_mono persistently_of_intuitionistically).trans (BI.equiv_entails.mp absorbingly_persistently).1,
+   (BI.equiv_entails.mp and_self).2.trans <| (BI.equiv_entails.mp persistently_and_intuitionistically_sep_r).1.trans <| sep_mono_l true_intro⟩
 
 theorem absorbingly_affinely_intro_of_persistent [BI PROP] {P : PROP} [Persistent P] :
     P ⊢ <absorb> <affine> P :=
-  persistent.trans <| absorbingly_intuitionistically.2.trans <|
+  persistent.trans <| (BI.equiv_entails.mp absorbingly_intuitionistically).2.trans <|
   absorbingly_mono affinely_of_intuitionistically
 
 instance imp_absorbing [BI PROP] (P Q : PROP) [Persistent P] [Absorbing P] [Absorbing Q] :
     Absorbing iprop(P → Q) where
-  absorbing := imp_intro' <| persistent_and_affinely_sep_l.1.trans <| absorbingly_sep_r.1.trans <|
-    (absorbingly_mono <| persistent_and_affinely_sep_l.2.trans imp_elim_r).trans absorbing
+  absorbing := imp_intro' <| (BI.equiv_entails.mp persistent_and_affinely_sep_l).1.trans <| (BI.equiv_entails.mp absorbingly_sep_r).1.trans <|
+    (absorbingly_mono <| (BI.equiv_entails.mp persistent_and_affinely_sep_l).2.trans imp_elim_r).trans absorbing
 
 theorem bigOp_sep_nil [BI PROP] : iprop([∗] []) ⊣⊢ (emp : PROP) := .rfl
 
@@ -1508,36 +1534,36 @@ theorem bigOp_and_cons [BI PROP] {P : PROP} {Ps : List PROP} :
 
 theorem and_forall_bool [BI PROP] {P Q : PROP} :
     P ∧ Q ⊣⊢ «forall» (fun b : Bool => if b then P else Q) :=
-  ⟨forall_intro (·.casesOn and_elim_r and_elim_l),
+  BI.equiv_entails.mpr ⟨forall_intro (·.casesOn and_elim_r and_elim_l),
    and_intro (forall_elim true) (forall_elim false)⟩
 
 theorem or_exists_bool [BI PROP] {P Q : PROP} :
     P ∨ Q ⊣⊢ «exists» (fun b : Bool => if b then P else Q) :=
-  ⟨or_elim (exists_intro' true .rfl) (exists_intro' false .rfl),
+  BI.equiv_entails.mpr ⟨or_elim (exists_intro' true .rfl) (exists_intro' false .rfl),
    exists_elim (Bool.rec or_intro_r or_intro_l ·)⟩
 
 /-! # Later -/
 
 theorem later_congr [BI PROP] {P Q : PROP} (h : P ⊣⊢ Q) : ▷ P ⊣⊢ ▷ Q :=
-  ⟨later_mono h.1, later_mono h.2⟩
+  BI.equiv_entails.mpr ⟨later_mono (BI.equiv_entails.mp h).1, later_mono (BI.equiv_entails.mp h).2⟩
 
-theorem later_true [BI PROP] : (▷ True ⊣⊢ (True : PROP)) := ⟨true_intro, later_intro⟩
+theorem later_true [BI PROP] : (▷ True ⊣⊢ (True : PROP)) := BI.equiv_entails.mpr ⟨true_intro, later_intro⟩
 
 theorem later_emp [BI PROP] [BIAffine PROP] : (▷ emp ⊣⊢ (emp : PROP)) :=
-  ⟨affine, later_intro⟩
+  BI.equiv_entails.mpr ⟨affine, later_intro⟩
 
 theorem later_forall_2 [BI PROP] {α} {Φ : α → PROP} : (∀ a, ▷ Φ a) ⊢ ▷ ∀ a, Φ a := by
   refine (forall_intro ?_).trans later_sForall_2
   intro P
   refine imp_intro' ?_
-  refine and_comm.mp.trans <| imp_elim' <| pure_elim _ .rfl ?_
+  refine (BI.equiv_entails.mp and_comm).1.trans <| imp_elim' <| pure_elim _ .rfl ?_
   rintro ⟨_, Ha⟩
   rewrite [← Ha]
   exact imp_intro' <| and_elim_l.trans <| forall_elim _
 
 theorem later_forall [BI PROP] {Φ : α → PROP} :
     ▷ (∀ a, Φ a) ⊣⊢ (∀ a, ▷ Φ a) :=
-  ⟨forall_intro (later_mono <| forall_elim ·), later_forall_2⟩
+  BI.equiv_entails.mpr ⟨forall_intro (later_mono <| forall_elim ·), later_forall_2⟩
 
 theorem later_exists_2 [BI PROP] {Φ : α → PROP} :
     (∃ a, ▷ Φ a) ⊢ ▷ (∃ a, Φ a) :=
@@ -1556,71 +1582,73 @@ theorem later_exists_false [BI PROP] {Φ : α → PROP} :
 
 theorem later_exists [BI PROP] [Inhabited α] {Φ : α → PROP} :
     (∃ a, ▷ Φ a) ⊣⊢ ▷ (∃ a, Φ a) := by
+  apply BI.equiv_entails.mpr
   refine ⟨later_exists_2, later_exists_false.trans ?_⟩
   exact or_elim (exists_intro' default <| later_mono <| false_elim) .rfl
 
 theorem later_and [BI PROP] {P Q : PROP} : ▷ (P ∧ Q) ⊣⊢ ▷ P ∧ ▷ Q := by
-  constructor
-  · refine (later_mono and_forall_bool.mp).trans ?_
-    refine .trans ?_ and_forall_bool.mpr
-    refine (later_forall).mp.trans (forall_mono ?_)
+  apply BI.equiv_entails.mpr; constructor
+  · refine (later_mono (BI.equiv_entails.mp and_forall_bool).1).trans ?_
+    refine .trans ?_ (BI.equiv_entails.mp and_forall_bool).2
+    refine (BI.equiv_entails.mp later_forall).1.trans (forall_mono ?_)
     exact (·.casesOn .rfl .rfl)
-  · refine .trans ?_ (later_mono and_forall_bool.mpr)
-    refine and_forall_bool.mp.trans ?_
-    refine .trans (forall_mono ?_) later_forall.mpr
+  · refine .trans ?_ (later_mono (BI.equiv_entails.mp and_forall_bool).2)
+    refine (BI.equiv_entails.mp and_forall_bool).1.trans ?_
+    refine .trans (forall_mono ?_) (BI.equiv_entails.mp later_forall).2
     exact (·.casesOn .rfl .rfl)
 
 theorem later_or [BI PROP] {P Q : PROP} : ▷ (P ∨ Q) ⊣⊢ ▷ P ∨ ▷ Q := by
-  constructor
-  · refine (later_mono or_exists_bool.mp).trans ?_
-    refine .trans ?_ or_exists_bool.mpr
-    refine later_exists.mpr.trans (exists_mono ?_)
+  apply BI.equiv_entails.mpr; constructor
+  · refine (later_mono (BI.equiv_entails.mp or_exists_bool).1).trans ?_
+    refine .trans ?_ (BI.equiv_entails.mp or_exists_bool).2
+    refine (BI.equiv_entails.mp later_exists).2.trans (exists_mono ?_)
     exact (·.casesOn .rfl .rfl)
-  · refine .trans ?_ (later_mono or_exists_bool.mpr)
-    refine .trans ?_ later_exists.mp
-    refine  or_exists_bool.mp.trans (exists_mono ?_)
+  · refine .trans ?_ (later_mono (BI.equiv_entails.mp or_exists_bool).2)
+    refine .trans ?_ (BI.equiv_entails.mp later_exists).1
+    refine (BI.equiv_entails.mp or_exists_bool).1.trans (exists_mono ?_)
     exact (·.casesOn .rfl .rfl)
 
 theorem later_impl [BI PROP] {P Q : PROP} : ▷ (P → Q) ⊢ ▷ P → ▷ Q :=
-  imp_intro' <| later_and.mpr.trans <| later_mono imp_elim_r
+  imp_intro' <| (BI.equiv_entails.mp later_and).2.trans <| later_mono imp_elim_r
 
 theorem later_wand [BI PROP] {P Q : PROP} : ▷ (P -∗ Q) ⊢ ▷ P -∗ ▷ Q :=
-  wand_intro' <| later_sep.mpr.trans <| later_mono wand_elim_r
+  wand_intro' <| later_sep_2.trans <| later_mono wand_elim_r
 
 theorem later_iff [BI PROP] {P Q : PROP} : ▷ (P ↔ Q) ⊢ (▷ P ↔ ▷ Q) :=
-  later_and.mp.trans <|and_intro (and_elim_l.trans later_impl) (and_elim_r.trans later_impl)
+  (BI.equiv_entails.mp later_and).1.trans <| and_intro (and_elim_l.trans later_impl) (and_elim_r.trans later_impl)
 
 theorem later_wand_iff [BI PROP] {P Q : PROP} : ▷ (P ∗-∗ Q) ⊢ ▷ P ∗-∗ ▷ Q :=
-  later_and.mp.trans <| and_intro (and_elim_l.trans later_wand) (and_elim_r.trans later_wand)
+  (BI.equiv_entails.mp later_and).1.trans <| and_intro (and_elim_l.trans later_wand) (and_elim_r.trans later_wand)
 
 theorem later_affinely_2 [BI PROP] {P : PROP} : <affine> ▷ P ⊢ ▷ <affine> P :=
-  .trans (and_mono later_intro .rfl) later_and.mpr
+  .trans (and_mono later_intro .rfl) (BI.equiv_entails.mp later_and).2
 
 theorem later_intuitionistically_2 [BI PROP] {P : PROP} : □ ▷ P ⊢ ▷ □ P :=
-  .trans (affinely_mono later_persistently.mpr) later_affinely_2
+  .trans (affinely_mono later_persistently_2) later_affinely_2
 
 theorem later_intuitionisticallyIf_2 [BI PROP] {P : PROP} : □?p ▷ P ⊢ ▷ □?p P :=
   p.casesOn .rfl later_intuitionistically_2
 
 theorem later_absorbingly [BI PROP] {P : PROP} : ▷ <absorb> P ⊣⊢ <absorb> ▷ P :=
-  ⟨later_sep.mp.trans <| sep_mono true_intro .rfl, (sep_mono later_intro .rfl).trans later_sep.mpr⟩
+  BI.equiv_entails.mpr ⟨later_sep_1.trans <| sep_mono true_intro .rfl, (sep_mono later_intro .rfl).trans later_sep_2⟩
 
 theorem later_affinely [BI PROP] [BIAffine PROP] {P : PROP} : <affine> ▷ P ⊣⊢ ▷ <affine> P :=
-  ⟨later_affinely_2, later_and.mp.trans <| .trans (and_elim_r) (affine_affinely _).mpr⟩
+  BI.equiv_entails.mpr ⟨later_affinely_2, (BI.equiv_entails.mp later_and).1.trans <| .trans (and_elim_r) (BI.equiv_entails.mp (affine_affinely _)).2⟩
 
 theorem later_intuitionistically [BI PROP] [BIAffine PROP] {P : PROP} : □ ▷ P ⊣⊢ ▷ □ P := by
-  refine ⟨later_intuitionistically_2, ?_⟩
-  refine (later_mono persistently_of_intuitionistically).trans ?_
-  exact later_persistently.mp.trans intuitionistically_iff_persistently.mpr
+  apply BI.equiv_entails.mpr; constructor
+  · exact later_intuitionistically_2
+  · refine (later_mono persistently_of_intuitionistically).trans ?_
+    exact later_persistently_1.trans (BI.equiv_entails.mp intuitionistically_iff_persistently).2
 
 theorem later_intuitionisticallyIf [BI PROP] [BIAffine PROP] {P : PROP} : □?p ▷ P ⊣⊢ ▷ □?p P :=
   p.casesOn (.of_eq rfl) later_intuitionistically
 
 instance later_persistent [BI PROP] {P : PROP} [Persistent P] : Persistent iprop(▷ P) where
-  persistent := (later_mono persistently_intro).trans later_persistently.mp
+  persistent := (later_mono persistently_intro).trans later_persistently_1
 
 instance later_absorbing [BI PROP] {P : PROP} [Absorbing P] : Absorbing iprop(▷ P) where
-  absorbing := later_absorbingly.mpr.trans <| later_mono absorbing
+  absorbing := (BI.equiv_entails.mp later_absorbingly).2.trans <| later_mono absorbing
 
 theorem entails_impl_true [BI PROP] {P Q : PROP} :
     (P ⊢ Q) ↔ iprop((True : PROP) ⊢ (P → Q)) :=
@@ -1630,10 +1658,10 @@ theorem loeb [BI PROP] [BILoeb PROP] {P : PROP} : (▷ P → P) ⊢ P := by
   apply entails_impl_true.mpr
   apply BILoeb.loeb_weak
   apply imp_intro
-  apply (and_mono .rfl and_self.mpr).trans
+  apply (and_mono .rfl (BI.equiv_entails.mp and_self).2).trans
   apply (and_mono .rfl (and_mono later_intro .rfl)).trans
   apply (and_mono later_impl .rfl).trans
-  apply and_assoc.mpr.trans
+  apply (BI.equiv_entails.mp and_assoc).2.trans
   apply (and_mono imp_elim_l .rfl).trans
   exact imp_elim_r
 
@@ -1646,11 +1674,106 @@ theorem loeb_wand_intuitionistically [BI PROP] [BILoeb PROP] {P : PROP} :
   refine .trans ?_ loeb
   refine imp_intro' ?_
   refine (and_mono (later_mono persistently_of_intuitionistically) .rfl).trans ?_
-  refine (and_mono later_persistently.mp .rfl).trans ?_
-  refine persistently_and_intuitionistically_sep_l.mp.trans ?_
-  refine (sep_mono intuitionistically_idem.mpr .rfl).trans ?_
+  refine (and_mono later_persistently_1 .rfl).trans ?_
+  refine (BI.equiv_entails.mp persistently_and_intuitionistically_sep_l).1.trans ?_
+  refine (sep_mono (BI.equiv_entails.mp intuitionistically_idem).2 .rfl).trans ?_
   exact intuitionistically_sep_2.trans (intuitionistically_mono wand_elim_r)
 
 theorem loeb_wand [BI PROP] [BILoeb PROP] {P : PROP} : □ (▷ P -∗ P) ⊢ P :=
   (intuitionistically_mono (wand_mono intuitionistically_elim .rfl)).trans
     loeb_wand_intuitionistically
+
+/-! ## Monoid Instances for Big Operators -/
+
+/-- `∧` forms a commutative monoid with unit `True`. -/
+instance bi_and_monoid [BI PROP] : Algebra.Monoid PROP BIBase.and iprop(True) where
+  op_ne := and_ne
+  op_assoc _ _ _ := and_assoc
+  op_comm _ _ := and_comm
+  op_left_id _ := true_and
+
+/-- `∨` forms a commutative monoid with unit `False`. -/
+instance bi_or_monoid [BI PROP] : Algebra.Monoid PROP BIBase.or iprop(False) where
+  op_ne := or_ne
+  op_assoc _ _ _ := or_assoc
+  op_comm _ _ := or_comm
+  op_left_id _ := false_or
+
+/-- `∗` forms a commutative monoid with unit `emp`. -/
+instance bi_sep_monoid [BI PROP] : Algebra.Monoid PROP BIBase.sep iprop(emp) where
+  op_ne := sep_ne
+  op_assoc _ _ _ := sep_assoc
+  op_comm _ _ := sep_comm
+  op_left_id _ := emp_sep
+
+/-- `<pers>` is a monoid homomorphism for `∧`/`True` with respect to `≡`. -/
+instance bi_persistently_and_homomorphism [BI PROP] :
+    Algebra.MonoidHomomorphism BIBase.and BIBase.and iprop(True) iprop(True)
+      (· ≡ ·) (@BIBase.persistently PROP _) where
+  rel_refl _ := OFE.Equiv.rfl
+  rel_trans h1 h2 := h1.trans h2
+  rel_proper h1 h2 := ⟨fun h => h1.symm.trans (h.trans h2), fun h => h1.trans (h.trans h2.symm)⟩
+  op_proper h1 h2 := and_congr h1 h2
+  f_ne := persistently_ne
+  homomorphism _ _ := persistently_and
+  map_unit := persistently_pure
+
+/-- `<pers>` is a monoid homomorphism for `∨`/`False` with respect to `≡`. -/
+instance bi_persistently_or_homomorphism [BI PROP] :
+    Algebra.MonoidHomomorphism BIBase.or BIBase.or iprop(False) iprop(False)
+      (· ≡ ·) (@BIBase.persistently PROP _) where
+  rel_refl _ := OFE.Equiv.rfl
+  rel_trans h1 h2 := h1.trans h2
+  rel_proper h1 h2 := ⟨fun h => h1.symm.trans (h.trans h2), fun h => h1.trans (h.trans h2.symm)⟩
+  op_proper h1 h2 := or_congr h1 h2
+  f_ne := persistently_ne
+  homomorphism _ _ := persistently_or
+  map_unit := persistently_pure
+
+/-- `<pers>` is a weak monoid homomorphism for `∗`/`emp` with respect to `≡` when `BiPositive`. -/
+instance bi_persistently_sep_weak_homomorphism [BI PROP] [BIPositive PROP] :
+    Algebra.WeakMonoidHomomorphism BIBase.sep BIBase.sep iprop(emp) iprop(emp)
+      (· ≡ ·) (@BIBase.persistently PROP _) where
+  rel_refl _ := OFE.Equiv.rfl
+  rel_trans h1 h2 := h1.trans h2
+  rel_proper h1 h2 := ⟨fun h => h1.symm.trans (h.trans h2), fun h => h1.trans (h.trans h2.symm)⟩
+  op_proper h1 h2 := sep_congr h1 h2
+  f_ne := persistently_ne
+  homomorphism _ _ := persistently_sep
+
+/-- `<pers>` is a monoid homomorphism for `∗`/`emp` with respect to `≡` when `BiAffine`. -/
+instance bi_persistently_sep_homomorphism [BI PROP] [BIAffine PROP] :
+    Algebra.MonoidHomomorphism BIBase.sep BIBase.sep iprop(emp) iprop(emp)
+      (· ≡ ·) (@BIBase.persistently PROP _) where
+  rel_refl _ := OFE.Equiv.rfl
+  rel_trans h1 h2 := h1.trans h2
+  rel_proper h1 h2 := ⟨fun h => h1.symm.trans (h.trans h2), fun h => h1.trans (h.trans h2.symm)⟩
+  op_proper h1 h2 := sep_congr h1 h2
+  f_ne := persistently_ne
+  homomorphism _ _ := persistently_sep
+  map_unit := persistently_emp'
+
+/-- `<pers>` is a weak monoid homomorphism for `∗`/`emp` with respect to `flip (⊢)`. -/
+instance bi_persistently_sep_entails_weak_homomorphism [BI PROP] :
+    Algebra.WeakMonoidHomomorphism BIBase.sep BIBase.sep iprop(emp) iprop(emp)
+      (flip BIBase.Entails) (@BIBase.persistently PROP _) where
+  rel_refl _ := BIBase.Entails.rfl
+  rel_trans h1 h2 := h2.trans h1
+  rel_proper h1 h2 := ⟨fun h => (BI.equiv_entails.mp h2).2.trans (h.trans (BI.equiv_entails.mp h1).1),
+                       fun h => (BI.equiv_entails.mp h2).1.trans (h.trans (BI.equiv_entails.mp h1).2)⟩
+  op_proper h1 h2 := sep_mono h1 h2
+  f_ne := persistently_ne
+  homomorphism _ _ := persistently_sep_2
+
+/-- `<pers>` is a monoid homomorphism for `∗`/`emp` with respect to `flip (⊢)`. -/
+instance bi_persistently_sep_entails_homomorphism [BI PROP] :
+    Algebra.MonoidHomomorphism BIBase.sep BIBase.sep iprop(emp) iprop(emp)
+      (flip BIBase.Entails) (@BIBase.persistently PROP _) where
+  rel_refl _ := BIBase.Entails.rfl
+  rel_trans h1 h2 := h2.trans h1
+  rel_proper h1 h2 := ⟨fun h => (BI.equiv_entails.mp h2).2.trans (h.trans (BI.equiv_entails.mp h1).1),
+                       fun h => (BI.equiv_entails.mp h2).1.trans (h.trans (BI.equiv_entails.mp h1).2)⟩
+  op_proper h1 h2 := sep_mono h1 h2
+  f_ne := persistently_ne
+  homomorphism _ _ := persistently_sep_2
+  map_unit := persistently_emp_intro

@@ -18,16 +18,16 @@ theorem from_forall_intro [BI PROP] {P Q : PROP} {Φ : α → PROP} [inst : From
 theorem imp_intro_intuitionistic [BI PROP] {P Q A1 A2 B : PROP}
     [FromImp Q A1 A2] [inst : IntoPersistently false A1 B] (h : P ∗ □ B ⊢ A2) : P ⊢ Q := by
   refine BI.imp_intro ?_ |>.trans from_imp
-  exact (and_mono_r inst.1).trans <| persistently_and_intuitionistically_sep_r.1.trans h
+  exact (and_mono_r inst.1).trans <| (BI.equiv_entails.mp persistently_and_intuitionistically_sep_r).1.trans h
 
 theorem wand_intro_intuitionistic [BI PROP] {P Q A1 A2 B : PROP}
     [FromWand Q A1 A2] [inst : IntoPersistently false A1 B] [or : TCOr (Affine A1) (Absorbing A2)]
     (h : P ∗ □ B ⊢ A2) : P ⊢ Q := by
   refine (wand_intro ?_).trans from_wand
   exact match or with
-  | TCOr.l => (sep_mono_r <| (affine_affinely A1).2.trans (affinely_mono inst.1)).trans h
-  | TCOr.r => (sep_mono_r <| inst.1.trans absorbingly_intuitionistically.2).trans <|
-      absorbingly_sep_r.1.trans <| (absorbingly_mono h).trans absorbing
+  | TCOr.l => (sep_mono_r <| (BI.equiv_entails.mp (affine_affinely A1)).2.trans (affinely_mono inst.1)).trans h
+  | TCOr.r => (sep_mono_r <| inst.1.trans (BI.equiv_entails.mp absorbingly_intuitionistically).2).trans <|
+      (BI.equiv_entails.mp absorbingly_sep_r).1.trans <| (absorbingly_mono h).trans absorbing
 
 theorem imp_intro_spatial [BI PROP] {P Q A1 A2 B : PROP}
     [FromImp Q A1 A2] [inst : FromAffinely B A1] [or : TCOr (Persistent A1) (Intuitionistic P)]
@@ -37,8 +37,8 @@ theorem imp_intro_spatial [BI PROP] {P Q A1 A2 B : PROP}
   exact match or with
   | TCOr.l => persistent_and_affinely_sep_r_1
   | TCOr.r (u := u) =>
-    (and_mono_l u.1).trans <| affinely_and_lr.1.trans <|
-    persistently_and_intuitionistically_sep_l.1.trans <| sep_mono_l intuitionistically_elim
+    (and_mono_l u.1).trans <| (BI.equiv_entails.mp affinely_and_lr).1.trans <|
+    (BI.equiv_entails.mp persistently_and_intuitionistically_sep_l).1.trans <| sep_mono_l intuitionistically_elim
 
 theorem wand_intro_spatial [BI PROP] {P Q A1 A2 : PROP}
     [FromWand Q A1 A2] (h : P ∗ A1 ⊢ A2) : P ⊢ Q := (wand_intro h).trans from_wand

@@ -12,8 +12,8 @@ open Lean Elab Tactic Meta Qq BI Std
 theorem pure_assumption [BI PROP] {P A Q : PROP} (h_P : ⊢ A)
     [inst : FromAssumption true A Q] [TCOr (Affine P) (Absorbing Q)] :
     P ⊢ Q :=
-  have := intuitionistically_emp.2.trans <| (intuitionistically_mono h_P).trans inst.1
-  emp_sep.2.trans <| (sep_mono_l this).trans sep_elim_l
+  have := (BI.equiv_entails.mp intuitionistically_emp).2.trans <| (intuitionistically_mono h_P).trans inst.1
+  (BI.equiv_entails.mp emp_sep).2.trans <| (sep_mono_l this).trans sep_elim_l
 
 def assumptionLean {prop : Q(Type u)} (_bi : Q(BI $prop)) (ehyps goal : Q($prop))
     (mvar : MVarId) : MetaM Unit := do

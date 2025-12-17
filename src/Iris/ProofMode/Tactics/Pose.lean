@@ -11,7 +11,7 @@ open Lean Elab Tactic Meta Qq BI Std
 
 theorem pose {PROP} [BI PROP] {P Q R : PROP}
     (H1 : P ∗ □ Q ⊢ R) (H2 : ⊢ Q) : P ⊢ R :=
-  sep_emp.mpr.trans <| (sep_mono_r (intuitionistically_emp.2.trans (intuitionistically_mono H2))).trans H1
+  (BI.equiv_entails.mp sep_emp).2.trans <| (sep_mono_r ((BI.equiv_entails.mp intuitionistically_emp).2.trans (intuitionistically_mono H2))).trans H1
 
 /-- Pose a hypothesis `Q` from the Iris context, keeping its persistence flag. -/
 theorem pose_hyp [BI PROP] {P P' : PROP} {p : Bool} {Q R : PROP}
@@ -23,7 +23,7 @@ theorem pose_hyp [BI PROP] {P P' : PROP} {p : Bool} {Q R : PROP}
 /-- Convert a Lean hypothesis `⊢ P` into the form `e ⊢ e ∗ □ P`.
     This allows treating Lean hypotheses uniformly with Iris hypotheses. -/
 theorem pose_lean [BI PROP] {e P : PROP} (h : ⊢ P) : e ⊢ e ∗ □ P :=
-  sep_emp.mpr.trans <| sep_mono_r <| intuitionistically_emp.2.trans (intuitionistically_mono h)
+  (BI.equiv_entails.mp sep_emp).2.trans <| sep_mono_r <| (BI.equiv_entails.mp intuitionistically_emp).2.trans (intuitionistically_mono h)
 
 theorem emp_wand {PROP} [BI PROP] {P : PROP}: (emp ⊢ P) → (⊢ P) := by
  intros H
@@ -122,7 +122,7 @@ def iPoseHypCore {e : Q($prop)}
     (addGoal : ∀ {e'}, Name → Hyps bi e' → (goal : Q($prop)) → MetaM Q($e' ⊢ $goal)) :
     TacticM (SpecializeState bi e) := do
   let ⟨e', hyps', _out, out', b, _, pf⟩ := hyps.remove false uniq
-  let state : SpecializeState bi e := { e := e', hyps := hyps', b, out := out', pf := q(($pf).1) }
+  let state : SpecializeState bi e := { e := e', hyps := hyps', b, out := out', pf := q((BI.equiv_entails.mp $pf).1) }
   let state ← liftM <| terms.foldlM SpecializeState.process1 state
   let state ← state.processSpats spats addGoal
   return state

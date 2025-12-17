@@ -44,7 +44,7 @@ instance : COFE (HeapProp Val) := COFE.ofDiscrete Eq equivalence_eq
 
 instance : BI (HeapProp Val) where
   entails_preorder := by infer_instance
-  equiv_iff {P Q} := ⟨
+  equiv_entails {P Q} := ⟨
     fun h : P = Q => h ▸ ⟨refl, refl⟩,
     fun ⟨h₁, h₂⟩ => funext fun σ => propext ⟨h₁ σ, h₂ σ⟩
   ⟩
@@ -136,25 +136,17 @@ instance : BI (HeapProp Val) where
     constructor
     · exact h_PQ σ₁ h_P
     · exact h_P'Q' σ₂ h_P'
-  emp_sep.mp := by
+  emp_sep_1 := by
     simp only [BI.Entails, BI.sep, BI.emp]
-    intro _ ⟨σ₁, σ₂, h_union, _, h_emp, h_P⟩
+    intro P σ ⟨σ₁, σ₂, h_union, _, h_emp, h_P⟩
     rw [h_emp] at h_union
     rw [← empty_union] at h_union
     rw [h_union]
     exact h_P
-  emp_sep.mpr := by
+  emp_sep_2 := by
     simp only [BI.Entails, BI.sep, BI.emp]
-    intro σ h_P
-    apply Exists.intro ∅
-    apply Exists.intro σ
-    constructor
-    · exact empty_union
-    constructor
-    · exact empty_disjoint
-    constructor
-    · rfl
-    · exact h_P
+    intro P σ h_P
+    exact ⟨∅, σ, empty_union, empty_disjoint, rfl, h_P⟩
   sep_symm := by
     simp only [BI.Entails, BI.sep]
     intro _ _ _ ⟨σ₁, σ₂, h_union, h_disjoint, h_P, h_Q⟩
@@ -257,6 +249,8 @@ instance : BI (HeapProp Val) where
   later_intro _ := id
   later_sForall_2 _ h _ hp := h _ ⟨_, rfl⟩ hp
   later_sExists_false _ := fun ⟨p, hp⟩ => .inr ⟨_, ⟨_, rfl⟩, hp⟩
-  later_sep := ⟨fun _ => id, fun _ => id⟩
-  later_persistently := ⟨fun _ => id, fun _ => id⟩
+  later_sep_1 _ := id
+  later_sep_2 _ := id
+  later_persistently_1 _ := id
+  later_persistently_2 _ := id
   later_false_em _ h := .inr fun _ => h

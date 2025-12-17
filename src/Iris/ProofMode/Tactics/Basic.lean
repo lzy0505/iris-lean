@@ -49,7 +49,7 @@ elab "istop" : tactic => do
 
 theorem assumption [BI PROP] {p : Bool} {P P' A Q : PROP} [inst : FromAssumption p A Q]
   [TCOr (Affine P') (Absorbing Q)] (h : P ⊣⊢ P' ∗ □?p A) : P ⊢ Q :=
-  h.1.trans <| (sep_mono_r inst.1).trans sep_elim_r
+  (BI.equiv_entails.mp h).1.trans <| (sep_mono_r inst.1).trans sep_elim_r
 
 def getFreshName : TSyntax ``binderIdent → CoreM (Name × Syntax)
   | `(binderIdent| $name:ident) => pure (name.getId, name)

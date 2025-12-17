@@ -14,6 +14,8 @@ import Iris.Std.CoPset
 
 namespace Iris
 open Iris.Std BI
+/-- Bidirectional entailment on separation logic propositions. -/
+local macro:25 P:term:29 " ⊣⊢ " Q:term:29 : term => ``(BI.BiEquiv iprop($P) iprop($Q))
 
 class BUpd (PROP : Type _) where
   bupd : PROP → PROP
@@ -122,7 +124,7 @@ theorem bupd_sep {P Q : PROP} : iprop((|==> P) ∗ (|==> Q) ⊢ |==> (P ∗ Q)) 
   bupd_frame_l.trans <| (mono <| frame_r).trans BIUpdate.trans
 
 theorem bupd_idem {P : PROP} : iprop((|==> |==> P) ⊣⊢ |==> P) :=
-  ⟨BIUpdate.trans, BIUpdate.intro⟩
+  BI.equiv_entails.mpr ⟨BIUpdate.trans, BIUpdate.intro⟩
 
 theorem bupd_or {P Q: PROP} : iprop((|==> P) ∨ (|==> Q) ⊢ |==> (P ∨ Q)) :=
   or_elim (mono or_intro_l) (mono or_intro_r)
@@ -152,9 +154,10 @@ theorem bupd_elim {P : PROP} [Plain P] : |==> P ⊢ P :=
 
 theorem bupd_plain_forall {A : Type} (Φ : A → PROP) [∀ x, Plain (Φ x)] :
     (|==> ∀ x, Φ x) ⊣⊢ (∀ x, |==> Φ x) := by
-  refine ⟨bupd_forall, ?_⟩
-  refine .trans ?_ intro
-  exact (forall_intro fun a => (forall_elim a).trans  bupd_elim)
+  apply BI.equiv_entails.mpr; constructor
+  · exact bupd_forall
+  · refine .trans ?_ intro
+    exact (forall_intro fun a => (forall_elim a).trans  bupd_elim)
 
 instance {P : PROP} [Plain P] : Plain iprop(|==> P) :=
   ⟨(mono Plain.plain).trans <| (bupd_elim).trans <| BIPlainly.mono intro⟩

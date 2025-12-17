@@ -10,7 +10,7 @@ open Lean Elab Tactic Meta Qq BI Std
 
 theorem wand_revert [BI PROP] {P Q A1 A2 : PROP}
     (h1 : P ⊣⊢ A1 ∗ A2) (h2 : A1 ⊢ A2 -∗ Q) : P ⊢ Q :=
-  h1.mp.trans (wand_elim h2)
+  (BI.equiv_entails.mp h1).1.trans (wand_elim h2)
 
 theorem forall_revert [BI PROP] {P : PROP} {Ψ : α → PROP}
     (h : P ⊢ ∀ x, Ψ x) : ∀ x, P ⊢ Ψ x :=
@@ -18,7 +18,7 @@ theorem forall_revert [BI PROP] {P : PROP} {Ψ : α → PROP}
 
 theorem pure_revert [BI PROP] {P Q : PROP} {φ : Prop}
     (h : P ⊢ ⌜φ⌝ -∗ Q) : φ → P ⊢ Q :=
-  λ hp => (sep_emp.mpr.trans (sep_mono .rfl (pure_intro hp))).trans (wand_elim h)
+  λ hp => ((BI.equiv_entails.mp sep_emp).2.trans (sep_mono .rfl (pure_intro hp))).trans (wand_elim h)
 
 elab "irevert" colGt hyp:ident : tactic => do
   let (mvar, { u, prop, bi, e, hyps, goal, .. }) ← istart (← getMainGoal)
