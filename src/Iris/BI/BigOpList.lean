@@ -843,19 +843,14 @@ theorem dup {P : PROP} [Affine P] {l : List A} :
 
 -- bigSepL over a list equals bigSep over replicate
 theorem replicate {P : PROP} {l : List A} :
-    [∗] (List.replicate l.length P) ⊣⊢ bigSepL (fun _ _ => P) l := by
+    bigSepL (fun _ _ => P) (List.replicate l.length P) ⊣⊢ bigSepL (fun _ _ => P) l := by
   induction l with
   | nil =>
-    simp only [List.length_nil, List.replicate, bigSep, Std.bigOp, bigSepL, bigOpL]
+    simp only [List.length_nil, List.replicate]
     exact .rfl
   | cons x xs ih =>
-    cases xs with
-    | nil =>
-      simp only [List.length_cons, List.length_nil, List.replicate, bigSep, Std.bigOp, bigSepL, bigOpL]
-      exact (sep_emp (P := P)).symm
-    | cons y ys =>
-      simp only [List.length_cons, List.replicate, bigSep, Std.bigOp, bigSepL, bigOpL]
-      exact ⟨sep_mono_r ih.1, sep_mono_r ih.2⟩
+    simp only [List.length_cons, List.replicate, bigSepL, BigOpL.cons]
+    exact ⟨sep_mono_r ih.1, sep_mono_r ih.2⟩
 
 /-! ## Zip-Related Lemmas -/
 

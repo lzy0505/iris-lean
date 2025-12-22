@@ -9,6 +9,7 @@ import Iris.BI.BI
 import Iris.Std.Classes
 import Iris.Std.Rewrite
 import Iris.Std.TC
+import Iris.Algebra.Monoid
 
 namespace Iris.BI
 open Iris.Std BI
@@ -193,15 +194,6 @@ theorem imp_trans [BI PROP] {P Q R : PROP} : (P → Q) ∧ (Q → R) ⊢ P → R
 theorem false_imp [BI PROP] {P : PROP} : (False → P) ⊣⊢ True :=
   ⟨true_intro, imp_intro <| and_elim_r.trans false_elim⟩
 
-instance [BI PROP] : LawfulBigOp and (iprop(True) : PROP) BiEntails where
-  refl := .rfl
-  symm h := h.symm
-  trans h1 h2 := h1.trans h2
-  comm := and_comm
-  assoc := and_assoc
-  left_id := true_and
-  congr_l := and_congr_l
-
 theorem and_left_comm [BI PROP] {P Q R : PROP} : P ∧ Q ∧ R ⊣⊢ Q ∧ P ∧ R :=
   and_assoc.symm.trans <| (and_congr_l and_comm).trans and_assoc
 
@@ -280,15 +272,6 @@ instance [BI PROP] : LeftId (α := PROP) BiEntails emp sep := ⟨emp_sep⟩
 
 theorem sep_emp [BI PROP] {P : PROP} : P ∗ emp ⊣⊢ P := sep_comm.trans emp_sep
 instance [BI PROP] : RightId (α := PROP) BiEntails emp sep := ⟨sep_emp⟩
-
-instance [BI PROP] : LawfulBigOp sep (emp : PROP) BiEntails where
-  refl := .rfl
-  symm h := h.symm
-  trans h1 h2 := h1.trans h2
-  comm := sep_comm
-  assoc := sep_assoc
-  left_id := emp_sep
-  congr_l := sep_congr_l
 
 theorem true_sep_2 [BI PROP] {P : PROP} : P ⊢ True ∗ P := emp_sep.2.trans (sep_mono_l true_intro)
 
@@ -1483,16 +1466,6 @@ instance imp_absorbing [BI PROP] (P Q : PROP) [Persistent P] [Absorbing P] [Abso
     Absorbing iprop(P → Q) where
   absorbing := imp_intro' <| persistent_and_affinely_sep_l.1.trans <| absorbingly_sep_r.1.trans <|
     (absorbingly_mono <| persistent_and_affinely_sep_l.2.trans imp_elim_r).trans absorbing
-
-theorem bigOp_sep_nil [BI PROP] : iprop([∗] []) ⊣⊢ (emp : PROP) := .rfl
-
-theorem bigOp_and_nil [BI PROP] : iprop([∧] []) ⊣⊢ (True : PROP) := .rfl
-
-theorem bigOp_sep_cons [BI PROP] {P : PROP} {Ps : List PROP} :
-    [∗] (P :: Ps) ⊣⊢ P ∗ [∗] Ps := bigOp_cons
-
-theorem bigOp_and_cons [BI PROP] {P : PROP} {Ps : List PROP} :
-    [∧] (P :: Ps) ⊣⊢ P ∧ [∧] Ps := bigOp_cons
 
 /-! # Reduction to boolean comparisons -/
 
