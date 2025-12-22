@@ -34,37 +34,37 @@ namespace BigSepL
 
 @[simp]
 theorem nil {Φ : Nat → A → PROP} :
-    bigSepL Φ ([] : List A) ⊣⊢ emp := by
+    ([∗ list] k ↦ x ∈ ([] : List A), Φ k x) ⊣⊢ emp := by
   simp only [bigSepL, bigOpL]
   exact .rfl
 
 theorem nil' {Φ : Nat → A → PROP} {l : List A} (h : l = []) :
-    bigSepL Φ l ⊣⊢ emp := by
+    ([∗ list] k ↦ x ∈ l, Φ k x) ⊣⊢ emp := by
   subst h; exact nil
 
 theorem cons {Φ : Nat → A → PROP} {x : A} {xs : List A} :
-    bigSepL Φ (x :: xs) ⊣⊢ Φ 0 x ∗ bigSepL (fun n => Φ (n + 1)) xs := by
+    ([∗ list] k ↦ y ∈ x :: xs, Φ k y) ⊣⊢ Φ 0 x ∗ [∗ list] k ↦ y ∈ xs, Φ (k + 1) y := by
   simp only [bigSepL, bigOpL]
   exact .rfl
 
 theorem singleton {Φ : Nat → A → PROP} {x : A} :
-    bigSepL Φ [x] ⊣⊢ Φ 0 x :=
+    ([∗ list] k ↦ y ∈ [x], Φ k y) ⊣⊢ Φ 0 x :=
   equiv_iff.mp (BigOpL.singleton Φ x)
 
 theorem app {Φ : Nat → A → PROP} {l₁ l₂ : List A} :
-    bigSepL Φ (l₁ ++ l₂) ⊣⊢
-      bigSepL Φ l₁ ∗ bigSepL (fun n => Φ (n + l₁.length)) l₂ :=
+    ([∗ list] k ↦ x ∈ l₁ ++ l₂, Φ k x) ⊣⊢
+      ([∗ list] k ↦ x ∈ l₁, Φ k x) ∗ [∗ list] k ↦ x ∈ l₂, Φ (k + l₁.length) x :=
   equiv_iff.mp (BigOpL.append Φ l₁ l₂)
 
 theorem snoc {Φ : Nat → A → PROP} {l : List A} {x : A} :
-    bigSepL Φ (l ++ [x]) ⊣⊢ bigSepL Φ l ∗ Φ l.length x :=
+    ([∗ list] k ↦ y ∈ l ++ [x], Φ k y) ⊣⊢ ([∗ list] k ↦ y ∈ l, Φ k y) ∗ Φ l.length x :=
   equiv_iff.mp (BigOpL.snoc Φ l x)
 
 /-! ## Monotonicity and Congruence -/
 
 theorem mono {Φ Ψ : Nat → A → PROP} {l : List A}
     (h : ∀ k x, l[k]? = some x → Φ k x ⊢ Ψ k x) :
-    bigSepL Φ l ⊢ bigSepL Ψ l := by
+    ([∗ list] k ↦ x ∈ l, Φ k x) ⊢ [∗ list] k ↦ x ∈ l, Ψ k x := by
   induction l generalizing Φ Ψ with
   | nil => exact Entails.rfl
   | cons y ys ih =>
@@ -77,30 +77,30 @@ theorem mono {Φ Ψ : Nat → A → PROP} {l : List A}
 
 theorem proper {Φ Ψ : Nat → A → PROP} {l : List A}
     (h : ∀ k x, l[k]? = some x → Φ k x ≡ Ψ k x) :
-    bigSepL Φ l ≡ bigSepL Ψ l :=
+    ([∗ list] k ↦ x ∈ l, Φ k x) ≡ [∗ list] k ↦ x ∈ l, Ψ k x :=
   BigOpL.congr h
 
 theorem congr {Φ Ψ : Nat → A → PROP} {l : List A}
     (h : ∀ k x, Φ k x ≡ Ψ k x) :
-    bigSepL Φ l ≡ bigSepL Ψ l :=
+    ([∗ list] k ↦ x ∈ l, Φ k x) ≡ [∗ list] k ↦ x ∈ l, Ψ k x :=
   BigOpL.congr' h
 
 /-- Non-expansiveness: if predicates are n-equivalent pointwise, so are their big seps. -/
 theorem ne {Φ Ψ : Nat → A → PROP} {l : List A} {n : Nat}
     (h : ∀ k x, l[k]? = some x → Φ k x ≡{n}≡ Ψ k x) :
-    bigSepL Φ l ≡{n}≡ bigSepL Ψ l :=
+    ([∗ list] k ↦ x ∈ l, Φ k x) ≡{n}≡ [∗ list] k ↦ x ∈ l, Ψ k x :=
   BigOpL.congr_ne h
 
 /-- Monotonicity without lookup condition: pointwise entailment lifts to bigSepL. -/
 theorem mono' {Φ Ψ : Nat → A → PROP} {l : List A}
     (h : ∀ k x, Φ k x ⊢ Ψ k x) :
-    bigSepL Φ l ⊢ bigSepL Ψ l :=
+    ([∗ list] k ↦ x ∈ l, Φ k x) ⊢ [∗ list] k ↦ x ∈ l, Ψ k x :=
   mono (fun k x _ => h k x)
 
 /-- Flip monotonicity: pointwise reverse entailment lifts to bigSepL. -/
 theorem flip_mono' {Φ Ψ : Nat → A → PROP} {l : List A}
     (h : ∀ k x, Ψ k x ⊢ Φ k x) :
-    bigSepL Ψ l ⊢ bigSepL Φ l :=
+    ([∗ list] k ↦ x ∈ l, Ψ k x) ⊢ [∗ list] k ↦ x ∈ l, Φ k x :=
   mono (fun k x _ => h k x)
 
 /-- Identity monotonicity: pairwise entailment on lists lifts to bigSepL.
@@ -108,7 +108,7 @@ theorem flip_mono' {Φ Ψ : Nat → A → PROP} {l : List A}
 theorem id_mono' {Ps Qs : List PROP}
     (hlen : Ps.length = Qs.length)
     (h : ∀ (i : Nat) (P Q : PROP), Ps[i]? = some P → Qs[i]? = some Q → P ⊢ Q) :
-    bigSepL (fun _ (P : PROP) => P) Ps ⊢ bigSepL (fun _ (Q : PROP) => Q) Qs := by
+    ([∗ list] P ∈ Ps, P) ⊢ [∗ list] Q ∈ Qs, Q := by
   induction Ps generalizing Qs with
   | nil =>
     cases Qs with
@@ -129,7 +129,7 @@ theorem id_mono' {Ps Qs : List PROP}
 /-! ## Typeclass Closure -/
 
 instance persistent {Φ : Nat → A → PROP} {l : List A} [∀ k x, Persistent (Φ k x)] :
-    Persistent (bigSepL Φ l) where
+    Persistent ([∗ list] k ↦ x ∈ l, Φ k x) where
   persistent := by
     induction l generalizing Φ with
     | nil =>
@@ -142,7 +142,7 @@ instance persistent {Φ : Nat → A → PROP} {l : List A} [∀ k x, Persistent 
       exact (sep_mono h1 h2).trans persistently_sep_2
 
 instance affine {Φ : Nat → A → PROP} {l : List A} [∀ k x, Affine (Φ k x)] :
-    Affine (bigSepL Φ l) where
+    Affine ([∗ list] k ↦ x ∈ l, Φ k x) where
   affine := by
     induction l generalizing Φ with
     | nil =>
@@ -157,7 +157,7 @@ instance affine {Φ : Nat → A → PROP} {l : List A} [∀ k x, Affine (Φ k x)
 /-- When all propositions in a list are Persistent, their big sep is Persistent.
     This is for the identity function case: `[∗ list] _ ↦ P ∈ Ps, P` where `Ps : List PROP`. -/
 theorem persistent_id {Ps : List PROP} (hPs : ∀ P, P ∈ Ps → Persistent P) :
-    Persistent (bigSepL (fun _ (P : PROP) => P) Ps) where
+    Persistent ([∗ list] P ∈ Ps, P) where
   persistent := by
     induction Ps with
     | nil =>
@@ -176,7 +176,7 @@ theorem persistent_id {Ps : List PROP} (hPs : ∀ P, P ∈ Ps → Persistent P) 
 /-- When all propositions in a list are Affine, their big sep is Affine.
     This is for the identity function case: `[∗ list] _ ↦ P ∈ Ps, P` where `Ps : List PROP`. -/
 theorem affine_id {Ps : List PROP} (hPs : ∀ P, P ∈ Ps → Affine P) :
-    Affine (bigSepL (fun _ (P : PROP) => P) Ps) where
+    Affine ([∗ list] P ∈ Ps, P) where
   affine := by
     induction Ps with
     | nil =>
@@ -193,7 +193,7 @@ theorem affine_id {Ps : List PROP} (hPs : ∀ P, P ∈ Ps → Affine P) :
 
 /-- Empty list is timeless (when emp is timeless). -/
 instance nil_timeless [Timeless (emp : PROP)] {Φ : Nat → A → PROP} :
-    Timeless (bigSepL Φ ([] : List A)) where
+    Timeless ([∗ list] k ↦ x ∈ ([] : List A), Φ k x) where
   timeless := by
     simp only [bigSepL, bigOpL]
     exact Timeless.timeless
@@ -234,30 +234,30 @@ instance nil_timeless [Timeless (emp : PROP)] {Φ : Nat → A → PROP} :
 /-! ## Unit/Emp Lemma -/
 
 theorem emp_l {l : List A} :
-    bigSepL (fun _ _ => (emp : PROP)) l ⊣⊢ emp :=
+    ([∗ list] _x ∈ l, (emp : PROP)) ⊣⊢ emp :=
   equiv_iff.mp (BigOpL.unit_const l)
 
 /-! ## Distribution over Sep -/
 
 theorem sep' {Φ Ψ : Nat → A → PROP} {l : List A} :
-    bigSepL (fun k x => iprop(Φ k x ∗ Ψ k x)) l ⊣⊢ bigSepL Φ l ∗ bigSepL Ψ l :=
+    ([∗ list] k ↦ x ∈ l, Φ k x ∗ Ψ k x) ⊣⊢ ([∗ list] k ↦ x ∈ l, Φ k x) ∗ [∗ list] k ↦ x ∈ l, Ψ k x :=
   equiv_iff.mp (BigOpL.op_distr Φ Ψ l)
 
 theorem sep_2 {Φ Ψ : Nat → A → PROP} {l : List A} :
-    bigSepL Φ l ∗ bigSepL Ψ l ⊣⊢ bigSepL (fun k x => iprop(Φ k x ∗ Ψ k x)) l :=
+    ([∗ list] k ↦ x ∈ l, Φ k x) ∗ ([∗ list] k ↦ x ∈ l, Ψ k x) ⊣⊢ [∗ list] k ↦ x ∈ l, Φ k x ∗ Ψ k x :=
   sep'.symm
 
 /-! ## Distribution over And -/
 
 theorem and' {Φ Ψ : Nat → A → PROP} {l : List A} :
-    bigSepL (fun k x => iprop(Φ k x ∧ Ψ k x)) l ⊢
-      bigSepL Φ l ∧ bigSepL Ψ l :=
+    ([∗ list] k ↦ x ∈ l, Φ k x ∧ Ψ k x) ⊢
+      ([∗ list] k ↦ x ∈ l, Φ k x) ∧ [∗ list] k ↦ x ∈ l, Ψ k x :=
   and_intro (mono fun _ _ _ => and_elim_l) (mono fun _ _ _ => and_elim_r)
 
 /-! ## Wand Lemma -/
 
 theorem wand {Φ Ψ : Nat → A → PROP} {l : List A} :
-    bigSepL Φ l ⊢ bigSepL (fun k x => iprop(Φ k x -∗ Ψ k x)) l -∗ bigSepL Ψ l := by
+    ([∗ list] k ↦ x ∈ l, Φ k x) ⊢ ([∗ list] k ↦ x ∈ l, Φ k x -∗ Ψ k x) -∗ [∗ list] k ↦ x ∈ l, Ψ k x := by
   apply wand_intro
   calc iprop(bigSepL Φ l ∗ bigSepL (fun k x => iprop(Φ k x -∗ Ψ k x)) l)
       ⊢ bigSepL (fun k x => iprop(Φ k x ∗ (Φ k x -∗ Ψ k x))) l := sep_2.1
@@ -266,7 +266,7 @@ theorem wand {Φ Ψ : Nat → A → PROP} {l : List A} :
 /-! ## Pure Interaction -/
 
 theorem pure_1 {φ : Nat → A → Prop} {l : List A} :
-    bigSepL (fun k x => iprop(⌜φ k x⌝)) l ⊢ (⌜∀ k x, l[k]? = some x → φ k x⌝ : PROP) := by
+    ([∗ list] k ↦ x ∈ l, ⌜φ k x⌝) ⊢ (⌜∀ k x, l[k]? = some x → φ k x⌝ : PROP) := by
   induction l generalizing φ with
   | nil =>
     simp only [bigSepL, bigOpL]
@@ -284,7 +284,7 @@ theorem pure_1 {φ : Nat → A → Prop} {l : List A} :
 
 theorem affinely_pure_2 {φ : Nat → A → Prop} {l : List A} :
     iprop(<affine> ⌜∀ k x, l[k]? = some x → φ k x⌝) ⊢
-      (bigSepL (fun k x => iprop(<affine> ⌜φ k x⌝)) l : PROP) := by
+      ([∗ list] k ↦ x ∈ l, <affine> ⌜φ k x⌝ : PROP) := by
   induction l generalizing φ with
   | nil =>
     simp only [bigSepL, bigOpL]
@@ -317,7 +317,7 @@ theorem affinely_pure_2 {φ : Nat → A → Prop} {l : List A} :
     exact h1.trans (h2.trans (h3.trans (h4.trans h5)))
 
 theorem pure' [BIAffine PROP] {φ : Nat → A → Prop} {l : List A} :
-    bigSepL (fun k x => iprop(⌜φ k x⌝)) l ⊣⊢ (⌜∀ k x, l[k]? = some x → φ k x⌝ : PROP) :=
+    ([∗ list] k ↦ x ∈ l, ⌜φ k x⌝) ⊣⊢ (⌜∀ k x, l[k]? = some x → φ k x⌝ : PROP) :=
   ⟨pure_1,
    -- ⌜∀ k x, l[k]? = some x → φ k x⌝ ⊢ bigSepL (fun k x => ⌜φ k x⌝) l
    -- Use: P ⊣⊢ <affine> P (in BIAffine)
@@ -329,14 +329,14 @@ theorem pure' [BIAffine PROP] {φ : Nat → A → Prop} {l : List A} :
 /-! ## Take and Drop -/
 
 theorem take_drop {Φ : Nat → A → PROP} {l : List A} {n : Nat} :
-    bigSepL Φ l ⊣⊢
-      bigSepL Φ (l.take n) ∗ bigSepL (fun k => Φ (n + k)) (l.drop n) :=
+    ([∗ list] k ↦ x ∈ l, Φ k x) ⊣⊢
+      ([∗ list] k ↦ x ∈ l.take n, Φ k x) ∗ [∗ list] k ↦ x ∈ l.drop n, Φ (n + k) x :=
   equiv_iff.mp (BigOpL.take_drop Φ l n)
 
 /-! ## Fmap -/
 
 theorem fmap {B : Type _} (f : A → B) {Φ : Nat → B → PROP} {l : List A} :
-    bigSepL Φ (l.map f) ≡ bigSepL (fun k x => Φ k (f x)) l := by
+    ([∗ list] k ↦ y ∈ l.map f, Φ k y) ≡ [∗ list] k ↦ x ∈ l, Φ k (f x) := by
   induction l generalizing Φ with
   | nil => simp only [List.map_nil]; exact OFE.Equiv.rfl
   | cons x xs ih =>
@@ -347,8 +347,8 @@ theorem fmap {B : Type _} (f : A → B) {Φ : Nat → B → PROP} {l : List A} :
 
 /-- Big sep over filterMap: the mapped elements with emp for filtered-out elements. -/
 theorem omap {B : Type _} (f : A → Option B) {Φ : B → PROP} {l : List A} :
-    bigSepL (fun _ => Φ) (l.filterMap f) ≡
-      bigSepL (fun _ x => (f x).elim emp Φ) l := by
+    ([∗ list] y ∈ l.filterMap f, Φ y) ≡
+      [∗ list] x ∈ l, (f x).elim emp Φ := by
   induction l with
   | nil => exact OFE.Equiv.rfl
   | cons x xs ih =>
@@ -361,8 +361,8 @@ theorem omap {B : Type _} (f : A → Option B) {Φ : B → PROP} {l : List A} :
 
 /-- Big sep over bind (flatMap): nested iteration. -/
 theorem bind {B : Type _} (f : A → List B) {Φ : B → PROP} {l : List A} :
-    bigSepL (fun _ => Φ) (l.flatMap f) ≡
-      bigSepL (fun _ x => bigSepL (fun _ => Φ) (f x)) l := by
+    ([∗ list] y ∈ l.flatMap f, Φ y) ≡
+      [∗ list] x ∈ l, [∗ list] y ∈ f x, Φ y := by
   induction l with
   | nil => exact OFE.Equiv.rfl
   | cons x xs ih =>
@@ -374,8 +374,8 @@ theorem bind {B : Type _} (f : A → List B) {Φ : B → PROP} {l : List A} :
 -- Extract an element from bigSepL using the lookup function
 theorem lookup_acc {Φ : Nat → A → PROP} {l : List A} {i : Nat} {x : A}
     (h : l[i]? = some x) :
-    bigSepL Φ l ⊣⊢
-      Φ i x ∗ (∀ y, Φ i y -∗ bigSepL Φ (l.set i y)) := by
+    ([∗ list] k ↦ y ∈ l, Φ k y) ⊣⊢
+      Φ i x ∗ (∀ y, Φ i y -∗ [∗ list] k ↦ z ∈ l.set i y, Φ k z) := by
   induction l generalizing i Φ x with
   | nil => simp at h
   | cons z zs ih =>
@@ -449,26 +449,26 @@ theorem lookup_acc {Φ : Nat → A → PROP} {l : List A} {i : Nat} {x : A}
 theorem lookup_absorbing {Φ : Nat → A → PROP} {l : List A} {i : Nat} {x : A}
     [Absorbing (Φ i x)]
     (h : l[i]? = some x) :
-    bigSepL Φ l ⊢ Φ i x :=
+    ([∗ list] k ↦ y ∈ l, Φ k y) ⊢ Φ i x :=
   (lookup_acc h).1.trans sep_elim_l
 
 -- Simplified lookup for BIAffine
 theorem lookup [BIAffine PROP] {Φ : Nat → A → PROP} {l : List A} {i : Nat} {x : A}
     (h : l[i]? = some x) :
-    bigSepL Φ l ⊢ Φ i x :=
+    ([∗ list] k ↦ y ∈ l, Φ k y) ⊢ Φ i x :=
   (lookup_acc h).1.trans sep_elim_l
 
 -- Insert accessor version (one direction of lookup_acc)
 -- This corresponds to big_sepL_insert_acc in Coq
 theorem insert_acc {Φ : Nat → A → PROP} {l : List A} {i : Nat} {x : A}
     (h : l[i]? = some x) :
-    bigSepL Φ l ⊢ Φ i x ∗ (∀ y, Φ i y -∗ bigSepL Φ (l.set i y)) :=
+    ([∗ list] k ↦ y ∈ l, Φ k y) ⊢ Φ i x ∗ (∀ y, Φ i y -∗ [∗ list] k ↦ z ∈ l.set i y, Φ k z) :=
   (lookup_acc h).1
 
 -- Element-of version of lookup_acc (no index)
 theorem elem_of_acc {Φ : A → PROP} {l : List A} {x : A}
     (h : x ∈ l) :
-    bigSepL (fun _ => Φ) l ⊢ Φ x ∗ (Φ x -∗ bigSepL (fun _ => Φ) l) := by
+    ([∗ list] y ∈ l, Φ y) ⊢ Φ x ∗ (Φ x -∗ [∗ list] y ∈ l, Φ y) := by
   have ⟨i, hi, hget⟩ := List.mem_iff_getElem.mp h
   have hlookup : l[i]? = some x := List.getElem?_eq_some_iff.mpr ⟨hi, hget⟩
   have hacc := (lookup_acc (Φ := fun _ => Φ) hlookup).1
@@ -488,7 +488,7 @@ theorem elem_of_acc {Φ : A → PROP} {l : List A} {x : A}
 -- Element-of version of lookup (BIAffine)
 theorem elem_of [BIAffine PROP] {Φ : A → PROP} {l : List A} {x : A}
     (h : x ∈ l) :
-    bigSepL (fun _ => Φ) l ⊢ Φ x :=
+    ([∗ list] y ∈ l, Φ y) ⊢ Φ x :=
   (elem_of_acc h).trans sep_elim_l
 
 /-! ## Delete Lemmas -/
@@ -496,8 +496,8 @@ theorem elem_of [BIAffine PROP] {Φ : A → PROP} {l : List A} {x : A}
 -- Extracting an element from bigSepL, leaving emp at that position
 theorem delete {Φ : Nat → A → PROP} {l : List A} {i : Nat} {x : A}
     (h : l[i]? = some x) :
-    bigSepL Φ l ⊣⊢
-      Φ i x ∗ bigSepL (fun k y => if k = i then emp else Φ k y) l := by
+    ([∗ list] k ↦ y ∈ l, Φ k y) ⊣⊢
+      Φ i x ∗ [∗ list] k ↦ y ∈ l, if k = i then emp else Φ k y := by
   induction l generalizing i Φ with
   | nil => simp at h
   | cons z zs ih =>
@@ -560,7 +560,7 @@ theorem delete {Φ : Nat → A → PROP} {l : List A} {i : Nat} {x : A}
 -- BiAffine version of delete using implication instead of emp
 theorem delete' [BIAffine PROP] {Φ : Nat → A → PROP} {l : List A} {i : Nat} {x : A}
     (h : l[i]? = some x) :
-    bigSepL Φ l ⊣⊢ Φ i x ∗ bigSepL (fun k y => iprop(⌜k ≠ i⌝ → Φ k y)) l := by
+    ([∗ list] k ↦ y ∈ l, Φ k y) ⊣⊢ Φ i x ∗ [∗ list] k ↦ y ∈ l, ⌜k ≠ i⌝ → Φ k y := by
   calc bigSepL Φ l
       ⊣⊢ Φ i x ∗ bigSepL (fun k y => if k = i then emp else Φ k y) l := delete h
     _ ⊣⊢ Φ i x ∗ bigSepL (fun k y => iprop(⌜k ≠ i⌝ → Φ k y)) l := by
@@ -585,7 +585,7 @@ theorem delete' [BIAffine PROP] {Φ : Nat → A → PROP} {l : List A} {i : Nat}
 -- This requires P to be intuitionistic (persistent and affine) to duplicate
 theorem intro {P : PROP} {Φ : Nat → A → PROP} {l : List A} [Intuitionistic P]
     (h : ∀ k x, l[k]? = some x → P ⊢ Φ k x) :
-    P ⊢ bigSepL Φ l := by
+    P ⊢ [∗ list] k ↦ x ∈ l, Φ k x := by
   induction l generalizing Φ with
   | nil =>
     simp only [bigSepL, bigOpL]
@@ -603,7 +603,7 @@ theorem intro {P : PROP} {Φ : Nat → A → PROP} {l : List A} [Intuitionistic 
 -- bigSepL entails forall when all elements are persistent
 theorem forall' {Φ : Nat → A → PROP} {l : List A} [BIAffine PROP]
     [∀ k x, Persistent (Φ k x)] :
-    bigSepL Φ l ⊢ ∀ k, ∀ x, iprop(⌜l[k]? = some x⌝ → Φ k x) := by
+    ([∗ list] k ↦ x ∈ l, Φ k x) ⊢ ∀ k, ∀ x, iprop(⌜l[k]? = some x⌝ → Φ k x) := by
   apply forall_intro; intro k
   apply forall_intro; intro x
   apply imp_intro'
@@ -626,7 +626,7 @@ theorem forall' {Φ : Nat → A → PROP} {l : List A} [BIAffine PROP]
 -- Implication under bigSepL (wand version, matching Iris/Rocq style)
 -- bigSepL Φ l -∗ □ (∀ k x, ⌜l[k]? = some x⌝ → Φ k x -∗ Ψ k x) -∗ bigSepL Ψ l
 theorem impl {Φ Ψ : Nat → A → PROP} {l : List A} :
-    bigSepL Φ l ⊢ □ (∀ k x, iprop(⌜l[k]? = some x⌝ → Φ k x -∗ Ψ k x)) -∗ bigSepL Ψ l := by
+    ([∗ list] k ↦ x ∈ l, Φ k x) ⊢ □ (∀ k x, iprop(⌜l[k]? = some x⌝ → Φ k x -∗ Ψ k x)) -∗ [∗ list] k ↦ x ∈ l, Ψ k x := by
   apply wand_intro
   -- Goal: bigSepL Φ l ∗ □ (∀ k x, ⌜l[k]? = some x⌝ → Φ k x -∗ Ψ k x) ⊢ bigSepL Ψ l
   -- Step 1: Use intro to get bigSepL (fun k x => Φ k x -∗ Ψ k x) l from the □ hypothesis
@@ -651,9 +651,9 @@ theorem impl {Φ Ψ : Nat → A → PROP} {l : List A} :
 -- This is the most general form: extract element, then restore with a different predicate
 theorem lookup_acc_impl {Φ : Nat → A → PROP} {l : List A} {i : Nat} {x : A}
     (h : l[i]? = some x) :
-    bigSepL Φ l ⊢
-      Φ i x ∗ ∀ Ψ, □ (∀ k y, iprop(⌜l[k]? = some y⌝ → ⌜k ≠ i⌝ → Φ k y -∗ Ψ k y)) -∗
-        Ψ i x -∗ bigSepL Ψ l := by
+    iprop([∗ list] k ↦ x ∈ l, Φ k x) ⊢
+      Φ i x ∗ ∀ (Ψ: Nat → A → PROP), □ (∀ k y, iprop(⌜l[k]? = some y⌝ → ⌜k ≠ i⌝ → Φ k y -∗ Ψ k y)) -∗
+        Ψ i x -∗  ([∗ list] k ↦ x ∈ l, Ψ k x) := by
   -- Use delete to extract element
   have hdel := (delete (Φ := Φ) h).1
   calc bigSepL Φ l
@@ -722,7 +722,7 @@ theorem lookup_acc_impl {Φ : Nat → A → PROP} {l : List A} {i : Nat} {x : A}
 /-! ## Modality Interaction -/
 
 theorem persistently {Φ : Nat → A → PROP} {l : List A} [BIAffine PROP] :
-    iprop(<pers> bigSepL Φ l) ⊣⊢ bigSepL (fun k x => iprop(<pers> Φ k x)) l := by
+    iprop(<pers> [∗ list] k ↦ x ∈ l, Φ k x) ⊣⊢ [∗ list] k ↦ x ∈ l, <pers> Φ k x := by
   induction l generalizing Φ with
   | nil =>
     simp only [bigSepL, bigOpL]
@@ -738,7 +738,7 @@ theorem persistently {Φ : Nat → A → PROP} {l : List A} [BIAffine PROP] :
 
 -- Later distributes over bigSepL (equivalence requires BIAffine for emp case)
 theorem later [BIAffine PROP] {Φ : Nat → A → PROP} {l : List A} :
-    iprop(▷ bigSepL Φ l) ⊣⊢ bigSepL (fun k x => iprop(▷ Φ k x)) l := by
+    iprop(▷ [∗ list] k ↦ x ∈ l, Φ k x) ⊣⊢ [∗ list] k ↦ x ∈ l, ▷ Φ k x := by
   induction l generalizing Φ with
   | nil =>
     simp only [bigSepL, bigOpL]
@@ -752,7 +752,7 @@ theorem later [BIAffine PROP] {Φ : Nat → A → PROP} {l : List A} :
 
 -- Later distribution (one direction, no BIAffine needed)
 theorem later_2 {Φ : Nat → A → PROP} {l : List A} :
-    bigSepL (fun k x => iprop(▷ Φ k x)) l ⊢ iprop(▷ bigSepL Φ l) := by
+    ([∗ list] k ↦ x ∈ l, ▷ Φ k x) ⊢ iprop(▷ [∗ list] k ↦ x ∈ l, Φ k x) := by
   induction l generalizing Φ with
   | nil =>
     simp only [bigSepL, bigOpL]
@@ -765,7 +765,7 @@ theorem later_2 {Φ : Nat → A → PROP} {l : List A} :
 
 -- LaterN distributes over bigSepL (equivalence requires BIAffine)
 theorem laterN [BIAffine PROP] {Φ : Nat → A → PROP} {l : List A} {n : Nat} :
-    iprop(▷^[n] bigSepL Φ l) ⊣⊢ bigSepL (fun k x => iprop(▷^[n] Φ k x)) l := by
+    iprop(▷^[n] [∗ list] k ↦ x ∈ l, Φ k x) ⊣⊢ [∗ list] k ↦ x ∈ l, ▷^[n] Φ k x := by
   induction n with
   | zero =>
     exact .rfl
@@ -777,7 +777,7 @@ theorem laterN [BIAffine PROP] {Φ : Nat → A → PROP} {l : List A} {n : Nat} 
 
 -- LaterN distribution (one direction)
 theorem laterN_2 {Φ : Nat → A → PROP} {l : List A} {n : Nat} :
-    bigSepL (fun k x => iprop(▷^[n] Φ k x)) l ⊢ iprop(▷^[n] bigSepL Φ l) := by
+    ([∗ list] k ↦ x ∈ l, ▷^[n] Φ k x) ⊢ iprop(▷^[n] [∗ list] k ↦ x ∈ l, Φ k x) := by
   induction n with
   | zero =>
     exact Entails.rfl
@@ -789,7 +789,7 @@ theorem laterN_2 {Φ : Nat → A → PROP} {l : List A} {n : Nat} :
 /-! ## Permutation -/
 
 theorem perm {Φ : A → PROP} {l₁ l₂ : List A} (hp : l₁.Perm l₂) :
-    bigSepL (fun _ => Φ) l₁ ⊣⊢ bigSepL (fun _ => Φ) l₂ :=
+    ([∗ list] x ∈ l₁, Φ x) ⊣⊢ [∗ list] x ∈ l₂, Φ x :=
   equiv_iff.mp (BigOpL.perm Φ hp)
 
 /-! ## Submultiset Lemma -/
@@ -801,7 +801,7 @@ theorem perm {Φ : A → PROP} {l₁ l₂ : List A} (hp : l₁.Perm l₂) :
     This corresponds to Coq's `big_sepL_submseteq`. -/
 theorem submseteq {Φ : A → PROP} [∀ x, Affine (Φ x)] {l₁ l₂ l : List A}
     (h : (l₁ ++ l).Perm l₂) :
-    bigSepL (fun _ => Φ) l₂ ⊢ bigSepL (fun _ => Φ) l₁ := by
+    ([∗ list] x ∈ l₂, Φ x) ⊢ [∗ list] x ∈ l₁, Φ x := by
   have hperm := (perm (Φ := Φ) h).2
   have happ := (app (Φ := fun _ => Φ) (l₁ := l₁) (l₂ := l)).1
   exact hperm.trans (happ.trans sep_elim_l)
@@ -811,7 +811,7 @@ theorem submseteq {Φ : A → PROP} [∀ x, Affine (Φ x)] {l₁ l₂ l : List A
 -- Duplicate a resource across a list using a duplication wand
 -- □ (P -∗ P ∗ P) -∗ P -∗ [∗ list] k↦x ∈ l, P
 theorem dup {P : PROP} [Affine P] {l : List A} :
-    iprop(□ (P -∗ P ∗ P)) ⊢ P -∗ bigSepL (fun _ _ => P) l := by
+    iprop(□ (P -∗ P ∗ P)) ⊢ P -∗ [∗ list] k ↦ x ∈ l, P := by
   apply wand_intro
   induction l with
   | nil =>
@@ -843,7 +843,7 @@ theorem dup {P : PROP} [Affine P] {l : List A} :
 
 -- bigSepL over a list equals bigSep over replicate
 theorem replicate {P : PROP} {l : List A} :
-    bigSepL (fun _ _ => P) (List.replicate l.length P) ⊣⊢ bigSepL (fun _ _ => P) l := by
+    ([∗ list] _x ∈ List.replicate l.length P, P) ⊣⊢ [∗ list] _x ∈ l, P := by
   induction l with
   | nil =>
     simp only [List.length_nil, List.replicate]
@@ -856,21 +856,21 @@ theorem replicate {P : PROP} {l : List A} :
 
 /-- Big sep over zip with a shifted sequence. -/
 theorem zip_seq {Φ : Nat × A → PROP} {n : Nat} {l : List A} :
-    bigSepL (fun _ => Φ) ((List.range' n l.length).zip l) ⊣⊢
-      bigSepL (fun i x => Φ (n + i, x)) l :=
+    ([∗ list] p ∈ (List.range' n l.length).zip l, Φ p) ⊣⊢
+      [∗ list] i ↦ x ∈ l, Φ (n + i, x) :=
   equiv_iff.mp (BigOpL.zip_seq Φ n l)
 
 /-- Big sep over zip with a sequence starting at 0. -/
 theorem zip_with_range {Φ : Nat × A → PROP} {l : List A} :
-    bigSepL (fun _ => Φ) ((List.range l.length).zip l) ⊣⊢
-      bigSepL (fun i x => Φ (i, x)) l :=
+    ([∗ list] p ∈ (List.range l.length).zip l, Φ p) ⊣⊢
+      [∗ list] i ↦ x ∈ l, Φ (i, x) :=
   equiv_iff.mp (BigOpL.zip_with_range Φ l)
 
 /-- Big sep over zipped list splits into product of big seps. -/
 theorem sep_zip {B : Type _} {Φ : Nat → A → PROP} {Ψ : Nat → B → PROP}
     {l₁ : List A} {l₂ : List B} (hlen : l₁.length = l₂.length) :
-    bigSepL (fun i xy => iprop(Φ i xy.1 ∗ Ψ i xy.2)) (l₁.zip l₂) ⊣⊢
-      bigSepL Φ l₁ ∗ bigSepL Ψ l₂ := by
+    ([∗ list] i ↦ xy ∈ l₁.zip l₂, Φ i xy.1 ∗ Ψ i xy.2) ⊣⊢
+      ([∗ list] i ↦ x ∈ l₁, Φ i x) ∗ [∗ list] i ↦ y ∈ l₂, Ψ i y := by
   induction l₁ generalizing l₂ Φ Ψ with
   | nil =>
     cases l₂ with
@@ -908,8 +908,8 @@ theorem sep_zip_with {B C : Type _}
     (hg1 : ∀ x y, g1 (f x y) = x)
     (hg2 : ∀ x y, g2 (f x y) = y)
     (hlen : l₁.length = l₂.length) :
-    bigSepL (fun i c => iprop(Φ i (g1 c) ∗ Ψ i (g2 c))) (List.zipWith f l₁ l₂) ⊣⊢
-      bigSepL Φ l₁ ∗ bigSepL Ψ l₂ := by
+    ([∗ list] i ↦ c ∈ List.zipWith f l₁ l₂, Φ i (g1 c) ∗ Ψ i (g2 c)) ⊣⊢
+      ([∗ list] i ↦ x ∈ l₁, Φ i x) ∗ [∗ list] i ↦ y ∈ l₂, Ψ i y := by
   induction l₁ generalizing l₂ Φ Ψ with
   | nil =>
     cases l₂ with
@@ -941,8 +941,8 @@ theorem sep_zip_with {B C : Type _}
 /-- Big sep over zip_with expressed in terms of conditional. -/
 theorem zip_with {B C : Type _} (f : A → B → C) {Φ : Nat → C → PROP}
     {l₁ : List A} {l₂ : List B} :
-    bigSepL Φ (List.zipWith f l₁ l₂) ⊣⊢
-      bigSepL (fun k x => match l₂[k]? with | some y => Φ k (f x y) | none => emp) l₁ := by
+    ([∗ list] k ↦ c ∈ List.zipWith f l₁ l₂, Φ k c) ⊣⊢
+      [∗ list] k ↦ x ∈ l₁, match l₂[k]? with | some y => Φ k (f x y) | none => emp := by
   induction l₁ generalizing l₂ Φ with
   | nil =>
     simp only [List.zipWith_nil_left, bigSepL, bigOpL]
