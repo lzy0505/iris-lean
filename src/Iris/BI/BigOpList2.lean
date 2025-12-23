@@ -5,10 +5,12 @@ Authors: Zongyuan Liu
 -/
 import Iris.BI.BigOp
 import Iris.BI.BigOpList
+import Iris.Std.TC
 
 namespace Iris.BI
 
 open Iris.Algebra
+open Iris.Std
 open BIBase
 
 
@@ -75,28 +77,16 @@ theorem nil' {P : PROP} [Affine P] {Φ : Nat → A → B → PROP} :
   exact Affine.affine.trans nil.symm.1
 
 theorem nil_inv_l {Φ : Nat → A → B → PROP} {l2 : List B} :
-    bigSepL2 Φ [] l2 ⊣⊢ iprop(⌜l2 = []⌝ ∧ emp) := by
+    bigSepL2 Φ [] l2 ⊢ iprop(⌜l2 = []⌝) := by
   cases l2 with
-  | nil =>
-    simp only [bigSepL2]
-    exact ⟨and_intro (pure_intro trivial) Entails.rfl, and_elim_r⟩
-  | cons y ys =>
-    simp only [bigSepL2]
-    constructor
-    · exact false_elim
-    · exact (and_elim_l.trans (pure_elim' (fun h => nomatch h)))
+  | nil => exact pure_intro rfl
+  | cons y ys => simp only [bigSepL2]; exact false_elim
 
 theorem nil_inv_r {Φ : Nat → A → B → PROP} {l1 : List A} :
-    bigSepL2 Φ l1 [] ⊣⊢ iprop(⌜l1 = []⌝ ∧ emp) := by
+    bigSepL2 Φ l1 [] ⊢ iprop(⌜l1 = []⌝) := by
   cases l1 with
-  | nil =>
-    simp only [bigSepL2]
-    exact ⟨and_intro (pure_intro trivial) Entails.rfl, and_elim_r⟩
-  | cons x xs =>
-    simp only [bigSepL2]
-    constructor
-    · exact false_elim
-    · exact (and_elim_l.trans (pure_elim' (fun h => nomatch h)))
+  | nil => exact pure_intro rfl
+  | cons x xs => simp only [bigSepL2]; exact false_elim
 
 theorem cons {Φ : Nat → A → B → PROP} {x1 : A} {x2 : B} {xs1 : List A} {xs2 : List B} :
     bigSepL2 Φ (x1 :: xs1) (x2 :: xs2) ⊣⊢
@@ -199,6 +189,8 @@ theorem proper {Φ Ψ : Nat → A → B → PROP} {l1 : List A} {l2 : List B}
   · apply mono; intro k x1 x2 h1 h2; exact ( (h k x1 x2 h1 h2)).1
   · apply mono; intro k x1 x2 h1 h2; exact ( (h k x1 x2 h1 h2)).2
 
+/-- Simplified version of `proper` that doesn't require lookup hypotheses.
+    Useful when the predicate transformation is unconditional. -/
 theorem congr {Φ Ψ : Nat → A → B → PROP} {l1 : List A} {l2 : List B}
     (h : ∀ k x1 x2, Φ k x1 x2 ⊣⊢ Ψ k x1 x2) :
     bigSepL2 Φ l1 l2 ⊣⊢ bigSepL2 Ψ l1 l2 := by
@@ -374,10 +366,23 @@ theorem pure_1 {φ : Nat → A → B → Prop} {l1 : List A} {l2 : List B} :
           exact ⟨h1, h2⟩
         exact hφ k (x1, x2) this
 
-theorem affinely_pure_2 {φ : Nat → A → B → Prop} {l1 : List A} {l2 : List B}
-    (hlen : l1.length = l2.length) :
-    iprop(<affine> ⌜∀ k x1 x2, l1[k]? = some x1 → l2[k]? = some x2 → φ k x1 x2⌝ : PROP) ⊢
+theorem affinely_pure_2 {φ : Nat → A → B → Prop} {l1 : List A} {l2 : List B} :
+    iprop(<affine> ⌜l1.length = l2.length ∧
+      ∀ k x1 x2, l1[k]? = some x1 → l2[k]? = some x2 → φ k x1 x2⌝ : PROP) ⊢
       bigSepL2 (fun k x1 x2 => iprop(<affine> ⌜φ k x1 x2⌝ : PROP)) l1 l2 := by
+  -- Split the affinely pure conjunction
+  have split_affine : iprop(<affine> ⌜l1.length = l2.length ∧
+      ∀ k x1 x2, l1[k]? = some x1 → l2[k]? = some x2 → φ k x1 x2⌝ : PROP) ⊢
+      iprop(<affine> ⌜l1.length = l2.length⌝ ∧
+        <affine> ⌜∀ k x1 x2, l1[k]? = some x1 → l2[k]? = some x2 → φ k x1 x2⌝ : PROP) := by
+    calc iprop(<affine> ⌜l1.length = l2.length ∧
+          ∀ k x1 x2, l1[k]? = some x1 → l2[k]? = some x2 → φ k x1 x2⌝ : PROP)
+        ⊢ iprop(<affine> (⌜l1.length = l2.length⌝ ∧
+          ⌜∀ k x1 x2, l1[k]? = some x1 → l2[k]? = some x2 → φ k x1 x2⌝) : PROP) :=
+          affinely_mono ( pure_and).2
+      _ ⊢ iprop(<affine> ⌜l1.length = l2.length⌝ ∧
+          <affine> ⌜∀ k x1 x2, l1[k]? = some x1 → l2[k]? = some x2 → φ k x1 x2⌝ : PROP) :=
+          ( affinely_and).1
   -- Convert via alt
   have step1 : iprop(<affine> ⌜∀ k x1 x2, l1[k]? = some x1 → l2[k]? = some x2 → φ k x1 x2⌝ : PROP) ⊢
       iprop(<affine> ⌜∀ k p, (l1.zip l2)[k]? = some p → φ k p.1 p.2⌝ : PROP) := by
@@ -390,16 +395,31 @@ theorem affinely_pure_2 {φ : Nat → A → B → Prop} {l1 : List A} {l2 : List
   have step2 : iprop(<affine> ⌜∀ k p, (l1.zip l2)[k]? = some p → φ k p.1 p.2⌝ : PROP) ⊢
       bigSepL (fun k p => iprop(<affine> ⌜φ k p.1 p.2⌝ : PROP)) (l1.zip l2) :=
     Iris.BI.BigSepL.affinely_pure_2
-  have step3 : bigSepL (fun k p => iprop(<affine> ⌜φ k p.1 p.2⌝ : PROP)) (l1.zip l2) ⊢
+  -- Use affinely_elim to extract the length proof for step3
+  have step3 : iprop(<affine> ⌜l1.length = l2.length⌝ ∧
+        bigSepL (fun k p => iprop(<affine> ⌜φ k p.1 p.2⌝ : PROP)) (l1.zip l2) : PROP) ⊢
       iprop(⌜l1.length = l2.length⌝ ∧
         bigSepL (fun k p => iprop(<affine> ⌜φ k p.1 p.2⌝ : PROP)) (l1.zip l2) : PROP) :=
-    and_intro (pure_intro hlen) Entails.rfl
+    and_mono affinely_elim Entails.rfl
   have step4 : iprop(⌜l1.length = l2.length⌝ ∧
       bigSepL (fun k p => iprop(<affine> ⌜φ k p.1 p.2⌝ : PROP)) (l1.zip l2) : PROP) ⊢
       bigSepL2 (fun k x1 x2 => iprop(<affine> ⌜φ k x1 x2⌝ : PROP)) l1 l2 :=
     ( (alt (Φ := fun k x1 x2 => iprop(<affine> ⌜φ k x1 x2⌝ : PROP))
       (l1 := l1) (l2 := l2)).symm).1
-  exact step1.trans (step2.trans (step3.trans step4))
+  -- Combine: split, then use step1 on RHS, step2 on result, combine with length
+  calc iprop(<affine> ⌜l1.length = l2.length ∧
+        ∀ k x1 x2, l1[k]? = some x1 → l2[k]? = some x2 → φ k x1 x2⌝ : PROP)
+      ⊢ iprop(<affine> ⌜l1.length = l2.length⌝ ∧
+          <affine> ⌜∀ k x1 x2, l1[k]? = some x1 → l2[k]? = some x2 → φ k x1 x2⌝ : PROP) :=
+        split_affine
+    _ ⊢ iprop(<affine> ⌜l1.length = l2.length⌝ ∧
+          bigSepL (fun k p => iprop(<affine> ⌜φ k p.1 p.2⌝ : PROP)) (l1.zip l2) : PROP) :=
+        and_mono Entails.rfl (step1.trans step2)
+    _ ⊢ iprop(⌜l1.length = l2.length⌝ ∧
+          bigSepL (fun k p => iprop(<affine> ⌜φ k p.1 p.2⌝ : PROP)) (l1.zip l2) : PROP) :=
+        step3
+    _ ⊢ bigSepL2 (fun k x1 x2 => iprop(<affine> ⌜φ k x1 x2⌝ : PROP)) l1 l2 :=
+        step4
 
 theorem pure [BIAffine PROP] {φ : Nat → A → B → Prop} {l1 : List A} {l2 : List B} :
     bigSepL2 (fun k x1 x2 => iprop(⌜φ k x1 x2⌝ : PROP)) l1 l2 ⊣⊢
@@ -413,22 +433,18 @@ theorem pure [BIAffine PROP] {φ : Nat → A → B → Prop} {l1 : List A} {l2 :
   · -- Backward direction
     calc iprop(⌜l1.length = l2.length ∧
           ∀ k x1 x2, l1[k]? = some x1 → l2[k]? = some x2 → φ k x1 x2⌝ : PROP)
-        ⊢ iprop(⌜l1.length = l2.length⌝ ∧
-          ⌜∀ k x1 x2, l1[k]? = some x1 → l2[k]? = some x2 → φ k x1 x2⌝ : PROP) :=
-          ( pure_and).2
+        ⊢ iprop(<affine> ⌜l1.length = l2.length ∧
+          ∀ k x1 x2, l1[k]? = some x1 → l2[k]? = some x2 → φ k x1 x2⌝ : PROP) :=
+          ( (affine_affinely (PROP := PROP) _)).2
+      _ ⊢ bigSepL2 (fun k x1 x2 => iprop(<affine> ⌜φ k x1 x2⌝ : PROP)) l1 l2 :=
+          affinely_pure_2
       _ ⊢ bigSepL2 (fun k x1 x2 => iprop(⌜φ k x1 x2⌝ : PROP)) l1 l2 := by
-          apply pure_elim_l; intro hlen
-          calc iprop(⌜∀ k x1 x2, l1[k]? = some x1 → l2[k]? = some x2 → φ k x1 x2⌝ : PROP)
-              ⊢ iprop(<affine> ⌜∀ k x1 x2, l1[k]? = some x1 → l2[k]? = some x2 → φ k x1 x2⌝ : PROP) :=
-                ( (affine_affinely (PROP := PROP) _)).2
-            _ ⊢ bigSepL2 (fun k x1 x2 => iprop(<affine> ⌜φ k x1 x2⌝ : PROP)) l1 l2 :=
-                affinely_pure_2 hlen
-            _ ⊢ bigSepL2 (fun k x1 x2 => iprop(⌜φ k x1 x2⌝ : PROP)) l1 l2 := by
-                apply mono; intro k x1 x2 _ _
-                exact affinely_elim
+          apply mono; intro k x1 x2 _ _
+          exact affinely_elim
 
 /-! ## Unit/Emp Lemma -/
 
+/-- When the predicate is constantly emp, bigSepL2 reduces to a length equality check. -/
 theorem emp_l [BIAffine PROP] {l1 : List A} {l2 : List B} :
     bigSepL2 (fun _ _ _ => (emp : PROP)) l1 l2 ⊣⊢ iprop(⌜l1.length = l2.length⌝) := by
   induction l1 generalizing l2 with
@@ -451,53 +467,127 @@ theorem emp_l [BIAffine PROP] {l1 : List A} {l2 : List B} :
 
 /-! ## App Lemma -/
 
-/-- bi-entailment version when we know one pair of lengths match. -/
-theorem app {Φ : Nat → A → B → PROP} {l1a l1b : List A} {l2a l2b : List B}
-    (hlen : l1a.length = l2a.length) :
-    bigSepL2 Φ (l1a ++ l1b) (l2a ++ l2b) ⊣⊢
+/-- One-directional app lemma using wand. This does NOT require a length proof.
+    Corresponds exactly to Rocq's `big_sepL2_app`. -/
+theorem app' {Φ : Nat → A → B → PROP} {l1a l1b : List A} {l2a l2b : List B} :
+    bigSepL2 Φ l1a l2a ⊢ bigSepL2 (fun n => Φ (n + l1a.length)) l1b l2b -∗
+      bigSepL2 Φ (l1a ++ l1b) (l2a ++ l2b) := by
+  apply wand_intro'
+  -- Goal after wand_intro': bigSepL2 l1b l2b ∗ bigSepL2 l1a l2a ⊢ bigSepL2 (l1a ++ l1b) (l2a ++ l2b)
+  induction l1a generalizing l2a Φ with
+  | nil =>
+    cases l2a with
+    | nil =>
+      simp only [bigSepL2, List.nil_append, List.length_nil, Nat.add_zero]
+      exact sep_emp.1
+    | cons =>
+      simp only [bigSepL2, List.nil_append]
+      exact sep_elim_r.trans (false_elim (P := bigSepL2 Φ l1b _))
+  | cons x1 xs1 ih =>
+    cases l2a with
+    | nil =>
+      simp only [bigSepL2, List.nil_append]
+      exact sep_elim_r.trans (false_elim (P := bigSepL2 Φ _ l2b))
+    | cons x2 xs2 =>
+      simp only [bigSepL2, List.cons_append, List.length_cons]
+      -- ih : bigSepL2 (Φ (·+xs1.length+1)) l1b l2b ∗ bigSepL2 (Φ (·+1)) xs1 xs2
+      --      ⊢ bigSepL2 (Φ (·+1)) (xs1 ++ l1b) (xs2 ++ l2b)
+      have ihspec := ih (Φ := fun n => Φ (n + 1)) (l2a := xs2)
+      have hcongr : bigSepL2 (fun n => Φ (n + (xs1.length + 1))) l1b l2b ⊣⊢
+                   bigSepL2 (fun n => Φ (n + xs1.length + 1)) l1b l2b :=
+        congr fun n _ _ => by simp only [Nat.add_assoc]; exact BiEntails.rfl
+      -- Goal: bigSepL2 (Φ (·+(xs1.length+1))) l1b l2b ∗ (Φ 0 x1 x2 ∗ bigSepL2 (Φ (·+1)) xs1 xs2)
+      --       ⊢ Φ 0 x1 x2 ∗ bigSepL2 (Φ (·+1)) (xs1 ++ l1b) (xs2 ++ l2b)
+      calc iprop(bigSepL2 (fun n => Φ (n + (xs1.length + 1))) l1b l2b ∗
+              (Φ 0 x1 x2 ∗ bigSepL2 (fun n => Φ (n + 1)) xs1 xs2))
+          ⊢ iprop(bigSepL2 (fun n => Φ (n + xs1.length + 1)) l1b l2b ∗
+              (Φ 0 x1 x2 ∗ bigSepL2 (fun n => Φ (n + 1)) xs1 xs2)) := sep_mono_l hcongr.1
+        _ ⊢ iprop((Φ 0 x1 x2 ∗ bigSepL2 (fun n => Φ (n + 1)) xs1 xs2) ∗
+              bigSepL2 (fun n => Φ (n + xs1.length + 1)) l1b l2b) := sep_symm
+        _ ⊢ iprop(Φ 0 x1 x2 ∗ (bigSepL2 (fun n => Φ (n + 1)) xs1 xs2 ∗
+              bigSepL2 (fun n => Φ (n + xs1.length + 1)) l1b l2b)) := sep_assoc.1
+        _ ⊢ iprop(Φ 0 x1 x2 ∗ (bigSepL2 (fun n => Φ (n + xs1.length + 1)) l1b l2b ∗
+              bigSepL2 (fun n => Φ (n + 1)) xs1 xs2)) := sep_mono_r sep_symm
+        _ ⊢ iprop(Φ 0 x1 x2 ∗ bigSepL2 (fun n => Φ (n + 1)) (xs1 ++ l1b) (xs2 ++ l2b)) :=
+            sep_mono_r ihspec
+
+/-- Inverse direction of app: splitting an appended bigSepL2 requires one pair of lengths to match.
+    Uses disjunctive condition like Rocq's `big_sepL2_app_inv`. -/
+private theorem app_inv_core {Φ : Nat → A → B → PROP} {l1a l1b : List A} {l2a l2b : List B}
+    (hlen : l1a.length = l2a.length ∨ l1b.length = l2b.length) :
+    bigSepL2 Φ (l1a ++ l1b) (l2a ++ l2b) ⊢
       bigSepL2 Φ l1a l2a ∗ bigSepL2 (fun n => Φ (n + l1a.length)) l1b l2b := by
   induction l1a generalizing l2a Φ with
   | nil =>
     cases l2a with
     | nil =>
       simp only [bigSepL2, List.nil_append, List.length_nil, Nat.add_zero]
-      exact emp_sep.symm
-    | cons => simp at hlen
+      exact emp_sep.2
+    | cons y ys =>
+      -- l2a = y :: ys, l1a = [], so length 0 ≠ length (y::ys) - contradiction via inl
+      -- or use l1b.length = l2b.length via inr
+      cases hlen with
+      | inl h => exact absurd h (by simp only [List.length_nil, List.length_cons]; omega)
+      | inr h =>
+        -- LHS: bigSepL2 Φ l1b ((y :: ys) ++ l2b) which has mismatched lengths, hence False
+        simp only [bigSepL2, List.nil_append]
+        have hne : l1b.length ≠ (y :: ys ++ l2b).length := by
+          simp only [List.length_cons, List.length_append]
+          omega
+        exact length.trans (pure_elim' fun heq => absurd heq hne)
   | cons x1 xs1 ih =>
     cases l2a with
-    | nil => simp at hlen
+    | nil =>
+      cases hlen with
+      | inl h => exact absurd h (by simp only [List.length_nil, List.length_cons]; omega)
+      | inr h =>
+        simp only [bigSepL2, List.nil_append]
+        have hne : (x1 :: xs1 ++ l1b).length ≠ l2b.length := by
+          simp only [List.length_cons, List.length_append]
+          omega
+        exact length.trans (pure_elim' fun heq => absurd heq hne)
     | cons x2 xs2 =>
-      simp only [List.length_cons, Nat.add_right_cancel_iff] at hlen
       simp only [bigSepL2, List.cons_append, List.length_cons]
-      have ihspec := ih (Φ := fun n => Φ (n + 1)) (l2a := xs2) hlen
-      -- ihspec : bigSepL2 (Φ (·+1)) (xs1++l1b) (xs2++l2b) ⊣⊢
-      --          bigSepL2 (Φ (·+1)) xs1 xs2 ∗ bigSepL2 (fun n => Φ (n + xs1.length + 1)) l1b l2b
-      -- We need to convert between (n + xs1.length + 1) and (n + (xs1.length + 1))
+      have hlen' : xs1.length = xs2.length ∨ l1b.length = l2b.length := by
+        cases hlen with
+        | inl h => left; simp only [List.length_cons] at h; omega
+        | inr h => right; exact h
+      have ihspec := ih (Φ := fun n => Φ (n + 1)) (l2a := xs2) hlen'
       have hcongr : bigSepL2 (fun n => Φ (n + xs1.length + 1)) l1b l2b ⊣⊢
                    bigSepL2 (fun n => Φ (n + (xs1.length + 1))) l1b l2b :=
         congr fun n _ _ => by simp only [Nat.add_assoc]; exact BiEntails.rfl
       calc iprop(Φ 0 x1 x2 ∗ bigSepL2 (fun n => Φ (n + 1)) (xs1 ++ l1b) (xs2 ++ l2b))
-          ⊣⊢ iprop(Φ 0 x1 x2 ∗ (bigSepL2 (fun n => Φ (n + 1)) xs1 xs2 ∗
-              bigSepL2 (fun n => Φ (n + xs1.length + 1)) l1b l2b)) := sep_congr .rfl ihspec
-        _ ⊣⊢ iprop(Φ 0 x1 x2 ∗ (bigSepL2 (fun n => Φ (n + 1)) xs1 xs2 ∗
+          ⊢ iprop(Φ 0 x1 x2 ∗ (bigSepL2 (fun n => Φ (n + 1)) xs1 xs2 ∗
+              bigSepL2 (fun n => Φ (n + xs1.length + 1)) l1b l2b)) := sep_mono_r ihspec
+        _ ⊢ iprop(Φ 0 x1 x2 ∗ (bigSepL2 (fun n => Φ (n + 1)) xs1 xs2 ∗
               bigSepL2 (fun n => Φ (n + (xs1.length + 1))) l1b l2b)) :=
-            sep_congr .rfl (sep_congr .rfl hcongr)
-        _ ⊣⊢ iprop((Φ 0 x1 x2 ∗ bigSepL2 (fun n => Φ (n + 1)) xs1 xs2) ∗
-              bigSepL2 (fun n => Φ (n + (xs1.length + 1))) l1b l2b) := sep_assoc.symm
+            sep_mono_r (sep_mono_r hcongr.2)
+        _ ⊢ iprop((Φ 0 x1 x2 ∗ bigSepL2 (fun n => Φ (n + 1)) xs1 xs2) ∗
+              bigSepL2 (fun n => Φ (n + (xs1.length + 1))) l1b l2b) := sep_assoc.2
+
+/-- bi-entailment version when we know one pair of lengths match.
+    Uses disjunctive condition like Rocq's `big_sepL2_app_same_length`. -/
+theorem app {Φ : Nat → A → B → PROP} {l1a l1b : List A} {l2a l2b : List B}
+    (hlen : l1a.length = l2a.length ∨ l1b.length = l2b.length) :
+    bigSepL2 Φ (l1a ++ l1b) (l2a ++ l2b) ⊣⊢
+      bigSepL2 Φ l1a l2a ∗ bigSepL2 (fun n => Φ (n + l1a.length)) l1b l2b :=
+  ⟨app_inv_core hlen, sep_symm.trans (wand_elim' app')⟩
 
 theorem app_inv {Φ : Nat → A → B → PROP} {l1a l1b : List A} {l2a l2b : List B}
-    (hlen : l1a.length = l2a.length) :
+    (hlen : l1a.length = l2a.length ∨ l1b.length = l2b.length) :
     bigSepL2 Φ (l1a ++ l1b) (l2a ++ l2b) ⊣⊢
       bigSepL2 Φ l1a l2a ∗ bigSepL2 (fun n => Φ (n + l1a.length)) l1b l2b := by
   exact app hlen
 
 /-! ## Snoc Lemma -/
 
-theorem snoc {Φ : Nat → A → B → PROP} {l1 : List A} {l2 : List B} {x : A} {y : B}
-    (hlen : l1.length = l2.length) :
+/-- Snoc lemma: no explicit length proof needed because singleton lists have equal length.
+    Corresponds to Rocq's `big_sepL2_snoc`. -/
+theorem snoc {Φ : Nat → A → B → PROP} {l1 : List A} {l2 : List B} {x : A} {y : B} :
     bigSepL2 Φ (l1 ++ [x]) (l2 ++ [y]) ⊣⊢
       bigSepL2 Φ l1 l2 ∗ Φ l1.length x y := by
-  have h := app (Φ := Φ) (l1b := [x]) (l2b := [y]) hlen
+  -- Use disjunctive app with Or.inr: [x].length = [y].length = 1
+  have h := app (Φ := Φ) (l1a := l1) (l2a := l2) (l1b := [x]) (l2b := [y]) (Or.inr rfl)
   simp only [bigSepL2] at h
   -- h : bigSepL2 Φ (l1 ++ [x]) (l2 ++ [y]) ⊣⊢ bigSepL2 Φ l1 l2 ∗ (Φ (0 + l1.length) x y ∗ emp)
   calc bigSepL2 Φ (l1 ++ [x]) (l2 ++ [y])
@@ -537,6 +627,7 @@ theorem fmap_r {C : Type _} (f : C → B) {Φ : Nat → A → B → PROP}
       simp only [List.map_cons, bigSepL2]
       exact sep_congr .rfl (ih (Φ := fun n => Φ (n + 1)))
 
+/-- Combined fmap_l and fmap_r: apply functions to both list arguments simultaneously. -/
 theorem fmap {C D : Type _} (f : C → A) (g : D → B) {Φ : Nat → A → B → PROP}
     {l1 : List C} {l2 : List D} :
     bigSepL2 Φ (l1.map f) (l2.map g) ⊣⊢ bigSepL2 (fun k x y => Φ k (f x) (g y)) l1 l2 := by
@@ -773,18 +864,49 @@ theorem lookup_acc {Φ : Nat → A → B → PROP} {l1 : List A} {l2 : List B} {
                 _ ⊢ iprop(Φ 0 y1 y2 ∗ bigSepL2 (fun n => Φ (n + 1)) ys1 ys2) :=
                     sep_mono_r wand_elim_r
 
-/-- Lookup lemma with Absorbing: extract element at index i (discarding the wand). -/
-theorem lookup_absorbing {Φ : Nat → A → B → PROP} {l1 : List A} {l2 : List B} {i : Nat} {x1 : A} {x2 : B}
-    [Absorbing (Φ i x1 x2)]
+/-- Corresponds to `big_sepL2_lookup` in Rocq Iris.
+    Simplified lookup: works when either all Φ are affine or Φ i x1 x2 is absorbing.
+    Uses `TCOr` to encode the typeclass disjunction. -/
+theorem lookup {Φ : Nat → A → B → PROP} {l1 : List A} {l2 : List B} {i : Nat} {x1 : A} {x2 : B}
     (h1 : l1[i]? = some x1) (h2 : l2[i]? = some x2) :
-    bigSepL2 Φ l1 l2 ⊢ Φ i x1 x2 :=
-  (lookup_acc h1 h2).trans sep_elim_l
-
-/-- Lookup lemma with BIAffine: extract element at index i (discarding the wand). -/
-theorem lookup [BIAffine PROP] {Φ : Nat → A → B → PROP} {l1 : List A} {l2 : List B} {i : Nat} {x1 : A} {x2 : B}
-    (h1 : l1[i]? = some x1) (h2 : l2[i]? = some x2) :
-    bigSepL2 Φ l1 l2 ⊢ Φ i x1 x2 :=
-  (lookup_acc h1 h2).trans sep_elim_l
+    [TCOr (∀ j y1 y2, Affine (Φ j y1 y2)) (Absorbing (Φ i x1 x2))] →
+    bigSepL2 Φ l1 l2 ⊢ Φ i x1 x2
+  | TCOr.l => by
+    -- All Φ j y1 y2 are affine. Use take_drop_middle decomposition.
+    have hi1 : i < l1.length := List.getElem?_eq_some_iff.mp h1 |>.1
+    have hi2 : i < l2.length := List.getElem?_eq_some_iff.mp h2 |>.1
+    have hx1 : l1[i] = x1 := List.getElem?_eq_some_iff.mp h1 |>.2
+    have hx2 : l2[i] = x2 := List.getElem?_eq_some_iff.mp h2 |>.2
+    have hlen1 : (l1.take i).length = i := List.length_take_of_le (Nat.le_of_lt hi1)
+    have hlen2 : (l2.take i).length = i := List.length_take_of_le (Nat.le_of_lt hi2)
+    -- l1 = take i l1 ++ x1 :: drop (i + 1) l1  (take_drop_middle)
+    have hmiddle1 : l1 = l1.take i ++ x1 :: l1.drop (i + 1) := by
+      have htake : l1.take (i + 1) = l1.take i ++ [x1] := by
+        rw [List.take_succ_eq_append_getElem hi1, hx1]
+      calc l1 = l1.take (i + 1) ++ l1.drop (i + 1) := (List.take_append_drop (i + 1) l1).symm
+        _ = (l1.take i ++ [x1]) ++ l1.drop (i + 1) := by rw [htake]
+        _ = l1.take i ++ ([x1] ++ l1.drop (i + 1)) := List.append_assoc ..
+        _ = l1.take i ++ (x1 :: l1.drop (i + 1)) := by rfl
+    have hmiddle2 : l2 = l2.take i ++ x2 :: l2.drop (i + 1) := by
+      have htake : l2.take (i + 1) = l2.take i ++ [x2] := by
+        rw [List.take_succ_eq_append_getElem hi2, hx2]
+      calc l2 = l2.take (i + 1) ++ l2.drop (i + 1) := (List.take_append_drop (i + 1) l2).symm
+        _ = (l2.take i ++ [x2]) ++ l2.drop (i + 1) := by rw [htake]
+        _ = l2.take i ++ ([x2] ++ l2.drop (i + 1)) := List.append_assoc ..
+        _ = l2.take i ++ (x2 :: l2.drop (i + 1)) := by rfl
+    -- Rewrite with hmiddle and apply app
+    rw [hmiddle1, hmiddle2]
+    have happ := @app PROP _ A B Φ (l1.take i) (x1 :: l1.drop (i + 1))
+      (l2.take i) (x2 :: l2.drop (i + 1)) (Or.inl (hlen1.trans hlen2.symm))
+    calc bigSepL2 Φ (l1.take i ++ x1 :: l1.drop (i + 1)) (l2.take i ++ x2 :: l2.drop (i + 1))
+        ⊢ bigSepL2 Φ (l1.take i) (l2.take i) ∗
+          bigSepL2 (fun k => Φ (k + (l1.take i).length)) (x1 :: l1.drop (i + 1)) (x2 :: l2.drop (i + 1)) :=
+          happ.1
+      _ ⊢ bigSepL2 Φ (l1.take i) (l2.take i) ∗
+          (Φ i x1 x2 ∗ bigSepL2 (fun k => Φ (k + 1 + i)) (l1.drop (i + 1)) (l2.drop (i + 1))) := by
+          simp only [hlen1, bigSepL2, Nat.zero_add]; exact Entails.rfl
+      _ ⊢ Φ i x1 x2 := sep_elim_r.trans sep_elim_l
+  | TCOr.r => (lookup_acc h1 h2).trans sep_elim_l
 
 /-- Insert access pattern: extract element at index i and get a wand to restore with updated values.
     Corresponds to big_sepL2_insert_acc in Rocq. -/
@@ -876,10 +998,14 @@ theorem insert_acc {Φ : Nat → A → B → PROP} {l1 : List A} {l2 : List B} {
 
 /-- Introduction rule: from a persistent implication, construct bigSepL2.
     Corresponds to big_sepL2_intro in Rocq. -/
-theorem intro {Φ : Nat → A → B → PROP} {l1 : List A} {l2 : List B}
-    (hlen : l1.length = l2.length) :
-    iprop(□ (∀ k, ∀ x1, ∀ x2, iprop(⌜l1[k]? = some x1⌝ → ⌜l2[k]? = some x2⌝ → Φ k x1 x2))) ⊢
+theorem intro {Φ : Nat → A → B → PROP} {l1 : List A} {l2 : List B} :
+    iprop(⌜l1.length = l2.length⌝ ∧
+      □ (∀ k, ∀ x1, ∀ x2, iprop(⌜l1[k]? = some x1⌝ → ⌜l2[k]? = some x2⌝ → Φ k x1 x2))) ⊢
       bigSepL2 Φ l1 l2 := by
+  apply pure_elim_l; intro hlen
+  -- Use a helper that takes hlen as a Prop argument for the induction
+  suffices h : iprop(□ (∀ k, ∀ x1, ∀ x2, iprop(⌜l1[k]? = some x1⌝ → ⌜l2[k]? = some x2⌝ → Φ k x1 x2))) ⊢
+      bigSepL2 Φ l1 l2 from h
   induction l1 generalizing l2 Φ with
   | nil =>
     cases l2 with
@@ -989,7 +1115,7 @@ theorem impl {Φ Ψ : Nat → A → B → PROP} {l1 : List A} {l2 : List B} :
         have hwands : iprop(□ (∀ k, ∀ x1, ∀ x2,
                 iprop(⌜l1[k]? = some x1⌝ → ⌜l2[k]? = some x2⌝ → Φ k x1 x2 -∗ Ψ k x1 x2)))
             ⊢ bigSepL2 (fun k x1 x2 => iprop(Φ k x1 x2 -∗ Ψ k x1 x2)) l1 l2 :=
-          intro hlen
+          (and_intro (pure_intro hlen) Entails.rfl).trans intro
         calc iprop(bigSepL2 Φ l1 l2 ∗
                 □ (∀ k, ∀ x1, ∀ x2,
                   iprop(⌜l1[k]? = some x1⌝ → ⌜l2[k]? = some x2⌝ → Φ k x1 x2 -∗ Ψ k x1 x2)))
@@ -1000,14 +1126,16 @@ theorem impl {Φ Ψ : Nat → A → B → PROP} {l1 : List A} {l2 : List B} :
               ( sep_2).1
           _ ⊢ bigSepL2 Ψ l1 l2 := mono fun _ _ _ _ _ => wand_elim_r
 
-/-- bigSepL2 of persistent propositions is equivalent to a conjunction of length and forall. -/
+/-- bigSepL2 of persistent propositions is equivalent to a conjunction of length and forall.
+    Corresponds to `big_sepL2_forall` in Rocq Iris. -/
 theorem forall' [BIAffine PROP] {Φ : Nat → A → B → PROP} {l1 : List A} {l2 : List B}
-    [∀ k x1 x2, Persistent (Φ k x1 x2)] :
+    (hPersistent : ∀ k x1 x2, Persistent (Φ k x1 x2)) :
     bigSepL2 Φ l1 l2 ⊣⊢
       iprop(⌜l1.length = l2.length⌝ ∧
         (∀ k, ∀ x1, ∀ x2, iprop(⌜l1[k]? = some x1⌝ → ⌜l2[k]? = some x2⌝ → Φ k x1 x2))) := by
   constructor
   · -- Forward direction
+    haveI : ∀ k x1 x2, Persistent (Φ k x1 x2) := hPersistent
     apply and_intro
     · exact length
     · apply forall_intro; intro k
@@ -1022,7 +1150,7 @@ theorem forall' [BIAffine PROP] {Φ : Nat → A → B → PROP} {l1 : List A} {l
     apply pure_elim_l; intro hlen
     -- Use persistent_and_sep_1 pattern: when Φ is persistent, we have P ∧ Q ⊢ P ∗ Q with affine
     -- Following Rocq: induction on l1, l2
-    induction l1 generalizing l2 Φ with
+    induction l1 generalizing l2 Φ hPersistent with
     | nil =>
       cases l2 with
       | nil => simp only [bigSepL2]; exact Affine.affine
@@ -1035,6 +1163,7 @@ theorem forall' [BIAffine PROP] {Φ : Nat → A → B → PROP} {l1 : List A} {l
         simp only [bigSepL2]
         -- Need: ∀ k x1 x2, ⌜...⌝ → ⌜...⌝ → Φ k x1 x2 ⊢ Φ 0 y1 y2 ∗ bigSepL2 (Φ (·+1)) ys1 ys2
         -- When Φ is persistent, we can duplicate it
+        haveI : ∀ k x1 x2, Persistent (Φ k x1 x2) := hPersistent
         have head_step : iprop(∀ k, ∀ x1, ∀ x2,
                 iprop(⌜(y1 :: ys1)[k]? = some x1⌝ → ⌜(y2 :: ys2)[k]? = some x2⌝ → Φ k x1 x2))
             ⊢ Φ 0 y1 y2 := by
@@ -1074,7 +1203,7 @@ theorem forall' [BIAffine PROP] {Φ : Nat → A → B → PROP} {l1 : List A} {l
                 iprop(⌜ys1[k]? = some x1⌝ → ⌜ys2[k]? = some x2⌝ → Φ (k + 1) x1 x2))) :=
               sep_mono_r tail_step
           _ ⊢ iprop(Φ 0 y1 y2 ∗ bigSepL2 (fun n => Φ (n + 1)) ys1 ys2) :=
-              sep_mono_r (ih hlen)
+              sep_mono_r (ih (fun k x1 x2 => hPersistent (k + 1) x1 x2) hlen)
 
 /-! ## Modality Interaction -/
 
@@ -1120,105 +1249,152 @@ theorem laterN_2 {Φ : Nat → A → B → PROP} {l1 : List A} {l2 : List B} {n 
         ⊢ iprop(▷ bigSepL2 (fun k x1 x2 => iprop(▷^[m] Φ k x1 x2)) l1 l2) := later_2
       _ ⊢ iprop(▷ ▷^[m] bigSepL2 Φ l1 l2) := later_mono ih
 
+/- Corresponds to `big_sepL2_later_1` in Rocq Iris.
+    Later modality through bigSepL2 (other direction, requires BIAffine and equal lengths).
+
+  TODO: Add except-0 infrastructure (timeless_pure, except0_and, except0_intro)
+theorem later_1 [BIAffine PROP] {Φ : Nat → A → B → PROP} {l1 : List A} {l2 : List B}:
+     iprop(▷ bigSepL2 Φ l1 l2) ⊢ ◇ bigSepL2 (fun k x1 x2 => iprop(▷ Φ k x1 x2)) l1 l2 := by sorry
+-/
+
+/- Corresponds to `big_sepL2_later` in Rocq Iris.
+    Later distributes over bigSepL2 (equivalence requires BIAffine for emp case).
+
+    TODO: Add except-0 infrastructure
+theorem later [BIAffine PROP] {Φ : Nat → A → B → PROP} {l1 : List A} {l2 : List B}:
+    iprop(▷ bigSepL2 Φ l1 l2) ⊣⊢ ◇ bigSepL2 (fun k x1 x2 => iprop(▷ Φ k x1 x2)) l1 l2 :=
+  ⟨later_1, later_2⟩
+-/
+
+/- LaterN modality through bigSepL2 (other direction, requires BIAffine).
+
+    TODO: Add except-0 infrastructure
+theorem laterN_1 [BIAffine PROP] {Φ : Nat → A → B → PROP} {l1 : List A} {l2 : List B} {n : Nat}:
+    iprop(▷^[n] bigSepL2 Φ l1 l2) ⊢ ◇ bigSepL2 (fun k x1 x2 => iprop(▷^[n] Φ k x1 x2)) l1 l2 := by sorry sorry
+-/
+
+/- Corresponds to `big_sepL2_laterN` in Rocq Iris.
+    LaterN distributes over bigSepL2 (equivalence requires BIAffine).
+
+    TODO: Add except-0 infrastructure
+theorem laterN [BIAffine PROP] {Φ : Nat → A → B → PROP} {l1 : List A} {l2 : List B} {n : Nat}:
+    iprop(▷^[n] bigSepL2 Φ l1 l2) ⊣⊢ bigSepL2 (fun k x1 x2 => iprop(▷^[n] Φ k x1 x2)) l1 l2 :=
+  ⟨laterN_1, laterN_2⟩
+ -/
+
 /-! ## Interaction with BigSepL -/
 
 /-- BigSepL2 over separated predicates is equivalent to separating two BigSepLs. -/
-theorem sepL {Φ1 : Nat → A → PROP} {Φ2 : Nat → B → PROP} {l1 : List A} {l2 : List B}
-    (hlen : l1.length = l2.length) :
+theorem sepL {Φ1 : Nat → A → PROP} {Φ2 : Nat → B → PROP} {l1 : List A} {l2 : List B} :
     bigSepL2 (fun k x1 x2 => iprop(Φ1 k x1 ∗ Φ2 k x2)) l1 l2 ⊣⊢
-      bigSepL Φ1 l1 ∗ bigSepL Φ2 l2 := by
+      iprop(⌜l1.length = l2.length⌝ ∧ (bigSepL Φ1 l1 ∗ bigSepL Φ2 l2)) := by
   calc bigSepL2 (fun k x1 x2 => iprop(Φ1 k x1 ∗ Φ2 k x2)) l1 l2
       ⊣⊢ iprop(⌜l1.length = l2.length⌝ ∧
           bigSepL (fun k p => iprop(Φ1 k p.1 ∗ Φ2 k p.2)) (l1.zip l2)) := alt
-    _ ⊣⊢ bigSepL (fun k p => iprop(Φ1 k p.1 ∗ Φ2 k p.2)) (l1.zip l2) := by
+    _ ⊣⊢ iprop(⌜l1.length = l2.length⌝ ∧ (bigSepL Φ1 l1 ∗ bigSepL Φ2 l2)) := by
+        have h : ∀ hlen : l1.length = l2.length,
+            bigSepL (fun k p => iprop(Φ1 k p.1 ∗ Φ2 k p.2)) (l1.zip l2) ⊣⊢
+              iprop(bigSepL Φ1 l1 ∗ bigSepL Φ2 l2) :=
+          fun hlen => BigSepL.sep_zip hlen
         constructor
-        · exact and_elim_r
-        · exact and_intro (pure_intro hlen) Entails.rfl
-    _ ⊣⊢ bigSepL Φ1 l1 ∗ bigSepL Φ2 l2 := BigSepL.sep_zip hlen
+        · apply pure_elim_l; intro hlen
+          exact and_intro (pure_intro hlen) ((h hlen).1)
+        · apply pure_elim_l; intro hlen
+          exact and_intro (pure_intro hlen) ((h hlen).2)
 
 /-- BigSepL2 can be constructed from two BigSepLs. -/
-theorem sepL_2 {Φ1 : Nat → A → PROP} {Φ2 : Nat → B → PROP} {l1 : List A} {l2 : List B}
-    (hlen : l1.length = l2.length) :
-    ⊢ bigSepL Φ1 l1 -∗ bigSepL Φ2 l2 -∗
+theorem sepL_2 {Φ1 : Nat → A → PROP} {Φ2 : Nat → B → PROP} {l1 : List A} {l2 : List B} :
+    iprop(⌜l1.length = l2.length⌝ ∧ bigSepL Φ1 l1) ⊢ bigSepL Φ2 l2 -∗
       bigSepL2 (fun k x1 x2 => iprop(Φ1 k x1 ∗ Φ2 k x2)) l1 l2 := by
-  apply entails_wand
-  apply wand_intro'
-  calc iprop(bigSepL Φ2 l2 ∗ bigSepL Φ1 l1)
-      ⊢ iprop(bigSepL Φ1 l1 ∗ bigSepL Φ2 l2) := ( sep_comm).1
-    _ ⊢ bigSepL2 (fun k x1 x2 => iprop(Φ1 k x1 ∗ Φ2 k x2)) l1 l2 := ( (sepL hlen)).2
+  apply wand_intro
+  -- Goal: (⌜...⌝ ∧ bigSepL Φ1 l1) ∗ bigSepL Φ2 l2 ⊢ bigSepL2 ...
+  -- First extract the pure to the left
+  have rearrange : iprop((⌜l1.length = l2.length⌝ ∧ bigSepL Φ1 l1) ∗ bigSepL Φ2 l2) ⊢
+      iprop(⌜l1.length = l2.length⌝ ∧ (bigSepL Φ1 l1 ∗ bigSepL Φ2 l2)) := by
+    calc iprop((⌜l1.length = l2.length⌝ ∧ bigSepL Φ1 l1) ∗ bigSepL Φ2 l2)
+        ⊢ iprop((<affine> ⌜l1.length = l2.length⌝ ∗ bigSepL Φ1 l1) ∗ bigSepL Φ2 l2) :=
+          sep_mono_l ( persistent_and_affinely_sep_l).1
+      _ ⊢ iprop(<affine> ⌜l1.length = l2.length⌝ ∗ (bigSepL Φ1 l1 ∗ bigSepL Φ2 l2)) :=
+          ( sep_assoc).1
+      _ ⊢ iprop(⌜l1.length = l2.length⌝ ∧ (bigSepL Φ1 l1 ∗ bigSepL Φ2 l2)) :=
+          ( persistent_and_affinely_sep_l.symm).1
+  exact rearrange.trans sepL.2
 
 /-! ## Reverse Lemmas -/
 
 /-- BigSepL2 over reversed lists (one direction).
-    Note: This lemma requires that the lists have equal length, which is implicit in
-    the well-formedness of bigSepL2. -/
-theorem reverse_2 {Φ : A → B → PROP} {l1 : List A} {l2 : List B}
-    (hlen : l1.length = l2.length) :
+    Note: The length equality is derived from the bigSepL2 on the LHS. -/
+theorem reverse_2 {Φ : A → B → PROP} {l1 : List A} {l2 : List B} :
     bigSepL2 (fun _ x1 x2 => Φ x1 x2) l1 l2 ⊢
       bigSepL2 (fun _ x1 x2 => Φ x1 x2) l1.reverse l2.reverse := by
-  induction l1 generalizing l2 with
-  | nil =>
-    cases l2 with
-    | nil => simp only [List.reverse_nil]; exact Entails.rfl
-    | cons => simp at hlen
-  | cons x1 xs1 ih =>
-    cases l2 with
-    | nil => simp at hlen
-    | cons x2 xs2 =>
-      simp only [List.length_cons] at hlen
-      have xs_len : xs1.length = xs2.length := Nat.succ.inj hlen
-      simp only [bigSepL2, List.reverse_cons]
-      -- Have: Φ x1 x2 ∗ bigSepL2 Φ xs1 xs2
-      -- Want: bigSepL2 Φ (xs1.reverse ++ [x1]) (xs2.reverse ++ [x2])
-      calc iprop(Φ x1 x2 ∗ bigSepL2 (fun _ => Φ) xs1 xs2)
-          ⊢ iprop(bigSepL2 (fun _ => Φ) xs1 xs2 ∗ Φ x1 x2) :=
-            ( sep_comm).1
-        _ ⊢ iprop(bigSepL2 (fun _ => Φ) xs1.reverse xs2.reverse ∗ Φ x1 x2) :=
-            sep_mono_l (ih xs_len)
-        _ ⊢ iprop(bigSepL2 (fun _ => Φ) xs1.reverse xs2.reverse ∗
-                   bigSepL2 (fun _ => Φ) [x1] [x2]) := by
-            apply sep_mono_r
-            simp only [bigSepL2]
-            exact ( sep_emp).2
-        _ ⊢ bigSepL2 (fun _ => Φ) (xs1.reverse ++ [x1]) (xs2.reverse ++ [x2]) := by
-            -- Use snoc with equal lengths
-            have rev_len : xs1.reverse.length = xs2.reverse.length := by
-              simp only [List.length_reverse, xs_len]
-            have h := snoc (Φ := fun _ => Φ) (l1 := xs1.reverse) (l2 := xs2.reverse)
-                           (x := x1) (y := x2) rev_len
-            calc iprop(bigSepL2 (fun _ => Φ) xs1.reverse xs2.reverse ∗
-                      bigSepL2 (fun _ => Φ) [x1] [x2])
-                ⊢ iprop(bigSepL2 (fun _ => Φ) xs1.reverse xs2.reverse ∗ Φ x1 x2) := by
-                  apply sep_mono_r
-                  simp only [bigSepL2]
-                  exact ( sep_emp).1
-              _ ⊢ iprop(bigSepL2 (fun _ => Φ) xs1.reverse xs2.reverse ∗
-                      (fun _ => Φ) xs1.reverse.length x1 x2) :=
-                  Entails.rfl
-              _ ⊢ bigSepL2 (fun _ => Φ) (xs1.reverse ++ [x1]) (xs2.reverse ++ [x2]) :=
-                  ( h).2
+  -- Extract length from bigSepL2 and use it in the induction
+  have h : ∀ hlen : l1.length = l2.length,
+      bigSepL2 (fun _ x1 x2 => Φ x1 x2) l1 l2 ⊢
+        bigSepL2 (fun _ x1 x2 => Φ x1 x2) l1.reverse l2.reverse := by
+    intro hlen
+    induction l1 generalizing l2 with
+    | nil =>
+      cases l2 with
+      | nil => simp only [List.reverse_nil]; exact Entails.rfl
+      | cons => simp at hlen
+    | cons x1 xs1 ih =>
+      cases l2 with
+      | nil => simp at hlen
+      | cons x2 xs2 =>
+        simp only [List.length_cons] at hlen
+        have xs_len : xs1.length = xs2.length := Nat.succ.inj hlen
+        simp only [bigSepL2, List.reverse_cons]
+        -- Have: Φ x1 x2 ∗ bigSepL2 Φ xs1 xs2
+        -- Want: bigSepL2 Φ (xs1.reverse ++ [x1]) (xs2.reverse ++ [x2])
+        calc iprop(Φ x1 x2 ∗ bigSepL2 (fun _ => Φ) xs1 xs2)
+            ⊢ iprop(bigSepL2 (fun _ => Φ) xs1 xs2 ∗ Φ x1 x2) :=
+              ( sep_comm).1
+          _ ⊢ iprop(bigSepL2 (fun _ => Φ) xs1.reverse xs2.reverse ∗ Φ x1 x2) :=
+              sep_mono_l (ih xs_len)
+          _ ⊢ iprop(bigSepL2 (fun _ => Φ) xs1.reverse xs2.reverse ∗
+                     bigSepL2 (fun _ => Φ) [x1] [x2]) := by
+              apply sep_mono_r
+              simp only [bigSepL2]
+              exact ( sep_emp).2
+          _ ⊢ bigSepL2 (fun _ => Φ) (xs1.reverse ++ [x1]) (xs2.reverse ++ [x2]) := by
+              -- Use snoc (no length argument needed now!)
+              have h := snoc (Φ := fun _ => Φ) (l1 := xs1.reverse) (l2 := xs2.reverse)
+                             (x := x1) (y := x2)
+              calc iprop(bigSepL2 (fun _ => Φ) xs1.reverse xs2.reverse ∗
+                        bigSepL2 (fun _ => Φ) [x1] [x2])
+                  ⊢ iprop(bigSepL2 (fun _ => Φ) xs1.reverse xs2.reverse ∗ Φ x1 x2) := by
+                    apply sep_mono_r
+                    simp only [bigSepL2]
+                    exact ( sep_emp).1
+                _ ⊢ iprop(bigSepL2 (fun _ => Φ) xs1.reverse xs2.reverse ∗
+                        (fun _ => Φ) xs1.reverse.length x1 x2) :=
+                    Entails.rfl
+                _ ⊢ bigSepL2 (fun _ => Φ) (xs1.reverse ++ [x1]) (xs2.reverse ++ [x2]) :=
+                    ( h).2
+  -- Now use pure_elim to derive the result
+  calc bigSepL2 (fun _ x1 x2 => Φ x1 x2) l1 l2
+      ⊢ iprop(⌜l1.length = l2.length⌝ ∧ bigSepL2 (fun _ x1 x2 => Φ x1 x2) l1 l2) :=
+        ( and_self).2.trans (and_mono_l length)
+    _ ⊢ bigSepL2 (fun _ x1 x2 => Φ x1 x2) l1.reverse l2.reverse := by
+        apply pure_elim_l; intro hlen
+        exact h hlen
 
 /-- BigSepL2 over reversed lists (equivalence). -/
-theorem reverse {Φ : A → B → PROP} {l1 : List A} {l2 : List B}
-    (hlen : l1.length = l2.length) :
+theorem reverse {Φ : A → B → PROP} {l1 : List A} {l2 : List B} :
     bigSepL2 (fun _ x1 x2 => Φ x1 x2) l1.reverse l2.reverse ⊣⊢
       bigSepL2 (fun _ x1 x2 => Φ x1 x2) l1 l2 := by
   constructor
   · -- reverse.reverse = id
-    have rev_len : l1.reverse.length = l2.reverse.length := by
-      simp only [List.length_reverse, hlen]
-    have h1 := reverse_2 (Φ := Φ) (l1 := l1.reverse) (l2 := l2.reverse) rev_len
+    have h1 := reverse_2 (Φ := Φ) (l1 := l1.reverse) (l2 := l2.reverse)
     simp only [List.reverse_reverse] at h1
     exact h1
-  · exact reverse_2 hlen
+  · exact reverse_2
 
 /-! ## Replicate Lemmas -/
 
 /-- BigSepL2 with replicate on the left reduces to BigSepL. -/
-theorem replicate_l {Φ : Nat → A → B → PROP} {l : List B} {x : A} {n : Nat}
-    (hlen : l.length = n) :
-    bigSepL2 Φ (List.replicate n x) l ⊣⊢ bigSepL (fun k x2 => Φ k x x2) l := by
-  subst hlen
+theorem replicate_l {Φ : Nat → A → B → PROP} {l : List B} {x : A} :
+    bigSepL2 Φ (List.replicate l.length x) l ⊣⊢ bigSepL (fun k x2 => Φ k x x2) l := by
   induction l generalizing Φ with
   | nil =>
     simp only [List.length_nil, List.replicate_zero, bigSepL2, bigSepL, bigOpL]
@@ -1228,10 +1404,8 @@ theorem replicate_l {Φ : Nat → A → B → PROP} {l : List B} {x : A} {n : Na
     exact sep_congr .rfl (ih (Φ := fun n => Φ (n + 1)))
 
 /-- BigSepL2 with replicate on the right reduces to BigSepL. -/
-theorem replicate_r {Φ : Nat → A → B → PROP} {l : List A} {x : B} {n : Nat}
-    (hlen : l.length = n) :
-    bigSepL2 Φ l (List.replicate n x) ⊣⊢ bigSepL (fun k x1 => Φ k x1 x) l := by
-  subst hlen
+theorem replicate_r {Φ : Nat → A → B → PROP} {l : List A} {x : B} :
+    bigSepL2 Φ l (List.replicate l.length x) ⊣⊢ bigSepL (fun k x1 => Φ k x1 x) l := by
   induction l generalizing Φ with
   | nil =>
     simp only [List.length_nil, List.replicate_zero, bigSepL2, bigSepL, bigOpL]
@@ -1244,7 +1418,7 @@ theorem replicate_r {Φ : Nat → A → B → PROP} {l : List A} {x : B} {n : Na
 
 /-- App lemma with explicit same-length hypothesis (simplified version). -/
 theorem app_same_length {Φ : Nat → A → B → PROP} {l1a l1b : List A} {l2a l2b : List B}
-    (hlen : l1a.length = l2a.length) :
+    (hlen : l1a.length = l2a.length ∨ l1b.length = l2b.length) :
     bigSepL2 Φ (l1a ++ l1b) (l2a ++ l2b) ⊣⊢
       iprop(bigSepL2 Φ l1a l2a ∗ bigSepL2 (fun k => Φ (l1a.length + k)) l1b l2b) := by
   have h := app (Φ := Φ) (l1a := l1a) (l2a := l2a) (l1b := l1b) (l2b := l2b) hlen
@@ -1673,7 +1847,8 @@ namespace BigSepL
 
 /-! ## SepL2 Diagonal -/
 
-/-- BigSepL over diagonal (l, l) relates to BigSepL2. -/
+/-- Lift a BigSepL over a single list to BigSepL2 on the diagonal (same list twice).
+    Useful when you have a unary predicate that you want to express as a binary relation. -/
 theorem sepL2_diag {Φ : Nat → A → A → PROP} {l : List A} :
     bigSepL (fun k x => Φ k x x) l ⊢ bigSepL2 Φ l l := by
   -- Key observation: l.zip l = l.map (fun x => (x, x))
