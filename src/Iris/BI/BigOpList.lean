@@ -46,6 +46,12 @@ theorem nil' {Φ : Nat → A → PROP} {l : List A} (h : l = []) :
     ([∗ list] k ↦ x ∈ l, Φ k x) ⊣⊢ emp := by
   subst h; exact nil
 
+/-- Corresponds to second `big_sepL_nil'` in Rocq Iris.
+    An affine proposition entails the bigSepL over an empty list. -/
+theorem nil'_affine {P : PROP} [Affine P] {Φ : Nat → A → PROP} :
+    P ⊢ [∗ list] k ↦ x ∈ ([] : List A), Φ k x :=
+  Affine.affine.trans nil.2
+
 /-- Corresponds to `big_sepL_cons` in Rocq Iris. -/
 theorem cons {Φ : Nat → A → PROP} {x : A} {xs : List A} :
     ([∗ list] k ↦ y ∈ x :: xs, Φ k y) ⊣⊢ Φ 0 x ∗ [∗ list] k ↦ y ∈ xs, Φ (k + 1) y := by
@@ -208,6 +214,49 @@ theorem affine_id {Ps : List PROP} (hPs : ∀ P, P ∈ Ps → Affine P) :
       have : Affine (bigSepL (fun _ (P : PROP) => P) Ps') := ⟨ih hPs'⟩
       have h1 : P ⊢ emp := hP.affine
       have h2 : bigSepL (fun _ (P : PROP) => P) Ps' ⊢ emp := this.affine
+      exact (sep_mono h1 h2).trans sep_emp.1
+
+/-- Corresponds to `big_sepL_persistent` in Rocq Iris.
+    Lookup-conditional version: bigSepL is persistent if each element is persistent
+    when actually present in the list. More general than the instance version. -/
+theorem persistent_cond {Φ : Nat → A → PROP} {l : List A}
+    (h : ∀ k x, l[k]? = some x → Persistent (Φ k x)) :
+    Persistent ([∗ list] k ↦ x ∈ l, Φ k x) where
+  persistent := by
+    induction l generalizing Φ with
+    | nil =>
+      simp only [bigSepL, bigOpL]
+      exact persistently_emp_2
+    | cons y ys ih =>
+      simp only [bigSepL, bigOpL]
+      have h0 : Persistent (Φ 0 y) := h 0 y rfl
+      have hrest : ∀ k x, ys[k]? = some x → Persistent (Φ (k + 1) x) :=
+        fun k x hget => h (k + 1) x hget
+      have h1 : Φ 0 y ⊢ <pers> Φ 0 y := h0.persistent
+      have hPers : Persistent (bigSepL (fun n => Φ (n + 1)) ys) := ⟨ih hrest⟩
+      have h2 : bigSepL (fun n => Φ (n + 1)) ys ⊢ <pers> bigSepL (fun n => Φ (n + 1)) ys :=
+        hPers.persistent
+      exact (sep_mono h1 h2).trans persistently_sep_2
+
+/-- Corresponds to `big_sepL_affine` in Rocq Iris.
+    Lookup-conditional version: bigSepL is affine if each element is affine
+    when actually present in the list. More general than the instance version. -/
+theorem affine_cond {Φ : Nat → A → PROP} {l : List A}
+    (h : ∀ k x, l[k]? = some x → Affine (Φ k x)) :
+    Affine ([∗ list] k ↦ x ∈ l, Φ k x) where
+  affine := by
+    induction l generalizing Φ with
+    | nil =>
+      simp only [bigSepL, bigOpL]
+      exact Entails.rfl
+    | cons y ys ih =>
+      simp only [bigSepL, bigOpL]
+      have h0 : Affine (Φ 0 y) := h 0 y rfl
+      have hrest : ∀ k x, ys[k]? = some x → Affine (Φ (k + 1) x) :=
+        fun k x hget => h (k + 1) x hget
+      have h1 : Φ 0 y ⊢ emp := h0.affine
+      have hAff : Affine (bigSepL (fun n => Φ (n + 1)) ys) := ⟨ih hrest⟩
+      have h2 : bigSepL (fun n => Φ (n + 1)) ys ⊢ emp := hAff.affine
       exact (sep_mono h1 h2).trans sep_emp.1
 
 /-- Corresponds to `big_sepL_nil_timeless` in Rocq Iris.
@@ -666,9 +715,9 @@ theorem intro {P : PROP} {Φ : Nat → A → PROP} {l : List A} [Intuitionistic 
     exact hbox.trans (hdup.trans (sep_mono (intuitionistically_elim.trans h1)
       (intuitionistically_elim.trans h2)))
 
-/-- Corresponds to `big_sepL_forall` in Rocq Iris.
+/-- Forward direction of `big_sepL_forall` in Rocq Iris.
     bigSepL entails forall when all elements are persistent. -/
-theorem forall' {Φ : Nat → A → PROP} {l : List A} [BIAffine PROP]
+theorem forall_1' {Φ : Nat → A → PROP} {l : List A} [BIAffine PROP]
     [∀ k x, Persistent (Φ k x)] :
     ([∗ list] k ↦ x ∈ l, Φ k x) ⊢ ∀ k, ∀ x, iprop(⌜l[k]? = some x⌝ → Φ k x) := by
   apply forall_intro; intro k
@@ -689,6 +738,54 @@ theorem forall' {Φ : Nat → A → PROP} {l : List A} [BIAffine PROP]
     _ ⊢ iprop(<pers> Φ k x ∗ (∀ y, Φ k y -∗ bigSepL Φ (l.set k y))) := sep_mono_l Persistent.persistent
     _ ⊢ iprop(<pers> Φ k x) := sep_comm.1.trans persistently_absorb_r
     _ ⊢ Φ k x := persistently_elim
+
+/-- Backward direction of `big_sepL_forall` in Rocq Iris.
+    Forall entails bigSepL when all elements are persistent (in BIAffine). -/
+theorem forall_2' {Φ : Nat → A → PROP} {l : List A} [BIAffine PROP]
+    [∀ k x, Persistent (Φ k x)] :
+    (∀ k x, iprop(⌜l[k]? = some x⌝ → Φ k x)) ⊢ [∗ list] k ↦ x ∈ l, Φ k x := by
+  -- Use induction and persistent_and_sep_1, similar to BigOpList2.forall'
+  induction l generalizing Φ with
+  | nil =>
+    simp only [bigSepL, bigOpL]
+    exact Affine.affine
+  | cons y ys ih =>
+    simp only [bigSepL, bigOpL]
+    -- Need: ∀ k x, ⌜(y::ys)[k]? = some x⌝ → Φ k x ⊢ Φ 0 y ∗ bigSepL (Φ (·+1)) ys
+    have head_step : iprop(∀ k x, ⌜(y :: ys)[k]? = some x⌝ → Φ k x) ⊢ Φ 0 y := by
+      calc iprop(∀ k x, ⌜(y :: ys)[k]? = some x⌝ → Φ k x)
+          ⊢ iprop(⌜(y :: ys)[0]? = some y⌝ → Φ 0 y) :=
+            (forall_elim 0).trans (forall_elim y)
+        _ ⊢ Φ 0 y := by
+            have h : (y :: ys)[0]? = some y := rfl
+            exact (and_intro (pure_intro h) Entails.rfl).trans imp_elim_r
+    have tail_step : iprop(∀ k x, ⌜(y :: ys)[k]? = some x⌝ → Φ k x)
+        ⊢ iprop(∀ k x, ⌜ys[k]? = some x⌝ → Φ (k + 1) x) := by
+      apply forall_intro; intro k
+      apply forall_intro; intro z
+      calc iprop(∀ k x, ⌜(y :: ys)[k]? = some x⌝ → Φ k x)
+          ⊢ iprop(⌜(y :: ys)[k + 1]? = some z⌝ → Φ (k + 1) z) :=
+            (forall_elim (k + 1)).trans (forall_elim z)
+        _ ⊢ iprop(⌜ys[k]? = some z⌝ → Φ (k + 1) z) := by
+            simp only [List.getElem?_cons_succ]
+            exact Entails.rfl
+    -- Use persistent_and_sep_1: P ∧ Q ⊢ P ∗ Q when P is Persistent
+    calc iprop(∀ k x, ⌜(y :: ys)[k]? = some x⌝ → Φ k x)
+        ⊢ iprop(Φ 0 y ∧ (∀ k x, ⌜(y :: ys)[k]? = some x⌝ → Φ k x)) :=
+          and_self.2.trans (and_mono_l head_step)
+      _ ⊢ iprop(Φ 0 y ∗ (∀ k x, ⌜(y :: ys)[k]? = some x⌝ → Φ k x)) :=
+          persistent_and_sep_1
+      _ ⊢ iprop(Φ 0 y ∗ (∀ k x, ⌜ys[k]? = some x⌝ → Φ (k + 1) x)) :=
+          sep_mono_r tail_step
+      _ ⊢ iprop(Φ 0 y ∗ bigSepL (fun n => Φ (n + 1)) ys) :=
+          sep_mono_r ih
+
+/-- Corresponds to `big_sepL_forall` in Rocq Iris (biconditional version).
+    bigSepL is equivalent to forall when all elements are persistent. -/
+theorem forall' {Φ : Nat → A → PROP} {l : List A} [BIAffine PROP]
+    [∀ k x, Persistent (Φ k x)] :
+    ([∗ list] k ↦ x ∈ l, Φ k x) ⊣⊢ ∀ k, ∀ x, iprop(⌜l[k]? = some x⌝ → Φ k x) :=
+  ⟨forall_1', forall_2'⟩
 
 /-- Corresponds to `big_sepL_impl` in Rocq Iris.
     Implication under bigSepL (wand version, matching Iris/Rocq style). -/
@@ -884,12 +981,12 @@ theorem submseteq {Φ : A → PROP} [∀ x, Affine (Φ x)] {l₁ l₂ l : List A
 /-- Corresponds to `big_sepL_dup` in Rocq Iris.
     Duplicate a resource across a list using a duplication wand. -/
 theorem dup {P : PROP} [Affine P] {l : List A} :
-    iprop(□ (P -∗ P ∗ P)) ⊢ P -∗ [∗ list] _x ∈ l, P := by
-  apply wand_intro
+     □ (P -∗ P ∗ P) ∗ P ⊢ ([∗ list] _x ∈ l, P) := by
+  -- Goal: □ (P -∗ P ∗ P) ∗ P ⊢ bigSepL (fun _ _ => P) l
   induction l with
   | nil =>
     simp only [bigSepL, bigOpL]
-    exact Affine.affine
+    exact sep_elim_r.trans Affine.affine
   | cons x xs ih =>
     simp only [bigSepL, bigOpL]
     -- We have: □ (P -∗ P ∗ P) ∗ P ⊢ P ∗ bigSepL (fun _ _ => P) xs
