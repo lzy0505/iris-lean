@@ -5,10 +5,12 @@ Authors: Zongyuan Liu
 -/
 import Iris.BI.BigOp
 import Iris.BI.Instances
+import Iris.Std.TC
 
 namespace Iris.BI
 
 open Iris.Algebra
+open Iris.Std
 open BIBase
 
 
@@ -32,36 +34,43 @@ namespace BigSepL
 
 /-! ## Basic Structural Lemmas -/
 
+/-- Corresponds to `big_sepL_nil` in Rocq Iris. -/
 @[simp]
 theorem nil {Φ : Nat → A → PROP} :
     ([∗ list] k ↦ x ∈ ([] : List A), Φ k x) ⊣⊢ emp := by
   simp only [bigSepL, bigOpL]
   exact .rfl
 
+/-- Corresponds to `big_sepL_nil'` in Rocq Iris. -/
 theorem nil' {Φ : Nat → A → PROP} {l : List A} (h : l = []) :
     ([∗ list] k ↦ x ∈ l, Φ k x) ⊣⊢ emp := by
   subst h; exact nil
 
+/-- Corresponds to `big_sepL_cons` in Rocq Iris. -/
 theorem cons {Φ : Nat → A → PROP} {x : A} {xs : List A} :
     ([∗ list] k ↦ y ∈ x :: xs, Φ k y) ⊣⊢ Φ 0 x ∗ [∗ list] k ↦ y ∈ xs, Φ (k + 1) y := by
   simp only [bigSepL, bigOpL]
   exact .rfl
 
+/-- Corresponds to `big_sepL_singleton` in Rocq Iris. -/
 theorem singleton {Φ : Nat → A → PROP} {x : A} :
     ([∗ list] k ↦ y ∈ [x], Φ k y) ⊣⊢ Φ 0 x :=
   equiv_iff.mp (BigOpL.singleton Φ x)
 
+/-- Corresponds to `big_sepL_app` in Rocq Iris. -/
 theorem app {Φ : Nat → A → PROP} {l₁ l₂ : List A} :
     ([∗ list] k ↦ x ∈ l₁ ++ l₂, Φ k x) ⊣⊢
       ([∗ list] k ↦ x ∈ l₁, Φ k x) ∗ [∗ list] k ↦ x ∈ l₂, Φ (k + l₁.length) x :=
   equiv_iff.mp (BigOpL.append Φ l₁ l₂)
 
+/-- Corresponds to `big_sepL_snoc` in Rocq Iris. -/
 theorem snoc {Φ : Nat → A → PROP} {l : List A} {x : A} :
     ([∗ list] k ↦ y ∈ l ++ [x], Φ k y) ⊣⊢ ([∗ list] k ↦ y ∈ l, Φ k y) ∗ Φ l.length x :=
   equiv_iff.mp (BigOpL.snoc Φ l x)
 
 /-! ## Monotonicity and Congruence -/
 
+/-- Corresponds to `big_sepL_mono` in Rocq Iris. -/
 theorem mono {Φ Ψ : Nat → A → PROP} {l : List A}
     (h : ∀ k x, l[k]? = some x → Φ k x ⊢ Ψ k x) :
     ([∗ list] k ↦ x ∈ l, Φ k x) ⊢ [∗ list] k ↦ x ∈ l, Ψ k x := by
@@ -75,35 +84,41 @@ theorem mono {Φ Ψ : Nat → A → PROP} {l : List A}
       intro k x hget
       exact h (k + 1) x hget
 
+/-- Corresponds to `big_sepL_proper` in Rocq Iris. -/
 theorem proper {Φ Ψ : Nat → A → PROP} {l : List A}
     (h : ∀ k x, l[k]? = some x → Φ k x ≡ Ψ k x) :
     ([∗ list] k ↦ x ∈ l, Φ k x) ≡ [∗ list] k ↦ x ∈ l, Ψ k x :=
   BigOpL.congr h
 
+/-- Unconditional version of `proper`. No direct Rocq equivalent. -/
 theorem congr {Φ Ψ : Nat → A → PROP} {l : List A}
     (h : ∀ k x, Φ k x ≡ Ψ k x) :
     ([∗ list] k ↦ x ∈ l, Φ k x) ≡ [∗ list] k ↦ x ∈ l, Ψ k x :=
   BigOpL.congr' h
 
-/-- Non-expansiveness: if predicates are n-equivalent pointwise, so are their big seps. -/
+/-- Corresponds to `big_sepL_ne` in Rocq Iris.
+    Non-expansiveness: if predicates are n-equivalent pointwise, so are their big seps. -/
 theorem ne {Φ Ψ : Nat → A → PROP} {l : List A} {n : Nat}
     (h : ∀ k x, l[k]? = some x → Φ k x ≡{n}≡ Ψ k x) :
     ([∗ list] k ↦ x ∈ l, Φ k x) ≡{n}≡ [∗ list] k ↦ x ∈ l, Ψ k x :=
   BigOpL.congr_ne h
 
-/-- Monotonicity without lookup condition: pointwise entailment lifts to bigSepL. -/
+/-- Corresponds to `big_sepL_mono'` in Rocq Iris.
+    Monotonicity without lookup condition: pointwise entailment lifts to bigSepL. -/
 theorem mono' {Φ Ψ : Nat → A → PROP} {l : List A}
     (h : ∀ k x, Φ k x ⊢ Ψ k x) :
     ([∗ list] k ↦ x ∈ l, Φ k x) ⊢ [∗ list] k ↦ x ∈ l, Ψ k x :=
   mono (fun k x _ => h k x)
 
-/-- Flip monotonicity: pointwise reverse entailment lifts to bigSepL. -/
+/-- Corresponds to `big_sepL_flip_mono'` in Rocq Iris.
+    Flip monotonicity: pointwise reverse entailment lifts to bigSepL. -/
 theorem flip_mono' {Φ Ψ : Nat → A → PROP} {l : List A}
     (h : ∀ k x, Ψ k x ⊢ Φ k x) :
     ([∗ list] k ↦ x ∈ l, Ψ k x) ⊢ [∗ list] k ↦ x ∈ l, Φ k x :=
   mono (fun k x _ => h k x)
 
-/-- Identity monotonicity: pairwise entailment on lists lifts to bigSepL.
+/-- Corresponds to `big_sepL_id_mono'` in Rocq Iris.
+    Identity monotonicity: pairwise entailment on lists lifts to bigSepL.
     This is a version where the predicate is just the identity. -/
 theorem id_mono' {Ps Qs : List PROP}
     (hlen : Ps.length = Qs.length)
@@ -128,6 +143,7 @@ theorem id_mono' {Ps Qs : List PROP}
 
 /-! ## Typeclass Closure -/
 
+/-- Corresponds to `big_sepL_persistent'` in Rocq Iris. -/
 instance persistent {Φ : Nat → A → PROP} {l : List A} [∀ k x, Persistent (Φ k x)] :
     Persistent ([∗ list] k ↦ x ∈ l, Φ k x) where
   persistent := by
@@ -141,6 +157,7 @@ instance persistent {Φ : Nat → A → PROP} {l : List A} [∀ k x, Persistent 
       have h2 : bigSepL (fun n => Φ (n + 1)) xs ⊢ <pers> bigSepL (fun n => Φ (n + 1)) xs := ih
       exact (sep_mono h1 h2).trans persistently_sep_2
 
+/-- Corresponds to `big_sepL_affine'` in Rocq Iris. -/
 instance affine {Φ : Nat → A → PROP} {l : List A} [∀ k x, Affine (Φ k x)] :
     Affine ([∗ list] k ↦ x ∈ l, Φ k x) where
   affine := by
@@ -154,7 +171,8 @@ instance affine {Φ : Nat → A → PROP} {l : List A} [∀ k x, Affine (Φ k x)
       have h2 : bigSepL (fun n => Φ (n + 1)) xs ⊢ emp := ih
       exact (sep_mono h1 h2).trans sep_emp.1
 
-/-- When all propositions in a list are Persistent, their big sep is Persistent.
+/-- Corresponds to `big_sepL_persistent_id` in Rocq Iris.
+    When all propositions in a list are Persistent, their big sep is Persistent.
     This is for the identity function case: `[∗ list] _ ↦ P ∈ Ps, P` where `Ps : List PROP`. -/
 theorem persistent_id {Ps : List PROP} (hPs : ∀ P, P ∈ Ps → Persistent P) :
     Persistent ([∗ list] P ∈ Ps, P) where
@@ -173,7 +191,8 @@ theorem persistent_id {Ps : List PROP} (hPs : ∀ P, P ∈ Ps → Persistent P) 
         this.persistent
       exact (sep_mono h1 h2).trans persistently_sep_2
 
-/-- When all propositions in a list are Affine, their big sep is Affine.
+/-- Corresponds to `big_sepL_affine_id` in Rocq Iris.
+    When all propositions in a list are Affine, their big sep is Affine.
     This is for the identity function case: `[∗ list] _ ↦ P ∈ Ps, P` where `Ps : List PROP`. -/
 theorem affine_id {Ps : List PROP} (hPs : ∀ P, P ∈ Ps → Affine P) :
     Affine ([∗ list] P ∈ Ps, P) where
@@ -191,7 +210,8 @@ theorem affine_id {Ps : List PROP} (hPs : ∀ P, P ∈ Ps → Affine P) :
       have h2 : bigSepL (fun _ (P : PROP) => P) Ps' ⊢ emp := this.affine
       exact (sep_mono h1 h2).trans sep_emp.1
 
-/-- Empty list is timeless (when emp is timeless). -/
+/-- Corresponds to `big_sepL_nil_timeless` in Rocq Iris.
+    Empty list is timeless (when emp is timeless). -/
 instance nil_timeless [Timeless (emp : PROP)] {Φ : Nat → A → PROP} :
     Timeless ([∗ list] k ↦ x ∈ ([] : List A), Φ k x) where
   timeless := by
@@ -233,22 +253,26 @@ instance nil_timeless [Timeless (emp : PROP)] {Φ : Nat → A → PROP} :
 
 /-! ## Unit/Emp Lemma -/
 
+/-- Corresponds to `big_sepL_emp` in Rocq Iris. -/
 theorem emp_l {l : List A} :
     ([∗ list] _x ∈ l, (emp : PROP)) ⊣⊢ emp :=
   equiv_iff.mp (BigOpL.unit_const l)
 
 /-! ## Distribution over Sep -/
 
+/-- Corresponds to `big_sepL_sep` in Rocq Iris. -/
 theorem sep' {Φ Ψ : Nat → A → PROP} {l : List A} :
     ([∗ list] k ↦ x ∈ l, Φ k x ∗ Ψ k x) ⊣⊢ ([∗ list] k ↦ x ∈ l, Φ k x) ∗ [∗ list] k ↦ x ∈ l, Ψ k x :=
   equiv_iff.mp (BigOpL.op_distr Φ Ψ l)
 
+/-- Corresponds to `big_sepL_sep_2` in Rocq Iris. -/
 theorem sep_2 {Φ Ψ : Nat → A → PROP} {l : List A} :
     ([∗ list] k ↦ x ∈ l, Φ k x) ∗ ([∗ list] k ↦ x ∈ l, Ψ k x) ⊣⊢ [∗ list] k ↦ x ∈ l, Φ k x ∗ Ψ k x :=
   sep'.symm
 
 /-! ## Distribution over And -/
 
+/-- Corresponds to `big_sepL_and` in Rocq Iris (one direction only). -/
 theorem and' {Φ Ψ : Nat → A → PROP} {l : List A} :
     ([∗ list] k ↦ x ∈ l, Φ k x ∧ Ψ k x) ⊢
       ([∗ list] k ↦ x ∈ l, Φ k x) ∧ [∗ list] k ↦ x ∈ l, Ψ k x :=
@@ -256,6 +280,7 @@ theorem and' {Φ Ψ : Nat → A → PROP} {l : List A} :
 
 /-! ## Wand Lemma -/
 
+/-- Corresponds to `big_sepL_wand` in Rocq Iris. -/
 theorem wand {Φ Ψ : Nat → A → PROP} {l : List A} :
     ([∗ list] k ↦ x ∈ l, Φ k x) ⊢ ([∗ list] k ↦ x ∈ l, Φ k x -∗ Ψ k x) -∗ [∗ list] k ↦ x ∈ l, Ψ k x := by
   apply wand_intro
@@ -265,6 +290,7 @@ theorem wand {Φ Ψ : Nat → A → PROP} {l : List A} :
 
 /-! ## Pure Interaction -/
 
+/-- Corresponds to `big_sepL_pure_1` in Rocq Iris. -/
 theorem pure_1 {φ : Nat → A → Prop} {l : List A} :
     ([∗ list] k ↦ x ∈ l, ⌜φ k x⌝) ⊢ (⌜∀ k x, l[k]? = some x → φ k x⌝ : PROP) := by
   induction l generalizing φ with
@@ -282,6 +308,7 @@ theorem pure_1 {φ : Nat → A → Prop} {l : List A} :
           | zero => simp only [List.getElem?_cons_zero, Option.some.injEq] at hget; subst hget; exact hy
           | succ k => simp only [List.getElem?_cons_succ] at hget; exact hys k x hget)
 
+/-- Corresponds to `big_sepL_affinely_pure_2` in Rocq Iris. -/
 theorem affinely_pure_2 {φ : Nat → A → Prop} {l : List A} :
     iprop(<affine> ⌜∀ k x, l[k]? = some x → φ k x⌝) ⊢
       ([∗ list] k ↦ x ∈ l, <affine> ⌜φ k x⌝ : PROP) := by
@@ -316,6 +343,7 @@ theorem affinely_pure_2 {φ : Nat → A → Prop} {l : List A} :
       sep_mono_r ih
     exact h1.trans (h2.trans (h3.trans (h4.trans h5)))
 
+/-- Corresponds to `big_sepL_pure` in Rocq Iris. Requires `BIAffine`. -/
 theorem pure' [BIAffine PROP] {φ : Nat → A → Prop} {l : List A} :
     ([∗ list] k ↦ x ∈ l, ⌜φ k x⌝) ⊣⊢ (⌜∀ k x, l[k]? = some x → φ k x⌝ : PROP) :=
   ⟨pure_1,
@@ -328,6 +356,7 @@ theorem pure' [BIAffine PROP] {φ : Nat → A → Prop} {l : List A} :
 
 /-! ## Take and Drop -/
 
+/-- Corresponds to `big_sepL_take_drop` in Rocq Iris. -/
 theorem take_drop {Φ : Nat → A → PROP} {l : List A} {n : Nat} :
     ([∗ list] k ↦ x ∈ l, Φ k x) ⊣⊢
       ([∗ list] k ↦ x ∈ l.take n, Φ k x) ∗ [∗ list] k ↦ x ∈ l.drop n, Φ (n + k) x :=
@@ -335,6 +364,7 @@ theorem take_drop {Φ : Nat → A → PROP} {l : List A} {n : Nat} :
 
 /-! ## Fmap -/
 
+/-- Corresponds to `big_sepL_fmap` in Rocq Iris. -/
 theorem fmap {B : Type _} (f : A → B) {Φ : Nat → B → PROP} {l : List A} :
     ([∗ list] k ↦ y ∈ l.map f, Φ k y) ≡ [∗ list] k ↦ x ∈ l, Φ k (f x) := by
   induction l generalizing Φ with
@@ -345,7 +375,8 @@ theorem fmap {B : Type _} (f : A → B) {Φ : Nat → B → PROP} {l : List A} :
 
 /-! ## FilterMap (omap) -/
 
-/-- Big sep over filterMap: the mapped elements with emp for filtered-out elements. -/
+/-- Corresponds to `big_sepL_omap` in Rocq Iris.
+    Big sep over filterMap: the mapped elements with emp for filtered-out elements. -/
 theorem omap {B : Type _} (f : A → Option B) {Φ : B → PROP} {l : List A} :
     ([∗ list] y ∈ l.filterMap f, Φ y) ≡
       [∗ list] x ∈ l, (f x).elim emp Φ := by
@@ -359,7 +390,8 @@ theorem omap {B : Type _} (f : A → Option B) {Φ : B → PROP} {l : List A} :
 
 /-! ## Bind (flatMap) -/
 
-/-- Big sep over bind (flatMap): nested iteration. -/
+/-- Corresponds to `big_sepL_bind` in Rocq Iris.
+    Big sep over bind (flatMap): nested iteration. -/
 theorem bind {B : Type _} (f : A → List B) {Φ : B → PROP} {l : List A} :
     ([∗ list] y ∈ l.flatMap f, Φ y) ≡
       [∗ list] x ∈ l, [∗ list] y ∈ f x, Φ y := by
@@ -371,7 +403,8 @@ theorem bind {B : Type _} (f : A → List B) {Φ : B → PROP} {l : List A} :
 
 /-! ## Lookup Lemmas -/
 
--- Extract an element from bigSepL using the lookup function
+/-- Corresponds to `big_sepL_lookup_acc` in Rocq Iris.
+    Extract an element from bigSepL using the lookup function. -/
 theorem lookup_acc {Φ : Nat → A → PROP} {l : List A} {i : Nat} {x : A}
     (h : l[i]? = some x) :
     ([∗ list] k ↦ y ∈ l, Φ k y) ⊣⊢
@@ -445,27 +478,46 @@ theorem lookup_acc {Φ : Nat → A → PROP} {l : List A} {i : Nat} {x : A}
           _ ⊢ iprop(Φ 0 z ∗ bigSepL (fun n => Φ (n + 1)) (zs.set j x)) := wand_elim_r
           _ ⊢ iprop(Φ 0 z ∗ bigSepL (fun n => Φ (n + 1)) zs) := by rw [hset_eq]; exact .rfl
 
--- Simplified lookup without the continuation (absorbing version)
-theorem lookup_absorbing {Φ : Nat → A → PROP} {l : List A} {i : Nat} {x : A}
-    [Absorbing (Φ i x)]
+/-- Corresponds to `big_sepL_lookup` in Rocq Iris.
+    Simplified lookup: works when either all Φ are affine or Φ i x is absorbing.
+    Uses `TCOr` to encode the typeclass disjunction. -/
+theorem lookup {Φ : Nat → A → PROP} {l : List A} {i : Nat} {x : A}
     (h : l[i]? = some x) :
-    ([∗ list] k ↦ y ∈ l, Φ k y) ⊢ Φ i x :=
-  (lookup_acc h).1.trans sep_elim_l
+    [TCOr (∀ k y, Affine (Φ k y)) (Absorbing (Φ i x))] →
+    ([∗ list] k ↦ y ∈ l, Φ k y) ⊢ Φ i x
+  | TCOr.l => by
+    -- All Φ k y are affine. Use take_drop_middle decomposition.
+    have hi : i < l.length := List.getElem?_eq_some_iff.mp h |>.1
+    have hx : l[i] = x := List.getElem?_eq_some_iff.mp h |>.2
+    have hlen : (l.take i).length = i := List.length_take_of_le (Nat.le_of_lt hi)
+    -- l = take i l ++ x :: drop (i + 1) l  (take_drop_middle)
+    have hmiddle : l = l.take i ++ x :: l.drop (i + 1) := by
+      have htake : l.take (i + 1) = l.take i ++ [x] := by
+        rw [List.take_succ_eq_append_getElem hi, hx]
+      calc l = l.take (i + 1) ++ l.drop (i + 1) := (List.take_append_drop (i + 1) l).symm
+        _ = (l.take i ++ [x]) ++ l.drop (i + 1) := by rw [htake]
+        _ = l.take i ++ ([x] ++ l.drop (i + 1)) := List.append_assoc ..
+        _ = l.take i ++ (x :: l.drop (i + 1)) := by rfl
+    -- Rewrite with hmiddle and apply app
+    rw [hmiddle]
+    have happ := @app PROP _ A Φ (l.take i) (x :: l.drop (i + 1))
+    calc bigSepL Φ (l.take i ++ x :: l.drop (i + 1))
+        ⊢ bigSepL Φ (l.take i) ∗ bigSepL (fun k => Φ (k + (l.take i).length)) (x :: l.drop (i + 1)) :=
+          happ.1
+      _ ⊢ bigSepL Φ (l.take i) ∗ (Φ i x ∗ bigSepL (fun k => Φ (k + 1 + i)) (l.drop (i + 1))) := by
+          simp only [hlen, bigSepL, bigOpL, Nat.zero_add]; exact Entails.rfl
+      _ ⊢ Φ i x := sep_elim_r.trans sep_elim_l
+  | TCOr.r => (lookup_acc h).1.trans sep_elim_l
 
--- Simplified lookup for BIAffine
-theorem lookup [BIAffine PROP] {Φ : Nat → A → PROP} {l : List A} {i : Nat} {x : A}
-    (h : l[i]? = some x) :
-    ([∗ list] k ↦ y ∈ l, Φ k y) ⊢ Φ i x :=
-  (lookup_acc h).1.trans sep_elim_l
-
--- Insert accessor version (one direction of lookup_acc)
--- This corresponds to big_sepL_insert_acc in Coq
+/-- Corresponds to `big_sepL_insert_acc` in Rocq Iris.
+    Insert accessor version (one direction of lookup_acc). -/
 theorem insert_acc {Φ : Nat → A → PROP} {l : List A} {i : Nat} {x : A}
     (h : l[i]? = some x) :
     ([∗ list] k ↦ y ∈ l, Φ k y) ⊢ Φ i x ∗ (∀ y, Φ i y -∗ [∗ list] k ↦ z ∈ l.set i y, Φ k z) :=
   (lookup_acc h).1
 
--- Element-of version of lookup_acc (no index)
+/-- Corresponds to `big_sepL_elem_of_acc` in Rocq Iris.
+    Element-of version of lookup_acc (no index). -/
 theorem elem_of_acc {Φ : A → PROP} {l : List A} {x : A}
     (h : x ∈ l) :
     ([∗ list] y ∈ l, Φ y) ⊢ Φ x ∗ (Φ x -∗ [∗ list] y ∈ l, Φ y) := by
@@ -485,15 +537,27 @@ theorem elem_of_acc {Φ : A → PROP} {l : List A} {x : A}
           · simp only [hik, ↓reduceIte]
         rw [hset]; exact Entails.rfl
 
--- Element-of version of lookup (BIAffine)
-theorem elem_of [BIAffine PROP] {Φ : A → PROP} {l : List A} {x : A}
+/-- Corresponds to `big_sepL_elem_of` in Rocq Iris.
+    Element-of version of lookup using `TCOr`. -/
+theorem elem_of {Φ : A → PROP} {l : List A} {x : A}
     (h : x ∈ l) :
-    ([∗ list] y ∈ l, Φ y) ⊢ Φ x :=
-  (elem_of_acc h).trans sep_elim_l
+    [TCOr (∀ y, Affine (Φ y)) (Absorbing (Φ x))] →
+    ([∗ list] y ∈ l, Φ y) ⊢ Φ x
+  | TCOr.l => by
+    have ⟨i, hi, hget⟩ := List.mem_iff_getElem.mp h
+    have hlookup : l[i]? = some x := List.getElem?_eq_some_iff.mpr ⟨hi, hget⟩
+    haveI : ∀ (k : Nat) (y : A), Affine ((fun _ y => Φ y) k y) := fun _ y => inferInstance
+    exact lookup (Φ := fun _ y => Φ y) hlookup
+  | TCOr.r => by
+    have ⟨i, hi, hget⟩ := List.mem_iff_getElem.mp h
+    have hlookup : l[i]? = some x := List.getElem?_eq_some_iff.mpr ⟨hi, hget⟩
+    haveI : Absorbing ((fun _ y => Φ y) i x) := inferInstance
+    exact lookup (Φ := fun _ y => Φ y) hlookup
 
 /-! ## Delete Lemmas -/
 
--- Extracting an element from bigSepL, leaving emp at that position
+/-- Corresponds to `big_sepL_delete` in Rocq Iris.
+    Extracting an element from bigSepL, leaving emp at that position. -/
 theorem delete {Φ : Nat → A → PROP} {l : List A} {i : Nat} {x : A}
     (h : l[i]? = some x) :
     ([∗ list] k ↦ y ∈ l, Φ k y) ⊣⊢
@@ -557,7 +621,8 @@ theorem delete {Φ : Nat → A → PROP} {l : List A} {i : Nat} {x : A}
                 have hkj' : k + 1 ≠ j + 1 := by omega
                 simp only [hkj', ↓reduceIte]; exact Entails.rfl
 
--- BiAffine version of delete using implication instead of emp
+/-- Corresponds to `big_sepL_delete'` in Rocq Iris.
+    BIAffine version of delete using implication instead of emp. -/
 theorem delete' [BIAffine PROP] {Φ : Nat → A → PROP} {l : List A} {i : Nat} {x : A}
     (h : l[i]? = some x) :
     ([∗ list] k ↦ y ∈ l, Φ k y) ⊣⊢ Φ i x ∗ [∗ list] k ↦ y ∈ l, ⌜k ≠ i⌝ → Φ k y := by
@@ -581,8 +646,9 @@ theorem delete' [BIAffine PROP] {Φ : Nat → A → PROP} {l : List A} {i : Nat}
 
 /-! ## Higher-Order Lemmas -/
 
--- Introduction rule: if P entails each Φ k x, then P entails the big sep
--- This requires P to be intuitionistic (persistent and affine) to duplicate
+/-- Corresponds to `big_sepL_intro` in Rocq Iris.
+    Introduction rule: if P entails each Φ k x, then P entails the big sep.
+    This requires P to be intuitionistic (persistent and affine) to duplicate. -/
 theorem intro {P : PROP} {Φ : Nat → A → PROP} {l : List A} [Intuitionistic P]
     (h : ∀ k x, l[k]? = some x → P ⊢ Φ k x) :
     P ⊢ [∗ list] k ↦ x ∈ l, Φ k x := by
@@ -600,7 +666,8 @@ theorem intro {P : PROP} {Φ : Nat → A → PROP} {l : List A} [Intuitionistic 
     exact hbox.trans (hdup.trans (sep_mono (intuitionistically_elim.trans h1)
       (intuitionistically_elim.trans h2)))
 
--- bigSepL entails forall when all elements are persistent
+/-- Corresponds to `big_sepL_forall` in Rocq Iris.
+    bigSepL entails forall when all elements are persistent. -/
 theorem forall' {Φ : Nat → A → PROP} {l : List A} [BIAffine PROP]
     [∀ k x, Persistent (Φ k x)] :
     ([∗ list] k ↦ x ∈ l, Φ k x) ⊢ ∀ k, ∀ x, iprop(⌜l[k]? = some x⌝ → Φ k x) := by
@@ -623,8 +690,8 @@ theorem forall' {Φ : Nat → A → PROP} {l : List A} [BIAffine PROP]
     _ ⊢ iprop(<pers> Φ k x) := sep_comm.1.trans persistently_absorb_r
     _ ⊢ Φ k x := persistently_elim
 
--- Implication under bigSepL (wand version, matching Iris/Rocq style)
--- bigSepL Φ l -∗ □ (∀ k x, ⌜l[k]? = some x⌝ → Φ k x -∗ Ψ k x) -∗ bigSepL Ψ l
+/-- Corresponds to `big_sepL_impl` in Rocq Iris.
+    Implication under bigSepL (wand version, matching Iris/Rocq style). -/
 theorem impl {Φ Ψ : Nat → A → PROP} {l : List A} :
     ([∗ list] k ↦ x ∈ l, Φ k x) ⊢ □ (∀ k x, iprop(⌜l[k]? = some x⌝ → Φ k x -∗ Ψ k x)) -∗ [∗ list] k ↦ x ∈ l, Ψ k x := by
   apply wand_intro
@@ -647,8 +714,9 @@ theorem impl {Φ Ψ : Nat → A → PROP} {l : List A} :
     _ ⊢ bigSepL (fun k x => iprop(Φ k x ∗ (Φ k x -∗ Ψ k x))) l := sep_2.1
     _ ⊢ bigSepL Ψ l := mono (fun _ _ _ => wand_elim_r)
 
--- Lookup with ability to change predicate when restoring
--- This is the most general form: extract element, then restore with a different predicate
+/-- Corresponds to `big_sepL_lookup_acc_impl` in Rocq Iris.
+    Lookup with ability to change predicate when restoring.
+    This is the most general form: extract element, then restore with a different predicate. -/
 theorem lookup_acc_impl {Φ : Nat → A → PROP} {l : List A} {i : Nat} {x : A}
     (h : l[i]? = some x) :
     iprop([∗ list] k ↦ x ∈ l, Φ k x) ⊢
@@ -721,6 +789,7 @@ theorem lookup_acc_impl {Φ : Nat → A → PROP} {l : List A} {i : Nat} {x : A}
 
 /-! ## Modality Interaction -/
 
+/-- Corresponds to `big_sepL_persistently` in Rocq Iris. Requires `BIAffine`. -/
 theorem persistently {Φ : Nat → A → PROP} {l : List A} [BIAffine PROP] :
     iprop(<pers> [∗ list] k ↦ x ∈ l, Φ k x) ⊣⊢ [∗ list] k ↦ x ∈ l, <pers> Φ k x := by
   induction l generalizing Φ with
@@ -736,7 +805,8 @@ theorem persistently {Φ : Nat → A → PROP} {l : List A} [BIAffine PROP] :
 
 /-! ## Later Modality -/
 
--- Later distributes over bigSepL (equivalence requires BIAffine for emp case)
+/-- Corresponds to `big_sepL_later` in Rocq Iris.
+    Later distributes over bigSepL (equivalence requires BIAffine for emp case). -/
 theorem later [BIAffine PROP] {Φ : Nat → A → PROP} {l : List A} :
     iprop(▷ [∗ list] k ↦ x ∈ l, Φ k x) ⊣⊢ [∗ list] k ↦ x ∈ l, ▷ Φ k x := by
   induction l generalizing Φ with
@@ -750,7 +820,8 @@ theorem later [BIAffine PROP] {Φ : Nat → A → PROP} {l : List A} :
       _ ⊣⊢ iprop(▷ Φ 0 x ∗ bigSepL (fun n k => iprop(▷ Φ (n + 1) k)) xs) :=
           ⟨sep_mono_r ih.1, sep_mono_r ih.2⟩
 
--- Later distribution (one direction, no BIAffine needed)
+/-- Corresponds to `big_sepL_later_2` in Rocq Iris.
+    Later distribution (one direction, no BIAffine needed). -/
 theorem later_2 {Φ : Nat → A → PROP} {l : List A} :
     ([∗ list] k ↦ x ∈ l, ▷ Φ k x) ⊢ iprop(▷ [∗ list] k ↦ x ∈ l, Φ k x) := by
   induction l generalizing Φ with
@@ -763,7 +834,8 @@ theorem later_2 {Φ : Nat → A → PROP} {l : List A} :
         ⊢ iprop(▷ Φ 0 x ∗ ▷ bigSepL (fun n => Φ (n + 1)) xs) := sep_mono_r ih
       _ ⊢ iprop(▷ (Φ 0 x ∗ bigSepL (fun n => Φ (n + 1)) xs)) := later_sep.2
 
--- LaterN distributes over bigSepL (equivalence requires BIAffine)
+/-- Corresponds to `big_sepL_laterN` in Rocq Iris.
+    LaterN distributes over bigSepL (equivalence requires BIAffine). -/
 theorem laterN [BIAffine PROP] {Φ : Nat → A → PROP} {l : List A} {n : Nat} :
     iprop(▷^[n] [∗ list] k ↦ x ∈ l, Φ k x) ⊣⊢ [∗ list] k ↦ x ∈ l, ▷^[n] Φ k x := by
   induction n with
@@ -775,7 +847,8 @@ theorem laterN [BIAffine PROP] {Φ : Nat → A → PROP} {l : List A} {n : Nat} 
           later_congr ih
       _ ⊣⊢ bigSepL (fun k x => iprop(▷ ▷^[m] Φ k x)) l := later
 
--- LaterN distribution (one direction)
+/-- Corresponds to `big_sepL_laterN_2` in Rocq Iris.
+    LaterN distribution (one direction). -/
 theorem laterN_2 {Φ : Nat → A → PROP} {l : List A} {n : Nat} :
     ([∗ list] k ↦ x ∈ l, ▷^[n] Φ k x) ⊢ iprop(▷^[n] [∗ list] k ↦ x ∈ l, Φ k x) := by
   induction n with
@@ -788,17 +861,17 @@ theorem laterN_2 {Φ : Nat → A → PROP} {l : List A} {n : Nat} :
 
 /-! ## Permutation -/
 
+/-- Corresponds to `big_sepL_Permutation` in Rocq Iris. -/
 theorem perm {Φ : A → PROP} {l₁ l₂ : List A} (hp : l₁.Perm l₂) :
     ([∗ list] x ∈ l₁, Φ x) ⊣⊢ [∗ list] x ∈ l₂, Φ x :=
   equiv_iff.mp (BigOpL.perm Φ hp)
 
 /-! ## Submultiset Lemma -/
 
-/-- If l1 can be obtained from l2 by removing some elements (preserving multiset),
+/-- Corresponds to `big_sepL_submseteq` in Rocq Iris.
+    If l1 can be obtained from l2 by removing some elements (preserving multiset),
     then the big sep over l2 entails the big sep over l1 (when all elements are Affine).
-    This uses the characterization: l1 ⊆+ l2 iff ∃ l, l1 ++ l ~ l2 (where ~ is permutation).
-
-    This corresponds to Coq's `big_sepL_submseteq`. -/
+    This uses the characterization: l1 ⊆+ l2 iff ∃ l, l1 ++ l ~ l2 (where ~ is permutation). -/
 theorem submseteq {Φ : A → PROP} [∀ x, Affine (Φ x)] {l₁ l₂ l : List A}
     (h : (l₁ ++ l).Perm l₂) :
     ([∗ list] x ∈ l₂, Φ x) ⊢ [∗ list] x ∈ l₁, Φ x := by
@@ -808,10 +881,10 @@ theorem submseteq {Φ : A → PROP} [∀ x, Affine (Φ x)] {l₁ l₂ l : List A
 
 /-! ## Duplication -/
 
--- Duplicate a resource across a list using a duplication wand
--- □ (P -∗ P ∗ P) -∗ P -∗ [∗ list] k↦x ∈ l, P
+/-- Corresponds to `big_sepL_dup` in Rocq Iris.
+    Duplicate a resource across a list using a duplication wand. -/
 theorem dup {P : PROP} [Affine P] {l : List A} :
-    iprop(□ (P -∗ P ∗ P)) ⊢ P -∗ [∗ list] k ↦ x ∈ l, P := by
+    iprop(□ (P -∗ P ∗ P)) ⊢ P -∗ [∗ list] _x ∈ l, P := by
   apply wand_intro
   induction l with
   | nil =>
@@ -841,7 +914,8 @@ theorem dup {P : PROP} [Affine P] {l : List A} :
 
 /-! ## Replicate -/
 
--- bigSepL over a list equals bigSep over replicate
+/-- Corresponds to `big_sepL_replicate` in Rocq Iris.
+    bigSepL over a list equals bigSep over replicate. -/
 theorem replicate {P : PROP} {l : List A} :
     ([∗ list] _x ∈ List.replicate l.length P, P) ⊣⊢ [∗ list] _x ∈ l, P := by
   induction l with
@@ -854,19 +928,22 @@ theorem replicate {P : PROP} {l : List A} :
 
 /-! ## Zip-Related Lemmas -/
 
-/-- Big sep over zip with a shifted sequence. -/
+/-- Corresponds to `big_sepL_zip_seq` in Rocq Iris.
+    Big sep over zip with a shifted sequence. -/
 theorem zip_seq {Φ : Nat × A → PROP} {n : Nat} {l : List A} :
     ([∗ list] p ∈ (List.range' n l.length).zip l, Φ p) ⊣⊢
       [∗ list] i ↦ x ∈ l, Φ (n + i, x) :=
   equiv_iff.mp (BigOpL.zip_seq Φ n l)
 
-/-- Big sep over zip with a sequence starting at 0. -/
+/-- Lean-only: Big sep over zip with a sequence starting at 0.
+    No direct Rocq equivalent (uses zero-indexed range). -/
 theorem zip_with_range {Φ : Nat × A → PROP} {l : List A} :
     ([∗ list] p ∈ (List.range l.length).zip l, Φ p) ⊣⊢
       [∗ list] i ↦ x ∈ l, Φ (i, x) :=
   equiv_iff.mp (BigOpL.zip_with_range Φ l)
 
-/-- Big sep over zipped list splits into product of big seps. -/
+/-- Corresponds to `big_sepL_sep_zip` in Rocq Iris.
+    Big sep over zipped list splits into product of big seps. -/
 theorem sep_zip {B : Type _} {Φ : Nat → A → PROP} {Ψ : Nat → B → PROP}
     {l₁ : List A} {l₂ : List B} (hlen : l₁.length = l₂.length) :
     ([∗ list] i ↦ xy ∈ l₁.zip l₂, Φ i xy.1 ∗ Ψ i xy.2) ⊣⊢
@@ -901,7 +978,8 @@ theorem sep_zip {B : Type _} {Φ : Nat → A → PROP} {Ψ : Nat → B → PROP}
         _ ⊣⊢ (Φ 0 x ∗ bigSepL (fun n => Φ (n + 1)) xs) ∗ (Ψ 0 y ∗ bigSepL (fun n => Ψ (n + 1)) ys) :=
             sep_assoc.symm
 
-/-- Big sep over zip_with with extraction functions. -/
+/-- Corresponds to `big_sepL_sep_zip_with` in Rocq Iris.
+    Big sep over zip_with with extraction functions. -/
 theorem sep_zip_with {B C : Type _}
     (f : A → B → C) (g1 : C → A) (g2 : C → B)
     {Φ : Nat → A → PROP} {Ψ : Nat → B → PROP} {l₁ : List A} {l₂ : List B}
@@ -938,7 +1016,8 @@ theorem sep_zip_with {B C : Type _}
         _ ⊣⊢ (Φ 0 x ∗ bigSepL (fun n => Φ (n + 1)) xs) ∗ (Ψ 0 y ∗ bigSepL (fun n => Ψ (n + 1)) ys) :=
             sep_assoc.symm
 
-/-- Big sep over zip_with expressed in terms of conditional. -/
+/-- Corresponds to `big_sepL_zip_with` in Rocq Iris.
+    Big sep over zip_with expressed in terms of conditional. -/
 theorem zip_with {B C : Type _} (f : A → B → C) {Φ : Nat → C → PROP}
     {l₁ : List A} {l₂ : List B} :
     ([∗ list] k ↦ c ∈ List.zipWith f l₁ l₂, Φ k c) ⊣⊢
