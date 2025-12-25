@@ -32,37 +32,37 @@ namespace BigAndL
 
 @[simp]
 theorem nil {Φ : Nat → A → PROP} :
-    bigAndL Φ ([] : List A) ⊣⊢ iprop(True) := by
+    ([∧ list] k ↦ x ∈ ([] : List A), Φ k x) ⊣⊢ iprop(True) := by
   simp only [bigAndL, bigOpL]
   exact .rfl
 
 theorem nil' {Φ : Nat → A → PROP} {l : List A} (h : l = []) :
-    bigAndL Φ l ⊣⊢ iprop(True) := by
+    ([∧ list] k ↦ x ∈ l, Φ k x) ⊣⊢ iprop(True) := by
   subst h; exact nil
 
 theorem cons {Φ : Nat → A → PROP} {x : A} {xs : List A} :
-    bigAndL Φ (x :: xs) ⊣⊢ Φ 0 x ∧ bigAndL (fun n => Φ (n + 1)) xs := by
+    ([∧ list] k ↦ y ∈ (x :: xs), Φ k y) ⊣⊢ Φ 0 x ∧ [∧ list] n ↦ y ∈ xs, Φ (n + 1) y := by
   simp only [bigAndL, bigOpL]
   exact .rfl
 
 theorem singleton {Φ : Nat → A → PROP} {x : A} :
-    bigAndL Φ [x] ⊣⊢ Φ 0 x :=
+    ([∧ list] k ↦ y ∈ [x], Φ k y) ⊣⊢ Φ 0 x :=
   equiv_iff.mp (BigOpL.singleton Φ x)
 
 theorem app {Φ : Nat → A → PROP} {l₁ l₂ : List A} :
-    bigAndL Φ (l₁ ++ l₂) ⊣⊢
-      iprop(bigAndL Φ l₁ ∧ bigAndL (fun n => Φ (n + l₁.length)) l₂) :=
+    ([∧ list] k ↦ x ∈ (l₁ ++ l₂), Φ k x) ⊣⊢
+      ([∧ list] k ↦ x ∈ l₁, Φ k x) ∧ [∧ list] n ↦ x ∈ l₂, Φ (n + l₁.length) x :=
   equiv_iff.mp (BigOpL.append Φ l₁ l₂)
 
 theorem snoc {Φ : Nat → A → PROP} {l : List A} {x : A} :
-    bigAndL Φ (l ++ [x]) ⊣⊢ iprop(bigAndL Φ l ∧ Φ l.length x) :=
+    ([∧ list] k ↦ y ∈ (l ++ [x]), Φ k y) ⊣⊢ ([∧ list] k ↦ y ∈ l, Φ k y) ∧ Φ l.length x :=
   equiv_iff.mp (BigOpL.snoc Φ l x)
 
 /-! ## Monotonicity and Congruence -/
 
 theorem mono {Φ Ψ : Nat → A → PROP} {l : List A}
     (h : ∀ k x, l[k]? = some x → Φ k x ⊢ Ψ k x) :
-    bigAndL Φ l ⊢ bigAndL Ψ l := by
+    ([∧ list] k ↦ x ∈ l, Φ k x) ⊢ [∧ list] k ↦ x ∈ l, Ψ k x := by
   induction l generalizing Φ Ψ with
   | nil => exact Entails.rfl
   | cons y ys ih =>
@@ -75,18 +75,18 @@ theorem mono {Φ Ψ : Nat → A → PROP} {l : List A}
 
 theorem proper {Φ Ψ : Nat → A → PROP} {l : List A}
     (h : ∀ k x, l[k]? = some x → Φ k x ≡ Ψ k x) :
-    bigAndL Φ l ≡ bigAndL Ψ l :=
+    ([∧ list] k ↦ x ∈ l, Φ k x) ≡ [∧ list] k ↦ x ∈ l, Ψ k x :=
   BigOpL.congr h
 
 theorem congr {Φ Ψ : Nat → A → PROP} {l : List A}
     (h : ∀ k x, Φ k x ≡ Ψ k x) :
-    bigAndL Φ l ≡ bigAndL Ψ l :=
+    ([∧ list] k ↦ x ∈ l, Φ k x) ≡ [∧ list] k ↦ x ∈ l, Ψ k x :=
   BigOpL.congr' h
 
 /-! ## Typeclass Closure -/
 
 instance persistent {Φ : Nat → A → PROP} {l : List A} [∀ k x, Persistent (Φ k x)] :
-    Persistent (bigAndL Φ l) where
+    Persistent ([∧ list] k ↦ x ∈ l, Φ k x) where
   persistent := by
     induction l generalizing Φ with
     | nil =>
@@ -95,11 +95,11 @@ instance persistent {Φ : Nat → A → PROP} {l : List A} [∀ k x, Persistent 
     | cons x xs ih =>
       simp only [bigAndL, bigOpL]
       have h1 : Φ 0 x ⊢ <pers> Φ 0 x := Persistent.persistent
-      have h2 : bigAndL (fun n => Φ (n + 1)) xs ⊢ <pers> bigAndL (fun n => Φ (n + 1)) xs := ih
+      have h2 : ([∧ list] n ↦ y ∈ xs, Φ (n + 1) y) ⊢ <pers> [∧ list] n ↦ y ∈ xs, Φ (n + 1) y := ih
       exact (and_mono h1 h2).trans persistently_and.2
 
 instance affine {Φ : Nat → A → PROP} {l : List A} [BIAffine PROP] :
-    Affine (bigAndL Φ l) where
+    Affine ([∧ list] k ↦ x ∈ l, Φ k x) where
   affine := by
     induction l generalizing Φ with
     | nil =>
@@ -112,30 +112,32 @@ instance affine {Φ : Nat → A → PROP} {l : List A} [BIAffine PROP] :
 /-! ## Unit/True Lemma -/
 
 theorem true_l {l : List A} :
-    bigAndL (fun _ _ => iprop(True : PROP)) l ≡ iprop(True) :=
+    ([∧ list] _x ∈ l, iprop(True : PROP)) ≡ iprop(True) :=
   BigOpL.unit_const l
 
 /-! ## Distribution over And -/
 
 theorem and' {Φ Ψ : Nat → A → PROP} {l : List A} :
-    bigAndL (fun k x => iprop(Φ k x ∧ Ψ k x)) l ≡ iprop(bigAndL Φ l ∧ bigAndL Ψ l) :=
+    ([∧ list] k ↦ x ∈ l, iprop(Φ k x ∧ Ψ k x)) ≡
+      iprop(([∧ list] k ↦ x ∈ l, Φ k x) ∧ [∧ list] k ↦ x ∈ l, Ψ k x) :=
   BigOpL.op_distr Φ Ψ l
 
 theorem and_2 {Φ Ψ : Nat → A → PROP} {l : List A} :
-    iprop(bigAndL Φ l ∧ bigAndL Ψ l) ≡ bigAndL (fun k x => iprop(Φ k x ∧ Ψ k x)) l :=
+    iprop(([∧ list] k ↦ x ∈ l, Φ k x) ∧ [∧ list] k ↦ x ∈ l, Ψ k x) ≡
+      [∧ list] k ↦ x ∈ l, iprop(Φ k x ∧ Ψ k x) :=
   and'.symm
 
 /-! ## Take and Drop -/
 
 theorem take_drop {Φ : Nat → A → PROP} {l : List A} {n : Nat} :
-    bigAndL Φ l ≡
-      iprop(bigAndL Φ (l.take n) ∧ bigAndL (fun k => Φ (n + k)) (l.drop n)) :=
+    ([∧ list] k ↦ x ∈ l, Φ k x) ≡
+      iprop(([∧ list] k ↦ x ∈ (l.take n), Φ k x) ∧ [∧ list] k ↦ x ∈ (l.drop n), Φ (n + k) x) :=
   BigOpL.take_drop Φ l n
 
 /-! ## Fmap -/
 
 theorem fmap {B : Type _} (f : A → B) {Φ : Nat → B → PROP} {l : List A} :
-    bigAndL Φ (l.map f) ≡ bigAndL (fun k x => Φ k (f x)) l := by
+    ([∧ list] k ↦ y ∈ (l.map f), Φ k y) ≡ [∧ list] k ↦ x ∈ l, Φ k (f x) := by
   induction l generalizing Φ with
   | nil => simp only [List.map_nil]; exact OFE.Equiv.rfl
   | cons x xs ih =>
@@ -148,7 +150,7 @@ theorem fmap {B : Type _} (f : A → B) {Φ : Nat → B → PROP} {l : List A} :
 -- This is simpler than the sep version because and is idempotent
 theorem lookup {Φ : Nat → A → PROP} {l : List A} {i : Nat} {x : A}
     (h : l[i]? = some x) :
-    bigAndL Φ l ⊢ Φ i x := by
+    ([∧ list] k ↦ y ∈ l, Φ k y) ⊢ Φ i x := by
   induction l generalizing i Φ with
   | nil => simp at h
   | cons y ys ih =>
@@ -169,7 +171,7 @@ theorem lookup {Φ : Nat → A → PROP} {l : List A} {i : Nat} {x : A}
 -- Introduction rule: if P entails each Φ k x, then P entails the big and
 theorem intro {P : PROP} {Φ : Nat → A → PROP} {l : List A}
     (h : ∀ k x, l[k]? = some x → P ⊢ Φ k x) :
-    P ⊢ bigAndL Φ l := by
+    P ⊢ [∧ list] k ↦ x ∈ l, Φ k x := by
   induction l generalizing Φ with
   | nil =>
     simp only [bigAndL, bigOpL]
@@ -182,18 +184,18 @@ theorem intro {P : PROP} {Φ : Nat → A → PROP} {l : List A}
 
 -- bigAndL is equivalent to forall
 theorem forall' {Φ : Nat → A → PROP} {l : List A} :
-    bigAndL Φ l ⊣⊢ ∀ k, ∀ x, iprop(⌜l[k]? = some x⌝ → Φ k x) := by
+    ([∧ list] k ↦ x ∈ l, Φ k x) ⊣⊢ ∀ k, ∀ x, iprop(⌜l[k]? = some x⌝ → Φ k x) := by
   constructor
-  · -- Forward: bigAndL Φ l ⊢ ∀ k x, ⌜l[k]? = some x⌝ → Φ k x
+  · -- Forward: [∧ list] k ↦ x ∈ l, Φ k x ⊢ ∀ k x, ⌜l[k]? = some x⌝ → Φ k x
     apply forall_intro; intro k
     apply forall_intro; intro x
     apply imp_intro
-    -- Goal: bigAndL Φ l ∧ ⌜l[k]? = some x⌝ ⊢ Φ k x
+    -- Goal: [∧ list] k ↦ x ∈ l, Φ k x ∧ ⌜l[k]? = some x⌝ ⊢ Φ k x
     apply and_comm.1.trans
     apply pure_elim_l
     intro hget
     exact lookup hget
-  · -- Backward: (∀ k x, ⌜l[k]? = some x⌝ → Φ k x) ⊢ bigAndL Φ l
+  · -- Backward: (∀ k x, ⌜l[k]? = some x⌝ → Φ k x) ⊢ [∧ list] k ↦ x ∈ l, Φ k x
     apply intro
     intro k x hget
     calc ((∀ k x, iprop(⌜l[k]? = some x⌝ → Φ k x)) : PROP)
@@ -205,13 +207,13 @@ theorem forall' {Φ : Nat → A → PROP} {l : List A} :
 
 -- Implication under bigAndL
 theorem impl {Φ Ψ : Nat → A → PROP} {l : List A} :
-    bigAndL Φ l ∧ (∀ k x, iprop(⌜l[k]? = some x⌝ → Φ k x → Ψ k x)) ⊢
-      bigAndL Ψ l := by
-  -- Use intro to construct bigAndL Ψ l
+    ([∧ list] k ↦ x ∈ l, Φ k x) ∧ (∀ k x, iprop(⌜l[k]? = some x⌝ → Φ k x → Ψ k x)) ⊢
+      [∧ list] k ↦ x ∈ l, Ψ k x := by
+  -- Use intro to construct [∧ list] k ↦ x ∈ l, Ψ k x
   apply intro
   intro k x hget
-  -- Goal: bigAndL Φ l ∧ (∀ k x, ⌜l[k]? = some x⌝ → Φ k x → Ψ k x) ⊢ Ψ k x
-  calc (bigAndL Φ l ∧ (∀ k x, iprop(⌜l[k]? = some x⌝ → Φ k x → Ψ k x)) : PROP)
+  -- Goal: [∧ list] k ↦ x ∈ l, Φ k x ∧ (∀ k x, ⌜l[k]? = some x⌝ → Φ k x → Ψ k x) ⊢ Ψ k x
+  calc (([∧ list] k ↦ x ∈ l, Φ k x) ∧ (∀ k x, iprop(⌜l[k]? = some x⌝ → Φ k x → Ψ k x)) : PROP)
       ⊢ Φ k x ∧ (∀ k x, iprop(⌜l[k]? = some x⌝ → Φ k x → Ψ k x)) := by
         exact and_mono (lookup hget) Entails.rfl
     _ ⊢ Φ k x ∧ iprop(⌜l[k]? = some x⌝ → Φ k x → Ψ k x) := by
@@ -249,24 +251,24 @@ theorem impl {Φ Ψ : Nat → A → PROP} {l : List A} :
 /-! ## Modality Interaction -/
 
 theorem persistently {Φ : Nat → A → PROP} {l : List A} :
-    iprop(<pers> bigAndL Φ l) ⊣⊢ bigAndL (fun k x => iprop(<pers> Φ k x)) l := by
+    iprop(<pers> [∧ list] k ↦ x ∈ l, Φ k x) ⊣⊢ [∧ list] k ↦ x ∈ l, iprop(<pers> Φ k x) := by
   induction l generalizing Φ with
   | nil =>
     simp only [bigAndL, bigOpL]
     exact persistently_true
   | cons x xs ih =>
     simp only [bigAndL, bigOpL]
-    calc iprop(<pers> (Φ 0 x ∧ bigAndL (fun n => Φ (n + 1)) xs))
-        ⊣⊢ iprop(<pers> Φ 0 x ∧ <pers> bigAndL (fun n => Φ (n + 1)) xs) := persistently_and
-      _ ⊣⊢ iprop(<pers> Φ 0 x ∧ bigAndL (fun n k => iprop(<pers> Φ (n + 1) k)) xs) :=
+    calc iprop(<pers> (Φ 0 x ∧ [∧ list] n ↦ y ∈ xs, Φ (n + 1) y))
+        ⊣⊢ iprop(<pers> Φ 0 x ∧ <pers> [∧ list] n ↦ y ∈ xs, Φ (n + 1) y) := persistently_and
+      _ ⊣⊢ iprop(<pers> Φ 0 x ∧ [∧ list] n ↦ y ∈ xs, iprop(<pers> Φ (n + 1) y)) :=
           and_congr .rfl ih
 
 /-! ## Pure Propositions -/
 
 theorem pure_1 {φ : Nat → A → Prop} {l : List A} :
-    bigAndL (fun k x => iprop(⌜φ k x⌝ : PROP)) l ⊢ iprop(⌜∀ k x, l[k]? = some x → φ k x⌝ : PROP) := by
+    ([∧ list] k ↦ x ∈ l, iprop(⌜φ k x⌝ : PROP)) ⊢ iprop(⌜∀ k x, l[k]? = some x → φ k x⌝ : PROP) := by
   -- Use forall' to convert to BI forall, then use pure_forall and pure_imp
-  calc bigAndL (fun k x => iprop(⌜φ k x⌝ : PROP)) l
+  calc ([∧ list] k ↦ x ∈ l, iprop(⌜φ k x⌝ : PROP))
       ⊢ ∀ k, ∀ x, iprop(⌜l[k]? = some x⌝ → ⌜φ k x⌝) := forall'.1
     _ ⊢ ∀ k, ∀ x, iprop(⌜l[k]? = some x → φ k x⌝ : PROP) :=
         forall_mono fun _ => forall_mono fun _ => pure_imp.1
@@ -276,7 +278,7 @@ theorem pure_1 {φ : Nat → A → Prop} {l : List A} :
         pure_forall.1
 
 theorem pure_2 {φ : Nat → A → Prop} {l : List A} :
-    iprop(⌜∀ k x, l[k]? = some x → φ k x⌝ : PROP) ⊢ bigAndL (fun k x => iprop(⌜φ k x⌝ : PROP)) l := by
+    iprop(⌜∀ k x, l[k]? = some x → φ k x⌝ : PROP) ⊢ [∧ list] k ↦ x ∈ l, iprop(⌜φ k x⌝ : PROP) := by
   -- Use forall' backward direction
   calc iprop(⌜∀ k x, l[k]? = some x → φ k x⌝ : PROP)
       ⊢ ∀ k, iprop(⌜∀ x, l[k]? = some x → φ k x⌝ : PROP) := pure_forall_2
@@ -284,10 +286,10 @@ theorem pure_2 {φ : Nat → A → Prop} {l : List A} :
         forall_mono fun _ => pure_forall_2
     _ ⊢ ∀ k, ∀ x, iprop(⌜l[k]? = some x⌝ → ⌜φ k x⌝) :=
         forall_mono fun _ => forall_mono fun _ => pure_imp_2
-    _ ⊢ bigAndL (fun k x => iprop(⌜φ k x⌝ : PROP)) l := forall'.2
+    _ ⊢ [∧ list] k ↦ x ∈ l, iprop(⌜φ k x⌝ : PROP) := forall'.2
 
 theorem pure {φ : Nat → A → Prop} {l : List A} :
-    bigAndL (fun k x => iprop(⌜φ k x⌝ : PROP)) l ⊣⊢ iprop(⌜∀ k x, l[k]? = some x → φ k x⌝ : PROP) :=
+    ([∧ list] k ↦ x ∈ l, iprop(⌜φ k x⌝ : PROP)) ⊣⊢ iprop(⌜∀ k x, l[k]? = some x → φ k x⌝ : PROP) :=
   ⟨pure_1, pure_2⟩
 
 -- Note: big_andL_sep_2 is not in Rocq; it was a speculative addition
@@ -297,7 +299,7 @@ theorem pure {φ : Nat → A → Prop} {l : List A} :
 -- Extract an element from bigAndL using membership
 theorem elem_of {Φ : A → PROP} {l : List A} {x : A}
     (h : x ∈ l) :
-    bigAndL (fun _ => Φ) l ⊢ Φ x := by
+    ([∧ list] y ∈ l, Φ y) ⊢ Φ x := by
   have ⟨i, hi, hget⟩ := List.mem_iff_getElem.mp h
   have hlookup : l[i]? = some x := List.getElem?_eq_some_iff.mpr ⟨hi, hget⟩
   exact lookup hlookup
@@ -309,8 +311,8 @@ theorem elem_of {Φ : A → PROP} {l : List A} {x : A}
     This lemma allows rewriting a big conjunction over a zipped list with an enumeration
     starting at `n` into a big conjunction with indexed access where indices are offset by `n`. -/
 theorem zip_seq {Φ : Nat × A → PROP} {n : Nat} {l : List A} :
-    bigAndL (fun _ => Φ) ((List.range' n l.length).zip l) ≡
-      bigAndL (fun i x => Φ (n + i, x)) l :=
+    ([∧ list] ky ∈ ((List.range' n l.length).zip l), Φ ky) ≡
+      [∧ list] i ↦ x ∈ l, Φ (n + i, x) :=
   BigOpL.zip_seq (op := and) (unit := iprop(True)) Φ n l
 
 /-- Big and over zip with a sequence starting at 0.
@@ -318,15 +320,15 @@ theorem zip_seq {Φ : Nat × A → PROP} {n : Nat} {l : List A} :
     This is a special case of `zip_seq` with `n = 0`, useful for converting between
     explicit enumeration via zip and implicit indexed big conjunction. -/
 theorem zip_seqZ {Φ : Nat × A → PROP} {l : List A} :
-    bigAndL (fun _ => Φ) ((List.range l.length).zip l) ≡
-      bigAndL (fun i x => Φ (i, x)) l :=
+    ([∧ list] ky ∈ ((List.range l.length).zip l), Φ ky) ≡
+      [∧ list] i ↦ x ∈ l, Φ (i, x) :=
   BigOpL.zip_with_range (op := and) (unit := iprop(True)) Φ l
 
 /-! ## Bind -/
 
 theorem bind {B : Type _} (f : A → List B) {Φ : B → PROP} {l : List A} :
-    bigAndL (fun _ => Φ) (l.flatMap f) ⊣⊢
-      bigAndL (fun _ x => bigAndL (fun _ => Φ) (f x)) l := by
+    ([∧ list] y ∈ (l.flatMap f), Φ y) ⊣⊢
+      [∧ list] x ∈ l, [∧ list] y ∈ (f x), Φ y := by
   induction l with
   | nil => exact .rfl
   | cons x xs ih =>
@@ -336,33 +338,33 @@ theorem bind {B : Type _} (f : A → List B) {Φ : B → PROP} {l : List A} :
 /-! ## Later Modality -/
 
 theorem later {Φ : Nat → A → PROP} {l : List A} :
-    iprop(▷ bigAndL Φ l) ⊣⊢ bigAndL (fun k x => iprop(▷ Φ k x)) l := by
+    iprop(▷ [∧ list] k ↦ x ∈ l, Φ k x) ⊣⊢ [∧ list] k ↦ x ∈ l, iprop(▷ Φ k x) := by
   induction l generalizing Φ with
   | nil =>
     simp only [bigAndL, bigOpL]
     exact later_true
   | cons x xs ih =>
     simp only [bigAndL, bigOpL]
-    calc iprop(▷ (Φ 0 x ∧ bigAndL (fun n => Φ (n + 1)) xs))
-        ⊣⊢ iprop(▷ Φ 0 x ∧ ▷ bigAndL (fun n => Φ (n + 1)) xs) := later_and
-      _ ⊣⊢ iprop(▷ Φ 0 x ∧ bigAndL (fun n k => iprop(▷ Φ (n + 1) k)) xs) :=
+    calc iprop(▷ (Φ 0 x ∧ [∧ list] n ↦ y ∈ xs, Φ (n + 1) y))
+        ⊣⊢ iprop(▷ Φ 0 x ∧ ▷ [∧ list] n ↦ y ∈ xs, Φ (n + 1) y) := later_and
+      _ ⊣⊢ iprop(▷ Φ 0 x ∧ [∧ list] n ↦ y ∈ xs, iprop(▷ Φ (n + 1) y)) :=
           and_congr .rfl ih
 
 theorem laterN {Φ : Nat → A → PROP} {l : List A} {n : Nat} :
-    iprop(▷^[n] bigAndL Φ l) ⊣⊢ bigAndL (fun k x => iprop(▷^[n] Φ k x)) l := by
+    iprop(▷^[n] [∧ list] k ↦ x ∈ l, Φ k x) ⊣⊢ [∧ list] k ↦ x ∈ l, iprop(▷^[n] Φ k x) := by
   induction n with
   | zero =>
     exact .rfl
   | succ m ih =>
-    calc iprop(▷ ▷^[m] bigAndL Φ l)
-        ⊣⊢ iprop(▷ bigAndL (fun k x => iprop(▷^[m] Φ k x)) l) :=
+    calc iprop(▷ ▷^[m] [∧ list] k ↦ x ∈ l, Φ k x)
+        ⊣⊢ iprop(▷ [∧ list] k ↦ x ∈ l, iprop(▷^[m] Φ k x)) :=
           later_congr ih
-      _ ⊣⊢ bigAndL (fun k x => iprop(▷ ▷^[m] Φ k x)) l := later
+      _ ⊣⊢ [∧ list] k ↦ x ∈ l, iprop(▷ ▷^[m] Φ k x) := later
 
 /-! ## Permutation -/
 
 theorem perm {Φ : A → PROP} {l₁ l₂ : List A} (hp : l₁.Perm l₂) :
-    bigAndL (fun _ => Φ) l₁ ≡ bigAndL (fun _ => Φ) l₂ :=
+    ([∧ list] x ∈ l₁, Φ x) ≡ [∧ list] x ∈ l₂, Φ x :=
   BigOpL.perm Φ hp
 
 end BigAndL
