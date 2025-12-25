@@ -201,115 +201,71 @@ theorem intro {P : PROP} {Φ : Nat → A → PROP} {l : List A}
     · exact ih (fun k x hget => h (k + 1) x hget)
 
 /-- Corresponds to `big_andL_forall` in Rocq Iris.
-    bigAndL is equivalent to forall. -/
+    bigAndL is equivalent to forall.
+    Rocq proof:
+    ```
+    apply (anti_symm _).
+    { apply forall_intro=> k; apply forall_intro=> x.
+      apply impl_intro_l, pure_elim_l=> ?; by apply: big_andL_lookup. }
+    revert Φ. induction l as [|x l IH]=> Φ; [by auto using big_andL_nil'|].
+    rewrite big_andL_cons. apply and_intro.
+    - by rewrite (forall_elim 0) (forall_elim x) pure_True // True_impl.
+    - rewrite -IH. apply forall_intro=> k; by rewrite (forall_elim (S k)).
+    ``` -/
 theorem forall' {Φ : Nat → A → PROP} {l : List A} :
     ([∧ list] k ↦ x ∈ l, Φ k x) ⊣⊢ ∀ k, ∀ x, iprop(⌜l[k]? = some x⌝ → Φ k x) := by
   constructor
-  · -- Forward: [∧ list] k ↦ x ∈ l, Φ k x ⊢ ∀ k x, ⌜l[k]? = some x⌝ → Φ k x
+  · -- Forward direction
     apply forall_intro; intro k
     apply forall_intro; intro x
-    apply imp_intro
-    -- Goal: [∧ list] k ↦ x ∈ l, Φ k x ∧ ⌜l[k]? = some x⌝ ⊢ Φ k x
-    apply and_comm.1.trans
-    apply pure_elim_l
-    intro hget
-    exact lookup hget
-  · -- Backward: (∀ k x, ⌜l[k]? = some x⌝ → Φ k x) ⊢ [∧ list] k ↦ x ∈ l, Φ k x
-    apply intro
-    intro k x hget
-    calc ((∀ k x, iprop(⌜l[k]? = some x⌝ → Φ k x)) : PROP)
-        ⊢ ∀ x, iprop(⌜l[k]? = some x⌝ → Φ k x) := forall_elim k
-      _ ⊢ iprop(⌜l[k]? = some x⌝ → Φ k x) := forall_elim x
-      _ ⊢ Φ k x := by
-          apply (and_intro Entails.rfl (pure_intro hget)).trans
-          exact imp_elim Entails.rfl
+    refine imp_intro <| and_comm.1.trans <| pure_elim_l (lookup ·)
+  · -- Backward direction: induction on list
+    induction l generalizing Φ with
+    | nil => exact true_intro
+    | cons y ys ih =>
+      simp only [bigAndL, bigOpL]
+      apply and_intro
+      · -- Φ 0 y: by rewrite (forall_elim 0) (forall_elim y) pure_True // True_impl
+        exact (forall_elim 0).trans <| (forall_elim y).trans <|
+          (imp_congr_l (pure_true rfl)).1.trans true_imp.1
+      · -- inductive case: rewrite -IH. apply forall_intro=> k; by rewrite (forall_elim (S k))
+        refine Entails.trans ?_ (ih (Φ := fun k x => Φ (k + 1) x))
+        exact forall_intro fun k => forall_intro fun x => (forall_elim (k + 1)).trans (forall_elim x)
 
 /-- Corresponds to `big_andL_impl` in Rocq Iris.
-    Implication under bigAndL. -/
+    Implication under bigAndL.
+    Rocq proof: `rewrite -big_andL_forall -big_andL_and. by setoid_rewrite bi.impl_elim_r.` -/
 theorem impl {Φ Ψ : Nat → A → PROP} {l : List A} :
     ([∧ list] k ↦ x ∈ l, Φ k x) ∧ (∀ k x, iprop(⌜l[k]? = some x⌝ → Φ k x → Ψ k x)) ⊢
-      [∧ list] k ↦ x ∈ l, Ψ k x := by
-  -- Use intro to construct [∧ list] k ↦ x ∈ l, Ψ k x
-  apply intro
-  intro k x hget
-  -- Goal: [∧ list] k ↦ x ∈ l, Φ k x ∧ (∀ k x, ⌜l[k]? = some x⌝ → Φ k x → Ψ k x) ⊢ Ψ k x
-  calc (([∧ list] k ↦ x ∈ l, Φ k x) ∧ (∀ k x, iprop(⌜l[k]? = some x⌝ → Φ k x → Ψ k x)) : PROP)
-      ⊢ Φ k x ∧ (∀ k x, iprop(⌜l[k]? = some x⌝ → Φ k x → Ψ k x)) := by
-        exact and_mono (lookup hget) Entails.rfl
-    _ ⊢ Φ k x ∧ iprop(⌜l[k]? = some x⌝ → Φ k x → Ψ k x) := by
-        apply and_mono Entails.rfl
-        calc ((∀ k x, iprop(⌜l[k]? = some x⌝ → Φ k x → Ψ k x)) : PROP)
-            ⊢ ∀ x, iprop(⌜l[k]? = some x⌝ → Φ k x → Ψ k x) := forall_elim k
-          _ ⊢ iprop(⌜l[k]? = some x⌝ → Φ k x → Ψ k x) := forall_elim x
-    _ ⊢ iprop(⌜l[k]? = some x⌝) ∧ Φ k x ∧ iprop(⌜l[k]? = some x⌝ → Φ k x → Ψ k x) := by
-        apply and_intro (pure_intro hget)
-        exact Entails.rfl
-    _ ⊢ Ψ k x := by
-        apply pure_elim_l; intro _
-        -- Goal: Φ k x ∧ (⌜l[k]? = some x⌝ → Φ k x → Ψ k x) ⊢ Ψ k x
-        -- Strategy: combine Φ k x with ⌜l[k]? = some x⌝ and apply the implication
-        have step1 : (Φ k x ∧ iprop(⌜l[k]? = some x⌝ → Φ k x → Ψ k x) : PROP) ⊢ iprop(Φ k x → Ψ k x) :=
-          calc (Φ k x ∧ iprop(⌜l[k]? = some x⌝ → Φ k x → Ψ k x) : PROP)
-              ⊢ iprop(⌜l[k]? = some x⌝) ∧ (Φ k x ∧ iprop(⌜l[k]? = some x⌝ → Φ k x → Ψ k x)) := by
-                apply and_intro (pure_intro hget) Entails.rfl
-            _ ⊢ (iprop(⌜l[k]? = some x⌝) ∧ Φ k x) ∧ iprop(⌜l[k]? = some x⌝ → Φ k x → Ψ k x) :=
-                and_assoc.2
-            _ ⊢ iprop(⌜l[k]? = some x⌝ → Φ k x → Ψ k x) ∧ (iprop(⌜l[k]? = some x⌝) ∧ Φ k x) :=
-                and_comm.1
-            _ ⊢ iprop(⌜l[k]? = some x⌝ → Φ k x → Ψ k x) ∧ iprop(⌜l[k]? = some x⌝) := by
-                apply and_mono Entails.rfl and_elim_l
-            _ ⊢ iprop(⌜l[k]? = some x⌝) ∧ iprop(⌜l[k]? = some x⌝ → Φ k x → Ψ k x) :=
-                and_comm.1
-            _ ⊢ iprop(Φ k x → Ψ k x) := imp_elim_r
-        -- To apply Φ k x → Ψ k x to Φ k x, we need (Φ k x → Ψ k x) ∧ Φ k x ⊢ Ψ k x
-        -- We have: Φ k x ∧ (⌜l[k]? = some x⌝ → Φ k x → Ψ k x) ⊢ Φ k x → Ψ k x (via step1)
-        -- And we have: Φ k x ∧ (⌜l[k]? = some x⌝ → Φ k x → Ψ k x) ⊢ Φ k x (via and_elim_l)
-        -- Combine these and apply modus ponens
-        have step2 : (Φ k x ∧ iprop(⌜l[k]? = some x⌝ → Φ k x → Ψ k x) : PROP) ⊢ Φ k x := and_elim_l
-        exact (and_intro step1 step2).trans imp_elim_l
+      [∧ list] k ↦ x ∈ l, Ψ k x :=
+  intro fun k x hget =>
+    (and_mono (lookup hget) ((forall_elim k).trans (forall_elim x))).trans <|
+      -- Φ k x ∧ (⌜hget⌝ → Φ k x → Ψ k x) ⊢ Ψ k x
+      (and_mono .rfl ((and_intro (pure_intro hget) .rfl).trans imp_elim_r)).trans imp_elim_r
 
 /-! ## Modality Interaction -/
 
-/-- Corresponds to `big_andL_persistently` in Rocq Iris. -/
+/-- Corresponds to `big_andL_persistently` in Rocq Iris.
+    Rocq proof: `apply (big_opL_commute _).` -/
 theorem persistently {Φ : Nat → A → PROP} {l : List A} :
-    iprop(<pers> [∧ list] k ↦ x ∈ l, Φ k x) ⊣⊢ [∧ list] k ↦ x ∈ l, iprop(<pers> Φ k x) := by
-  induction l generalizing Φ with
-  | nil =>
-    simp only [bigAndL, bigOpL]
-    exact persistently_true
-  | cons x xs ih =>
-    simp only [bigAndL, bigOpL]
-    calc iprop(<pers> (Φ 0 x ∧ [∧ list] n ↦ y ∈ xs, Φ (n + 1) y))
-        ⊣⊢ iprop(<pers> Φ 0 x ∧ <pers> [∧ list] n ↦ y ∈ xs, Φ (n + 1) y) := persistently_and
-      _ ⊣⊢ iprop(<pers> Φ 0 x ∧ [∧ list] n ↦ y ∈ xs, iprop(<pers> Φ (n + 1) y)) :=
-          and_congr .rfl ih
+    iprop(<pers> [∧ list] k ↦ x ∈ l, Φ k x) ⊣⊢ [∧ list] k ↦ x ∈ l, iprop(<pers> Φ k x) :=
+  equiv_iff.mp <| BigOpL.commute bi_persistently_and_homomorphism Φ l
 
 /-! ## Pure Propositions -/
 
-/-- Corresponds to `big_andL_pure_1` in Rocq Iris. -/
+/-- Corresponds to `big_andL_pure_1` in Rocq Iris.
+    Rocq proof: `rewrite big_andL_forall. f_equiv=>k. ... pure_forall_1 ... pure_impl_1.` -/
 theorem pure_1 {φ : Nat → A → Prop} {l : List A} :
-    ([∧ list] k ↦ x ∈ l, iprop(⌜φ k x⌝ : PROP)) ⊢ iprop(⌜∀ k x, l[k]? = some x → φ k x⌝ : PROP) := by
-  -- Use forall' to convert to BI forall, then use pure_forall and pure_imp
-  calc ([∧ list] k ↦ x ∈ l, iprop(⌜φ k x⌝ : PROP))
-      ⊢ ∀ k, ∀ x, iprop(⌜l[k]? = some x⌝ → ⌜φ k x⌝) := forall'.1
-    _ ⊢ ∀ k, ∀ x, iprop(⌜l[k]? = some x → φ k x⌝ : PROP) :=
-        forall_mono fun _ => forall_mono fun _ => pure_imp.1
-    _ ⊢ ∀ k, iprop(⌜∀ x, l[k]? = some x → φ k x⌝ : PROP) :=
-        forall_mono fun _ => pure_forall.1
-    _ ⊢ iprop(⌜∀ k, ∀ x, l[k]? = some x → φ k x⌝ : PROP) :=
-        pure_forall.1
+    ([∧ list] k ↦ x ∈ l, iprop(⌜φ k x⌝ : PROP)) ⊢ iprop(⌜∀ k x, l[k]? = some x → φ k x⌝ : PROP) :=
+  forall'.1.trans <| (forall_mono fun _ => forall_mono fun _ => pure_imp.1).trans <|
+    (forall_mono fun _ => pure_forall.1).trans pure_forall.1
 
-/-- Corresponds to `big_andL_pure_2` in Rocq Iris. -/
+/-- Corresponds to `big_andL_pure_2` in Rocq Iris.
+    Rocq proof: `rewrite big_andL_forall pure_forall_1. f_equiv=>k. ... pure_impl_1.` -/
 theorem pure_2 {φ : Nat → A → Prop} {l : List A} :
-    iprop(⌜∀ k x, l[k]? = some x → φ k x⌝ : PROP) ⊢ [∧ list] k ↦ x ∈ l, iprop(⌜φ k x⌝ : PROP) := by
-  -- Use forall' backward direction
-  calc iprop(⌜∀ k x, l[k]? = some x → φ k x⌝ : PROP)
-      ⊢ ∀ k, iprop(⌜∀ x, l[k]? = some x → φ k x⌝ : PROP) := pure_forall_2
-    _ ⊢ ∀ k, ∀ x, iprop(⌜l[k]? = some x → φ k x⌝ : PROP) :=
-        forall_mono fun _ => pure_forall_2
-    _ ⊢ ∀ k, ∀ x, iprop(⌜l[k]? = some x⌝ → ⌜φ k x⌝) :=
-        forall_mono fun _ => forall_mono fun _ => pure_imp_2
-    _ ⊢ [∧ list] k ↦ x ∈ l, iprop(⌜φ k x⌝ : PROP) := forall'.2
+    iprop(⌜∀ k x, l[k]? = some x → φ k x⌝ : PROP) ⊢ [∧ list] k ↦ x ∈ l, iprop(⌜φ k x⌝ : PROP) :=
+  pure_forall_2.trans <| (forall_mono fun _ => pure_forall_2).trans <|
+    (forall_mono fun _ => forall_mono fun _ => pure_imp_2).trans forall'.2
 
 /-- Corresponds to `big_andL_pure` in Rocq Iris. -/
 theorem pure {φ : Nat → A → Prop} {l : List A} :
@@ -365,31 +321,19 @@ theorem bind {B : Type _} (f : A → List B) {Φ : B → PROP} {l : List A} :
 
 /-! ## Later Modality -/
 
-/-- Corresponds to `big_andL_later` in Rocq Iris. -/
+/-- Corresponds to `big_andL_later` in Rocq Iris.
+    Rocq proof: `apply (big_opL_commute _).` -/
 theorem later {Φ : Nat → A → PROP} {l : List A} :
-    iprop(▷ [∧ list] k ↦ x ∈ l, Φ k x) ⊣⊢ [∧ list] k ↦ x ∈ l, iprop(▷ Φ k x) := by
-  induction l generalizing Φ with
-  | nil =>
-    simp only [bigAndL, bigOpL]
-    exact later_true
-  | cons x xs ih =>
-    simp only [bigAndL, bigOpL]
-    calc iprop(▷ (Φ 0 x ∧ [∧ list] n ↦ y ∈ xs, Φ (n + 1) y))
-        ⊣⊢ iprop(▷ Φ 0 x ∧ ▷ [∧ list] n ↦ y ∈ xs, Φ (n + 1) y) := later_and
-      _ ⊣⊢ iprop(▷ Φ 0 x ∧ [∧ list] n ↦ y ∈ xs, iprop(▷ Φ (n + 1) y)) :=
-          and_congr .rfl ih
+    iprop(▷ [∧ list] k ↦ x ∈ l, Φ k x) ⊣⊢ [∧ list] k ↦ x ∈ l, iprop(▷ Φ k x) :=
+  equiv_iff.mp <| BigOpL.commute bi_later_and_homomorphism Φ l
 
-/-- Corresponds to `big_andL_laterN` in Rocq Iris. -/
+/-- Corresponds to `big_andL_laterN` in Rocq Iris.
+    Rocq proof: `apply (big_opL_commute _).` -/
 theorem laterN {Φ : Nat → A → PROP} {l : List A} {n : Nat} :
     iprop(▷^[n] [∧ list] k ↦ x ∈ l, Φ k x) ⊣⊢ [∧ list] k ↦ x ∈ l, iprop(▷^[n] Φ k x) := by
   induction n with
-  | zero =>
-    exact .rfl
-  | succ m ih =>
-    calc iprop(▷ ▷^[m] [∧ list] k ↦ x ∈ l, Φ k x)
-        ⊣⊢ iprop(▷ [∧ list] k ↦ x ∈ l, iprop(▷^[m] Φ k x)) :=
-          later_congr ih
-      _ ⊣⊢ [∧ list] k ↦ x ∈ l, iprop(▷ ▷^[m] Φ k x) := later
+  | zero => exact .rfl
+  | succ m ih => exact (later_congr ih).trans later
 
 /-! ## Permutation -/
 

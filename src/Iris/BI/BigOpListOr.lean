@@ -154,85 +154,46 @@ theorem exist {Φ : Nat → A → PROP} {l : List A} :
   constructor
   · -- Forward: induction on l
     induction l generalizing Φ with
-    | nil =>
-      simp only [bigOrL, bigOpL]
-      exact false_elim
+    | nil => simp only [bigOrL, bigOpL]; exact false_elim
     | cons y ys ih =>
       simp only [bigOrL, bigOpL]
       apply or_elim
       · -- Φ 0 y ⊢ ∃ k x, ⌜(y :: ys)[k]? = some x⌝ ∧ Φ k x
-        calc Φ 0 y
-            ⊢ iprop(⌜(y :: ys)[0]? = some y⌝ ∧ Φ 0 y) := (and_intro (pure_intro rfl) Entails.rfl)
-          _ ⊢ ∃ x, iprop(⌜(y :: ys)[0]? = some x⌝ ∧ Φ 0 x) := exists_intro' y Entails.rfl
-          _ ⊢ ∃ k, ∃ x, iprop(⌜(y :: ys)[k]? = some x⌝ ∧ Φ k x) := exists_intro' 0 Entails.rfl
+        -- Following Rocq: rewrite -(exist_intro 0) -(exist_intro x) pure_True // left_id
+        exact exists_intro' 0 (exists_intro' y (and_intro (pure_intro rfl) .rfl))
       · -- [∨ list] k ↦ x ∈ ys, Φ (k + 1) x ⊢ ∃ k x, ⌜(y :: ys)[k]? = some x⌝ ∧ Φ k x
-        calc ([∨ list] k ↦ x ∈ ys, Φ (k + 1) x)
-            ⊢ ∃ k, ∃ x, iprop(⌜ys[k]? = some x⌝ ∧ Φ (k + 1) x) := ih
-          _ ⊢ ∃ k, ∃ x, iprop(⌜(y :: ys)[k + 1]? = some x⌝ ∧ Φ (k + 1) x) := by
-              apply exists_mono; intro k
-              apply exists_mono; intro x
-              apply and_mono _ Entails.rfl
-              apply pure_mono; intro h; exact h
-          _ ⊢ ∃ k, ∃ x, iprop(⌜(y :: ys)[k]? = some x⌝ ∧ Φ k x) := by
-              apply exists_elim; intro k
-              exact exists_intro' (k + 1) Entails.rfl
-  · -- Backward: ∃ k x, ⌜l[k]? = some x⌝ ∧ Φ k x ⊢ [∨ list] k ↦ x ∈ l, Φ k x
-    apply exists_elim; intro k
-    apply exists_elim; intro x
-    apply pure_elim_l; intro hget
-    exact intro hget
+        -- Following Rocq: rewrite IH. apply exist_elim=> k. by rewrite -(exist_intro (S k)).
+        refine ih.trans (exists_elim fun k => exists_intro' (k + 1) .rfl)
+  · -- Backward: apply exist_elim=> k; apply exist_elim=> x. apply pure_elim_l=> ?. by apply: big_orL_intro.
+    exact exists_elim fun k => exists_elim fun x => pure_elim_l (intro ·)
 
 /-! ## Pure Propositions -/
 
 /-- Corresponds to `big_orL_pure` in Rocq Iris. -/
 theorem pure {φ : Nat → A → Prop} {l : List A} :
-    ([∨ list] k ↦ x ∈ l, (⌜φ k x⌝ : PROP)) ⊣⊢ iprop(⌜∃ k x, l[k]? = some x ∧ φ k x⌝ : PROP) := by
-  -- Following Rocq: use exist theorem and pure_exists
-  calc ([∨ list] k ↦ x ∈ l, (⌜φ k x⌝ : PROP))
-      ⊣⊢ ∃ k, ∃ x, iprop(⌜l[k]? = some x⌝ ∧ ⌜φ k x⌝) := exist
-    _ ⊣⊢ ∃ k, ∃ x, iprop(⌜l[k]? = some x ∧ φ k x⌝ : PROP) := by
-        apply exists_congr; intro k
-        apply exists_congr; intro x
-        exact pure_and
-    _ ⊣⊢ ∃ k, iprop(⌜∃ x, l[k]? = some x ∧ φ k x⌝ : PROP) := by
-        apply exists_congr; intro k
-        exact pure_exists
-    _ ⊣⊢ iprop(⌜∃ k, ∃ x, l[k]? = some x ∧ φ k x⌝ : PROP) := pure_exists
+    ([∨ list] k ↦ x ∈ l, (⌜φ k x⌝ : PROP)) ⊣⊢ iprop(⌜∃ k x, l[k]? = some x ∧ φ k x⌝ : PROP) :=
+  -- Following Rocq: rewrite big_orL_exist. rewrite pure_exist (twice). rewrite -pure_and. done.
+  exist.trans <| (exists_congr fun _ => (exists_congr fun _ => pure_and).trans pure_exists).trans pure_exists
 
 /-! ## Interaction with Sep -/
 
 /-- Corresponds to `big_orL_sep_l` in Rocq Iris. -/
 theorem sep_l {P : PROP} {Φ : Nat → A → PROP} {l : List A} :
-    iprop(P ∗ [∨ list] k ↦ x ∈ l, Φ k x) ⊣⊢ [∨ list] k ↦ x ∈ l, iprop(P ∗ Φ k x) := by
-  -- Following Rocq: rewrite using exist and sep_exists_l
-  calc iprop(P ∗ [∨ list] k ↦ x ∈ l, Φ k x)
-      ⊣⊢ iprop(P ∗ (∃ k, ∃ x, iprop(⌜l[k]? = some x⌝ ∧ Φ k x))) := sep_congr .rfl exist
-    _ ⊣⊢ ∃ k, iprop(P ∗ (∃ x, iprop(⌜l[k]? = some x⌝ ∧ Φ k x))) := sep_exists_l
-    _ ⊣⊢ ∃ k, ∃ x, iprop(P ∗ (⌜l[k]? = some x⌝ ∧ Φ k x)) := by
-        apply exists_congr; intro k; exact sep_exists_l
-    _ ⊣⊢ ∃ k, ∃ x, iprop(⌜l[k]? = some x⌝ ∧ (P ∗ Φ k x)) := by
-        apply exists_congr; intro k
-        apply exists_congr; intro x
-        -- Use persistent_and_affinely_sep_l and associativity
-        -- ⌜l[k]? = some x⌝ is Persistent and Affine, so we can reorder
-        calc iprop(P ∗ (⌜l[k]? = some x⌝ ∧ Φ k x))
-            ⊣⊢ iprop(P ∗ (<affine> ⌜l[k]? = some x⌝ ∗ Φ k x)) := by
-                apply sep_congr .rfl
-                exact persistent_and_affinely_sep_l
-          _ ⊣⊢ iprop((P ∗ <affine> ⌜l[k]? = some x⌝) ∗ Φ k x) := sep_assoc.symm
-          _ ⊣⊢ iprop((<affine> ⌜l[k]? = some x⌝ ∗ P) ∗ Φ k x) := sep_congr sep_comm .rfl
-          _ ⊣⊢ iprop(<affine> ⌜l[k]? = some x⌝ ∗ (P ∗ Φ k x)) := sep_assoc
-          _ ⊣⊢ iprop(⌜l[k]? = some x⌝ ∧ (P ∗ Φ k x)) := persistent_and_affinely_sep_l.symm
-    _ ⊣⊢ [∨ list] k ↦ x ∈ l, iprop(P ∗ Φ k x) := exist.symm
+    iprop(P ∗ [∨ list] k ↦ x ∈ l, Φ k x) ⊣⊢ [∨ list] k ↦ x ∈ l, iprop(P ∗ Φ k x) :=
+  -- Following Rocq: rewrite !big_orL_exist sep_exist_l. f_equiv=> k. rewrite sep_exist_l. f_equiv=> x.
+  -- by rewrite !persistent_and_affinely_sep_l !assoc (comm _ P).
+  (sep_congr .rfl exist).trans <| sep_exists_l.trans <| (exists_congr fun _ =>
+    sep_exists_l.trans <| exists_congr fun _ =>
+      -- P ∗ (⌜_⌝ ∧ Φ) ⊣⊢ ⌜_⌝ ∧ (P ∗ Φ) via persistent_and_affinely_sep_l, assoc, comm
+      (sep_congr .rfl persistent_and_affinely_sep_l).trans <|
+        sep_assoc.symm.trans <| (sep_congr sep_comm .rfl).trans <|
+          sep_assoc.trans persistent_and_affinely_sep_l.symm).trans exist.symm
 
 /-- Corresponds to `big_orL_sep_r` in Rocq Iris. -/
 theorem sep_r {Φ : Nat → A → PROP} {P : PROP} {l : List A} :
-    iprop(([∨ list] k ↦ x ∈ l, Φ k x) ∗ P) ⊣⊢ [∨ list] k ↦ x ∈ l, iprop(Φ k x ∗ P) := by
-  calc iprop(([∨ list] k ↦ x ∈ l, Φ k x) ∗ P)
-      ⊣⊢ iprop(P ∗ [∨ list] k ↦ x ∈ l, Φ k x) := sep_comm
-    _ ⊣⊢ [∨ list] k ↦ x ∈ l, iprop(P ∗ Φ k x) := sep_l
-    _ ⊣⊢ [∨ list] k ↦ x ∈ l, iprop(Φ k x ∗ P) :=
-        equiv_iff.mp (congr (fun k x => equiv_iff.mpr sep_comm))
+    iprop(([∨ list] k ↦ x ∈ l, Φ k x) ∗ P) ⊣⊢ [∨ list] k ↦ x ∈ l, iprop(Φ k x ∗ P) :=
+  -- Following Rocq: setoid_rewrite (comm bi_sep). apply big_orL_sep_l.
+  sep_comm.trans <| sep_l.trans (equiv_iff.mp (congr fun _ _ => equiv_iff.mpr sep_comm))
 
 /-! ## Lookup Lemmas -/
 
@@ -264,58 +225,24 @@ theorem bind {B : Type _} (f : A → List B) {Φ : B → PROP} {l : List A} :
 
 /-- Corresponds to `big_orL_persistently` in Rocq Iris. -/
 theorem persistently {Φ : Nat → A → PROP} {l : List A} :
-    iprop(<pers> [∨ list] k ↦ x ∈ l, Φ k x) ⊣⊢ [∨ list] k ↦ x ∈ l, iprop(<pers> Φ k x) := by
-  induction l generalizing Φ with
-  | nil =>
-    simp only [bigOrL, bigOpL]
-    -- <pers> False ⊣⊢ False
-    constructor
-    · -- <pers> False ⊢ False
-      exact persistently_elim.trans false_elim
-    · -- False ⊢ <pers> False
-      exact false_elim
-  | cons x xs ih =>
-    simp only [bigOrL, bigOpL]
-    calc iprop(<pers> (Φ 0 x ∨ [∨ list] n ↦ y ∈ xs, Φ (n + 1) y))
-        ⊣⊢ iprop(<pers> Φ 0 x ∨ <pers> [∨ list] n ↦ y ∈ xs, Φ (n + 1) y) := persistently_or
-      _ ⊣⊢ iprop(<pers> Φ 0 x ∨ [∨ list] n ↦ y ∈ xs, iprop(<pers> Φ (n + 1) y)) :=
-          or_congr .rfl ih
+    iprop(<pers> [∨ list] k ↦ x ∈ l, Φ k x) ⊣⊢ [∨ list] k ↦ x ∈ l, iprop(<pers> Φ k x) :=
+  -- Following Rocq: apply (big_opL_commute _).
+  equiv_iff.mp (BigOpL.commute bi_persistently_or_homomorphism Φ l)
 
 /-- Corresponds to `big_orL_later` in Rocq Iris.
-    Later distributes over non-empty big disjunctions.
-    The proof follows Rocq's approach using the singleton lemma to avoid needing `▷ False ⊢ False`. -/
+    Later distributes over non-empty big disjunctions. -/
 theorem later {Φ : Nat → A → PROP} {l : List A} (hne : l ≠ []) :
-    iprop(▷ [∨ list] k ↦ x ∈ l, Φ k x) ⊣⊢ [∨ list] k ↦ x ∈ l, iprop(▷ Φ k x) := by
-  induction l generalizing Φ with
-  | nil => contradiction
-  | cons x xs ih =>
-    cases xs with
-    | nil =>
-      -- Singleton case: [∨ list] k ↦ y ∈ [x], Φ k y ⊣⊢ Φ 0 x (by singleton lemma)
-      -- So ▷ [∨ list] ... ⊣⊢ ▷ Φ 0 x and [∨ list] k ↦ y ∈ [x], ▷ Φ k y ⊣⊢ ▷ Φ 0 x
-      calc iprop(▷ [∨ list] k ↦ y ∈ [x], Φ k y)
-          ⊣⊢ iprop(▷ Φ 0 x) := later_congr singleton
-        _ ⊣⊢ [∨ list] k ↦ y ∈ [x], iprop(▷ Φ k y) :=
-            (singleton (Φ := fun k y => iprop(▷ Φ k y))).symm
-    | cons y ys =>
-      -- l = x :: y :: ys, which has at least two elements
-      simp only [bigOrL, bigOpL]
-      calc iprop(▷ (Φ 0 x ∨ [∨ list] n ↦ z ∈ (y :: ys), Φ (n + 1) z))
-          ⊣⊢ iprop(▷ Φ 0 x ∨ ▷ [∨ list] n ↦ z ∈ (y :: ys), Φ (n + 1) z) := later_or
-        _ ⊣⊢ iprop(▷ Φ 0 x ∨ [∨ list] n ↦ z ∈ (y :: ys), iprop(▷ Φ (n + 1) z)) := by
-            apply or_congr .rfl
-            exact ih (by simp)
+    iprop(▷ [∨ list] k ↦ x ∈ l, Φ k x) ⊣⊢ [∨ list] k ↦ x ∈ l, iprop(▷ Φ k x) :=
+  -- Following Rocq: apply (big_opL_commute1 _).
+  equiv_iff.mp (BigOpL.commute_weak bi_later_or_weak_homomorphism Φ l hne)
 
 /-- Corresponds to `big_orL_laterN` in Rocq Iris. -/
 theorem laterN {Φ : Nat → A → PROP} {l : List A} {n : Nat} (hne : l ≠ []) :
     iprop(▷^[n] [∨ list] k ↦ x ∈ l, Φ k x) ⊣⊢ [∨ list] k ↦ x ∈ l, iprop(▷^[n] Φ k x) := by
+  -- Following Rocq: apply (big_opL_commute1 _).
   induction n with
   | zero => exact .rfl
-  | succ m ih =>
-    calc iprop(▷ ▷^[m] [∨ list] k ↦ x ∈ l, Φ k x)
-        ⊣⊢ iprop(▷ [∨ list] k ↦ x ∈ l, iprop(▷^[m] Φ k x)) :=
-          later_congr ih
-      _ ⊣⊢ [∨ list] k ↦ x ∈ l, iprop(▷ ▷^[m] Φ k x) := later hne
+  | succ m ih => exact (later_congr ih).trans (later hne)
 
 /-! ## Permutation -/
 
