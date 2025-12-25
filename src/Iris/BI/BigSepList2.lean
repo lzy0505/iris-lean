@@ -4,7 +4,7 @@ Released under Apache 2.0 license as described in the file LICENSE.
 Authors: Zongyuan Liu
 -/
 import Iris.BI.BigOp
-import Iris.BI.BigOpList
+import Iris.BI.BigSepList
 import Iris.Std.TC
 
 namespace Iris.BI

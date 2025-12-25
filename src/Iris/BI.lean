@@ -5,3 +5,8 @@ import Iris.BI.Instances
 import Iris.BI.BI
 import Iris.BI.Notation
 import Iris.BI.Updates
+import Iris.BI.BigOp
+import Iris.BI.BigSepList
+import Iris.BI.BigSepList2
+import Iris.BI.BigAndList
+import Iris.BI.BigOrList
