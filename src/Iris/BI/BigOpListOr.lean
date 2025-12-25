@@ -10,22 +10,11 @@ namespace Iris.BI
 open Iris.Algebra
 open BIBase
 
-/-! # Big Disjunction over Lists
-
-This file contains lemmas about `bigOrL`, the big disjunction over lists.
-The main sections are:
-- Basic structural lemmas (nil, cons, singleton, app)
-- Monotonicity and congruence
-- Lookup/access lemmas
-- Operator interaction (or, sep, pure)
-- Higher-order lemmas (intro, exist)
--/
+-- # Big Disjunction over Lists
 
 variable {PROP : Type _} [BI PROP] {A : Type _}
 
 namespace BigOrL
-
-/-! ## Basic Structural Lemmas -/
 
 /-- Corresponds to `big_orL_nil` in Rocq Iris. -/
 @[simp]
@@ -61,8 +50,6 @@ theorem snoc {Φ : Nat → A → PROP} {l : List A} {x : A} :
     ([∨ list] k ↦ y ∈ (l ++ [x]), Φ k y) ⊣⊢ ([∨ list] k ↦ y ∈ l, Φ k y) ∨ Φ l.length x :=
   equiv_iff.mp (BigOpL.snoc Φ l x)
 
-/-! ## Monotonicity and Congruence -/
-
 /-- Corresponds to `big_orL_mono` in Rocq Iris. -/
 theorem mono {Φ Ψ : Nat → A → PROP} {l : List A}
     (h : ∀ k x, l[k]? = some x → Φ k x ⊢ Ψ k x) :
@@ -89,14 +76,10 @@ theorem congr {Φ Ψ : Nat → A → PROP} {l : List A}
     ([∨ list] k ↦ x ∈ l, Φ k x) ≡ [∨ list] k ↦ x ∈ l, Ψ k x :=
   BigOpL.congr' h
 
-/-! ## Unit/False Lemma -/
-
 /-- Corresponds to `big_orL_false` in Rocq Iris. -/
 theorem false_l {l : List A} :
     ([∨ list] _k ∈ l, iprop(False : PROP)) ≡ iprop(False) :=
   BigOpL.unit_const l
-
-/-! ## Distribution over Or -/
 
 /-- Corresponds to `big_orL_or` in Rocq Iris. -/
 theorem or' {Φ Ψ : Nat → A → PROP} {l : List A} :
@@ -110,15 +93,11 @@ theorem or_2 {Φ Ψ : Nat → A → PROP} {l : List A} :
       [∨ list] k ↦ x ∈ l, iprop(Φ k x ∨ Ψ k x) :=
   or'.symm
 
-/-! ## Take and Drop -/
-
 /-- Corresponds to `big_orL_take_drop` in Rocq Iris. -/
 theorem take_drop {Φ : Nat → A → PROP} {l : List A} {n : Nat} :
     ([∨ list] k ↦ x ∈ l, Φ k x) ≡
       iprop(([∨ list] k ↦ x ∈ (l.take n), Φ k x) ∨ [∨ list] k ↦ x ∈ (l.drop n), Φ (n + k) x) :=
   BigOpL.take_drop Φ l n
-
-/-! ## Fmap -/
 
 /-- Corresponds to `big_orL_fmap` in Rocq Iris. -/
 theorem fmap {B : Type _} (f : A → B) {Φ : Nat → B → PROP} {l : List A} :
@@ -128,8 +107,6 @@ theorem fmap {B : Type _} (f : A → B) {Φ : Nat → B → PROP} {l : List A} :
   | cons x xs ih =>
     simp only [List.map_cons, bigOrL, bigOpL]
     exact Monoid.op_proper OFE.Equiv.rfl (ih (Φ := fun n => Φ (n + 1)))
-
-/-! ## Higher-Order Lemmas -/
 
 /-- Corresponds to `big_orL_intro` in Rocq Iris. -/
 theorem intro {Φ : Nat → A → PROP} {l : List A} {k : Nat} {x : A}
@@ -152,39 +129,25 @@ theorem intro {Φ : Nat → A → PROP} {l : List A} {k : Nat} {x : A}
 theorem exist {Φ : Nat → A → PROP} {l : List A} :
     ([∨ list] k ↦ x ∈ l, Φ k x) ⊣⊢ ∃ k, ∃ x, iprop(⌜l[k]? = some x⌝ ∧ Φ k x) := by
   constructor
-  · -- Forward: induction on l
-    induction l generalizing Φ with
+  · induction l generalizing Φ with
     | nil => simp only [bigOrL, bigOpL]; exact false_elim
     | cons y ys ih =>
       simp only [bigOrL, bigOpL]
       apply or_elim
-      · -- Φ 0 y ⊢ ∃ k x, ⌜(y :: ys)[k]? = some x⌝ ∧ Φ k x
-        -- Following Rocq: rewrite -(exist_intro 0) -(exist_intro x) pure_True // left_id
-        exact exists_intro' 0 (exists_intro' y (and_intro (pure_intro rfl) .rfl))
-      · -- [∨ list] k ↦ x ∈ ys, Φ (k + 1) x ⊢ ∃ k x, ⌜(y :: ys)[k]? = some x⌝ ∧ Φ k x
-        -- Following Rocq: rewrite IH. apply exist_elim=> k. by rewrite -(exist_intro (S k)).
-        refine ih.trans (exists_elim fun k => exists_intro' (k + 1) .rfl)
-  · -- Backward: apply exist_elim=> k; apply exist_elim=> x. apply pure_elim_l=> ?. by apply: big_orL_intro.
-    exact exists_elim fun k => exists_elim fun x => pure_elim_l (intro ·)
-
-/-! ## Pure Propositions -/
+      · exact exists_intro' 0 (exists_intro' y (and_intro (pure_intro rfl) .rfl))
+      · refine ih.trans (exists_elim fun k => exists_intro' (k + 1) .rfl)
+  · exact exists_elim fun k => exists_elim fun x => pure_elim_l (intro ·)
 
 /-- Corresponds to `big_orL_pure` in Rocq Iris. -/
 theorem pure {φ : Nat → A → Prop} {l : List A} :
     ([∨ list] k ↦ x ∈ l, (⌜φ k x⌝ : PROP)) ⊣⊢ iprop(⌜∃ k x, l[k]? = some x ∧ φ k x⌝ : PROP) :=
-  -- Following Rocq: rewrite big_orL_exist. rewrite pure_exist (twice). rewrite -pure_and. done.
   exist.trans <| (exists_congr fun _ => (exists_congr fun _ => pure_and).trans pure_exists).trans pure_exists
-
-/-! ## Interaction with Sep -/
 
 /-- Corresponds to `big_orL_sep_l` in Rocq Iris. -/
 theorem sep_l {P : PROP} {Φ : Nat → A → PROP} {l : List A} :
     iprop(P ∗ [∨ list] k ↦ x ∈ l, Φ k x) ⊣⊢ [∨ list] k ↦ x ∈ l, iprop(P ∗ Φ k x) :=
-  -- Following Rocq: rewrite !big_orL_exist sep_exist_l. f_equiv=> k. rewrite sep_exist_l. f_equiv=> x.
-  -- by rewrite !persistent_and_affinely_sep_l !assoc (comm _ P).
   (sep_congr .rfl exist).trans <| sep_exists_l.trans <| (exists_congr fun _ =>
     sep_exists_l.trans <| exists_congr fun _ =>
-      -- P ∗ (⌜_⌝ ∧ Φ) ⊣⊢ ⌜_⌝ ∧ (P ∗ Φ) via persistent_and_affinely_sep_l, assoc, comm
       (sep_congr .rfl persistent_and_affinely_sep_l).trans <|
         sep_assoc.symm.trans <| (sep_congr sep_comm .rfl).trans <|
           sep_assoc.trans persistent_and_affinely_sep_l.symm).trans exist.symm
@@ -192,10 +155,7 @@ theorem sep_l {P : PROP} {Φ : Nat → A → PROP} {l : List A} :
 /-- Corresponds to `big_orL_sep_r` in Rocq Iris. -/
 theorem sep_r {Φ : Nat → A → PROP} {P : PROP} {l : List A} :
     iprop(([∨ list] k ↦ x ∈ l, Φ k x) ∗ P) ⊣⊢ [∨ list] k ↦ x ∈ l, iprop(Φ k x ∗ P) :=
-  -- Following Rocq: setoid_rewrite (comm bi_sep). apply big_orL_sep_l.
   sep_comm.trans <| sep_l.trans (equiv_iff.mp (congr fun _ _ => equiv_iff.mpr sep_comm))
-
-/-! ## Lookup Lemmas -/
 
 /-- Corresponds to `big_orL_elem_of` in Rocq Iris. -/
 theorem elem_of {Φ : A → PROP} {l : List A} {x : A}
@@ -209,8 +169,6 @@ theorem elem_of {Φ : A → PROP} {l : List A} {x : A}
     | head => exact or_intro_l
     | tail _ hmem => exact (ih hmem).trans or_intro_r
 
-/-! ## Bind -/
-
 /-- Corresponds to `big_orL_bind` in Rocq Iris. -/
 theorem bind {B : Type _} (f : A → List B) {Φ : B → PROP} {l : List A} :
     ([∨ list] y ∈ (l.flatMap f), Φ y) ⊣⊢
@@ -220,8 +178,6 @@ theorem bind {B : Type _} (f : A → List B) {Φ : B → PROP} {l : List A} :
   | cons x xs ih =>
     simp only [List.flatMap_cons, bigOrL, bigOpL]
     exact app.trans (or_congr .rfl ih)
-
-/-! ## Modality Interaction -/
 
 /-- Corresponds to `big_orL_persistently` in Rocq Iris. -/
 theorem persistently {Φ : Nat → A → PROP} {l : List A} :
@@ -244,42 +200,29 @@ theorem laterN {Φ : Nat → A → PROP} {l : List A} {n : Nat} (hne : l ≠ [])
   | zero => exact .rfl
   | succ m ih => exact (later_congr ih).trans (later hne)
 
-/-! ## Permutation -/
-
 /-- Corresponds to `big_orL_Permutation` in Rocq Iris. -/
 theorem perm {Φ : A → PROP} {l₁ l₂ : List A} (hp : l₁.Perm l₂) :
     ([∨ list] x ∈ l₁, Φ x) ≡ [∨ list] x ∈ l₂, Φ x :=
   BigOpL.perm Φ hp
 
-/-! ## Submultiset Lemma -/
-
-/-- Corresponds to `big_orL_submseteq` in Rocq Iris.
-    If l1 is a submultiset of l2 (i.e., l1 ++ l ~ l2 for some l),
-    then the big or over l1 entails the big or over l2.
-    Note: direction is opposite to BigAndL - here we go FROM smaller TO larger. -/
+/-- Corresponds to `big_orL_submseteq` in Rocq Iris. -/
 theorem submseteq {Φ : A → PROP} {l₁ l₂ l : List A}
     (h : (l₁ ++ l).Perm l₂) :
     ([∨ list] x ∈ l₁, Φ x) ⊢ [∨ list] x ∈ l₂, Φ x := by
   have hperm := (equiv_iff.mp (perm (Φ := Φ) h)).1
-  -- [∨ list] x ∈ l₁, Φ x ⊢ [∨ list] x ∈ l₁, Φ x ∨ [∨ list] x ∈ l, Φ x ⊢ [∨ list] x ∈ (l₁ ++ l), Φ x ⊢ [∨ list] x ∈ l₂, Φ x
   have step1 : ([∨ list] x ∈ l₁, Φ x) ⊢ ([∨ list] x ∈ l₁, Φ x) ∨ [∨ list] x ∈ l, Φ x :=
     or_intro_l (Q := [∨ list] x ∈ l, Φ x)
   have step2 : (([∨ list] x ∈ l₁, Φ x) ∨ [∨ list] x ∈ l, Φ x) ⊢ [∨ list] x ∈ (l₁ ++ l), Φ x :=
     (app (Φ := fun _ => Φ) (l₁ := l₁) (l₂ := l)).2
   exact step1.trans (step2.trans hperm)
 
-/-! ## Monotonicity Instances -/
-
-/-- Corresponds to `big_orL_mono'` in Rocq Iris.
-    Unconditional version of `mono` - pointwise entailment implies big or entailment. -/
+/-- Corresponds to `big_orL_mono'` in Rocq Iris. -/
 theorem mono' {Φ Ψ : Nat → A → PROP} {l : List A}
     (h : ∀ k x, Φ k x ⊢ Ψ k x) :
     ([∨ list] k ↦ x ∈ l, Φ k x) ⊢ [∨ list] k ↦ x ∈ l, Ψ k x :=
   mono fun k x _ => h k x
 
-/-- Corresponds to `big_orL_id_mono'` in Rocq Iris.
-    If lists are pairwise entailing, so are their big ors.
-    Uses indexed lookup instead of Forall2. -/
+/-- Corresponds to `big_orL_id_mono'` in Rocq Iris. -/
 theorem id_mono' {l₁ l₂ : List PROP}
     (hlen : l₁.length = l₂.length)
     (h : ∀ (i : Nat) (P Q : PROP), l₁[i]? = some P → l₂[i]? = some Q → P ⊢ Q) :
@@ -299,8 +242,6 @@ theorem id_mono' {l₁ l₂ : List PROP}
       have htail : ∀ (i : Nat) (P' Q' : PROP), Ps[i]? = some P' → Qs[i]? = some Q' → P' ⊢ Q' :=
         fun i P' Q' hp hq => h (i + 1) P' Q' hp hq
       exact or_mono h0 (ih hlen htail)
-
-/-! ## Typeclass Closure -/
 
 /-- Corresponds to `big_orL_nil_persistent` in Rocq Iris (typeclass instance). -/
 instance nil_persistent {Φ : Nat → A → PROP} :
@@ -322,8 +263,6 @@ theorem persistent_cond {Φ : Nat → A → PROP} {l : List A}
       have h0 : Persistent (Φ 0 y) := h 0 y rfl
       have htail : ∀ k x, ys[k]? = some x → Persistent (Φ (k + 1) x) := fun k x hget => h (k + 1) x hget
       have iha := ih htail
-      -- P ∨ Q ⊢ <pers> (P ∨ Q) when P and Q are both persistent
-      -- We have: P ∨ Q ⊢ <pers> P ∨ <pers> Q ⊢ <pers> (P ∨ Q)
       apply or_elim
       · exact h0.persistent.trans (persistently_mono or_intro_l)
       · exact iha.trans (persistently_mono or_intro_r)
@@ -333,19 +272,11 @@ instance persistent {Φ : Nat → A → PROP} {l : List A} [∀ k x, Persistent 
     Persistent ([∨ list] k ↦ x ∈ l, Φ k x) :=
   persistent_cond fun _ _ _ => inferInstance
 
-/-! ## Zip with Sequence -/
-
 /-- Corresponds to `big_orL_zip_seq` in Rocq Iris. -/
 theorem zip_seq {Φ : Nat × A → PROP} {n : Nat} {l : List A} :
     ([∨ list] ky ∈ ((List.range' n l.length).zip l), Φ ky) ≡
       [∨ list] i ↦ x ∈ l, Φ (n + i, x) :=
   BigOpL.zip_seq (op := or) (unit := iprop(False)) Φ n l
-
-/-- Corresponds to `big_orL_zip_seqZ` in Rocq Iris (uses Nat, not Z). -/
-theorem zip_seqZ {Φ : Nat × A → PROP} {l : List A} :
-    ([∨ list] ky ∈ ((List.range l.length).zip l), Φ ky) ≡
-      [∨ list] i ↦ x ∈ l, Φ (i, x) :=
-  BigOpL.zip_with_range (op := or) (unit := iprop(False)) Φ l
 
 /-! ## Missing Lemmas from Rocq Iris
 
