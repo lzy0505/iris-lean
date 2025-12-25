@@ -14,27 +14,10 @@ open Iris.Std
 open BIBase
 
 
-/-! # Big Separating Conjunction over Two Lists
-
-This file contains the definition and lemmas for `bigSepL2`, which is the big
-separating conjunction over two lists simultaneously. If the lists have different
-lengths, the result is `False`.
-
-The main sections are:
-- Core definition
-- Basic structural lemmas (nil, cons, singleton, app)
-- Monotonicity and congruence
-- Typeclass closure (Persistent, Affine)
-- Operator interaction (sep, emp)
-- Alternative characterizations (via zip)
--/
+-- # Big Separating Conjunction over Two Lists
 
 variable {PROP : Type _} [BI PROP] {A B : Type _}
 
-/-! ## Core Definition -/
-
-/-- Big separating conjunction over two lists simultaneously.
-    Returns `False` if lists have different lengths. -/
 def bigSepL2 [BI PROP] {A B : Type _} (Φ : Nat → A → B → PROP)
     (l1 : List A) (l2 : List B) : PROP :=
   match l1, l2 with
@@ -42,11 +25,7 @@ def bigSepL2 [BI PROP] {A B : Type _} (Φ : Nat → A → B → PROP)
   | x1 :: xs1, x2 :: xs2 => sep (Φ 0 x1 x2) (bigSepL2 (fun n => Φ (n + 1)) xs1 xs2)
   | _, _ => iprop(False)
 
-/-! ## Notation -/
-
--- Notation for bigSepL2 without index
 syntax "[∗ " "list" "] " ident ";" ident " ∈ " term ";" term ", " term : term
--- Notation for bigSepL2 with index
 syntax "[∗ " "list" "] " ident " ↦ " ident ";" ident " ∈ " term ";" term ", " term : term
 
 macro_rules
@@ -55,7 +34,6 @@ macro_rules
   | `([∗ list] $k:ident ↦ $x1:ident;$x2:ident ∈ $l1;$l2, $P) =>
       `(bigSepL2 (fun $k $x1 $x2 => $P) $l1 $l2)
 
--- iprop macro rules
 macro_rules
   | `(iprop([∗ list] $x1:ident;$x2:ident ∈ $l1;$l2, $P)) =>
       `(bigSepL2 (fun _ $x1 $x2 => iprop($P)) $l1 $l2)
@@ -63,8 +41,6 @@ macro_rules
       `(bigSepL2 (fun $k $x1 $x2 => iprop($P)) $l1 $l2)
 
 namespace BigSepL2
-
-/-! ## Basic Structural Lemmas -/
 
 /-- Corresponds to `big_sepL2_nil` in Rocq Iris. -/
 @[simp]
@@ -151,10 +127,7 @@ theorem singleton {Φ : Nat → A → B → PROP} {x : A} {y : B} :
 
 /-! ## Alternative Characterization via Zip -/
 
-/-- Corresponds to `big_sepL2_alt` in Rocq Iris.
-    Rocq proof: `apply (anti_symm _). - apply and_intro. + revert Φ l2. induction l1 ... auto using pure_intro,
-    False_elim. rewrite IH sep_elim_r. apply pure_mono; auto. + revert Φ l2. induction l1 ... by rewrite IH.
-    - apply pure_elim_l=> /Forall2_same_length Hl. revert Φ. induction Hl ... //=. by rewrite -IH.` -/
+/-- Corresponds to `big_sepL2_alt` in Rocq Iris. -/
 theorem alt {Φ : Nat → A → B → PROP} {l1 : List A} {l2 : List B} :
     ([∗ list] k ↦ x1;x2 ∈ l1;l2, Φ k x1 x2) ⊣⊢
       iprop(⌜l1.length = l2.length⌝ ∧ bigSepL (fun k p => Φ k p.1 p.2) (l1.zip l2)) := by
@@ -193,16 +166,14 @@ theorem alt {Φ : Nat → A → B → PROP} {l1 : List A} {l2 : List B} :
 
 /-! ## Length Lemma -/
 
-/-- Corresponds to `big_sepL2_length` in Rocq Iris.
-    Rocq proof: `by rewrite big_sepL2_alt and_elim_l.` -/
+/-- Corresponds to `big_sepL2_length` in Rocq Iris. -/
 theorem length {Φ : Nat → A → B → PROP} {l1 : List A} {l2 : List B} :
     ([∗ list] k ↦ x1;x2 ∈ l1;l2, Φ k x1 x2) ⊢ iprop(⌜l1.length = l2.length⌝) :=
   alt.1.trans and_elim_l
 
 /-! ## Monotonicity and Congruence -/
 
-/-- Corresponds to `big_sepL2_mono` in Rocq Iris.
-    Rocq proof: `intros H. rewrite !big_sepL2_alt. f_equiv. apply big_sepL_mono=> k [y1 y2]. ...` -/
+/-- Corresponds to `big_sepL2_mono` in Rocq Iris. -/
 theorem mono {Φ Ψ : Nat → A → B → PROP} {l1 : List A} {l2 : List B}
     (h : ∀ k x1 x2, l1[k]? = some x1 → l2[k]? = some x2 → Φ k x1 x2 ⊢ Ψ k x1 x2) :
     ([∗ list] k ↦ x1;x2 ∈ l1;l2, Φ k x1 x2) ⊢ ([∗ list] k ↦ x1;x2 ∈ l1;l2, Ψ k x1 x2) := by
@@ -232,8 +203,7 @@ theorem congr {Φ Ψ : Nat → A → B → PROP} {l1 : List A} {l2 : List B}
   intro k x1 x2 _ _
   exact h k x1 x2
 
-/-- Corresponds to `big_sepL2_ne` in Rocq Iris.
-    Rocq proof: `intros H. rewrite !big_sepL2_alt. f_equiv. apply big_sepL_ne=> k [y1 y2]. ...` -/
+/-- Corresponds to `big_sepL2_ne` in Rocq Iris. -/
 theorem ne {Φ Ψ : Nat → A → B → PROP} {l1 : List A} {l2 : List B} {n : Nat}
     (h : ∀ k x1 x2, l1[k]? = some x1 → l2[k]? = some x2 → Φ k x1 x2 ≡{n}≡ Ψ k x1 x2) :
     ([∗ list] k ↦ x1;x2 ∈ l1;l2, Φ k x1 x2) ≡{n}≡ ([∗ list] k ↦ x1;x2 ∈ l1;l2, Ψ k x1 x2) := by
@@ -257,8 +227,6 @@ theorem flip_mono' {Φ Ψ : Nat → A → B → PROP} {l1 : List A} {l2 : List B
     (h : ∀ k x1 x2, Ψ k x1 x2 ⊢ Φ k x1 x2) :
     ([∗ list] k ↦ x1;x2 ∈ l1;l2, Ψ k x1 x2) ⊢ ([∗ list] k ↦ x1;x2 ∈ l1;l2, Φ k x1 x2) :=
   mono (fun k x1 x2 _ _ => h k x1 x2)
-
-/-! ## Typeclass Closure -/
 
 /-- Corresponds to `big_sepL2_persistent'` in Rocq Iris. -/
 instance persistent {Φ : Nat → A → B → PROP} {l1 : List A} {l2 : List B}
@@ -299,10 +267,7 @@ instance affine {Φ : Nat → A → B → PROP} {l1 : List A} {l2 : List B}
         have h2 : ([∗ list] n ↦ y1;y2 ∈ xs1;xs2, Φ (n + 1) y1 y2) ⊢ emp := ih
         exact (sep_mono h1 h2).trans ( sep_emp).1
 
-/-! ## Distribution over Sep -/
-
-/-- Corresponds to `big_sepL2_sep` in Rocq Iris.
-    Rocq proof: `rewrite !big_sepL2_alt big_sepL_sep !persistent_and_affinely_sep_l. ...` -/
+/-- Corresponds to `big_sepL2_sep` in Rocq Iris. -/
 theorem sep' {Φ Ψ : Nat → A → B → PROP} {l1 : List A} {l2 : List B} :
     ([∗ list] k ↦ x1;x2 ∈ l1;l2, Φ k x1 x2 ∗ Ψ k x1 x2) ⊣⊢
       ([∗ list] k ↦ x1;x2 ∈ l1;l2, Φ k x1 x2) ∗ ([∗ list] k ↦ x1;x2 ∈ l1;l2, Ψ k x1 x2) := by
@@ -320,8 +285,6 @@ theorem sep_2 {Φ Ψ : Nat → A → B → PROP} {l1 : List A} {l2 : List B} :
       ([∗ list] k ↦ x1;x2 ∈ l1;l2, Φ k x1 x2 ∗ Ψ k x1 x2) :=
   sep'.symm
 
-/-! ## Distribution over And -/
-
 /-- Corresponds to `big_sepL2_and` in Rocq Iris. -/
 theorem and' {Φ Ψ : Nat → A → B → PROP} {l1 : List A} {l2 : List B} :
     ([∗ list] k ↦ x1;x2 ∈ l1;l2, Φ k x1 x2 ∧ Ψ k x1 x2) ⊢
@@ -330,10 +293,7 @@ theorem and' {Φ Ψ : Nat → A → B → PROP} {l1 : List A} {l2 : List B} :
   · exact mono fun k x1 x2 _ _ => and_elim_l
   · exact mono fun k x1 x2 _ _ => and_elim_r
 
-/-! ## Pure Proposition Lemmas -/
-
-/-- Corresponds to `big_sepL2_pure_1` in Rocq Iris.
-    Rocq proof: `rewrite big_sepL2_alt big_sepL_pure_1. rewrite -pure_and. f_equiv=> ...` -/
+/-- Corresponds to `big_sepL2_pure_1` in Rocq Iris. -/
 theorem pure_1 {φ : Nat → A → B → Prop} {l1 : List A} {l2 : List B} :
     ([∗ list] k ↦ x1;x2 ∈ l1;l2, (⌜φ k x1 x2⌝ : PROP)) ⊢
       iprop(⌜∀ k x1 x2, l1[k]? = some x1 → l2[k]? = some x2 → φ k x1 x2⌝ : PROP) :=
@@ -341,29 +301,24 @@ theorem pure_1 {φ : Nat → A → B → Prop} {l1 : List A} {l2 : List B} :
   (and_mono .rfl BigSepL.pure_1 |>.trans pure_and.1 |>.trans <| pure_mono fun ⟨_, h⟩ k x1 x2 h1 h2 =>
     h k (x1, x2) (List.getElem?_zip_eq_some.mpr ⟨h1, h2⟩)) |> alt.1.trans
 
-/-- Corresponds to `big_sepL2_affinely_pure_2` in Rocq Iris.
-    Rocq proof: `rewrite big_sepL2_alt. rewrite -big_sepL_affinely_pure_2. rewrite affinely_and_r -pure_and. ...` -/
+/-- Corresponds to `big_sepL2_affinely_pure_2` in Rocq Iris. -/
 theorem affinely_pure_2 {φ : Nat → A → B → Prop} {l1 : List A} {l2 : List B} :
     iprop(<affine> ⌜l1.length = l2.length ∧
       ∀ k x1 x2, l1[k]? = some x1 → l2[k]? = some x2 → φ k x1 x2⌝ : PROP) ⊢
       ([∗ list] k ↦ x1;x2 ∈ l1;l2, (<affine> ⌜φ k x1 x2⌝ : PROP)) :=
-  -- Split affinely pure, convert forall, apply BigSepL.affinely_pure_2, combine with alt
   (affinely_mono pure_and.2).trans affinely_and.1 |>.trans
     (and_mono .rfl <| (affinely_mono <| pure_mono fun h k (p : A × B) hp =>
         h k p.1 p.2 (List.getElem?_zip_eq_some.mp hp).1 (List.getElem?_zip_eq_some.mp hp).2).trans
       BigSepL.affinely_pure_2) |>.trans (and_mono affinely_elim .rfl) |>.trans
     (alt (Φ := fun k x1 x2 => iprop(<affine> ⌜φ k x1 x2⌝))).2
 
-/-- Corresponds to `big_sepL2_pure` in Rocq Iris.
-    Rocq proof: `apply (anti_symm (⊢)). { rewrite pure_and. apply and_intro. - apply big_sepL2_length. - apply big_sepL2_pure_1. } rewrite -(affine_affinely ⌜_⌝%I). rewrite pure_and -affinely_and_r. apply pure_elim_l=>Hdom. rewrite big_sepL2_affinely_pure_2 //. by setoid_rewrite affinely_elim.` -/
+/-- Corresponds to `big_sepL2_pure` in Rocq Iris. -/
 theorem pure [BIAffine PROP] {φ : Nat → A → B → Prop} {l1 : List A} {l2 : List B} :
     ([∗ list] k ↦ x1;x2 ∈ l1;l2, (⌜φ k x1 x2⌝ : PROP)) ⊣⊢
       iprop(⌜l1.length = l2.length ∧
         ∀ k x1 x2, l1[k]? = some x1 → l2[k]? = some x2 → φ k x1 x2⌝ : PROP) :=
   ⟨(and_intro length pure_1).trans pure_and.1,
    (affine_affinely _).2.trans affinely_pure_2 |>.trans (mono fun _ _ _ _ _ => affinely_elim)⟩
-
-/-! ## Unit/Emp Lemma -/
 
 /-- When the predicate is constantly emp, bigSepL2 reduces to a length equality check. -/
 theorem emp_l [BIAffine PROP] {l1 : List A} {l2 : List B} :
@@ -382,13 +337,7 @@ theorem emp_l [BIAffine PROP] {l1 : List A} {l2 : List B} :
       simp only [bigSepL2, List.length_cons]
       exact emp_sep.trans <| ih.trans ⟨pure_mono (congrArg (· + 1)), pure_mono Nat.succ.inj⟩
 
-/-! ## App Lemma -/
-
-/-- One-directional app lemma using wand. This does NOT require a length proof.
-    Corresponds exactly to Rocq's `big_sepL2_app`.
-    Rocq proof: `apply wand_intro_r. revert Φ l1'. induction l1 ... - by rewrite left_id.
-    - rewrite left_absorb. apply False_elim. - rewrite left_absorb. apply False_elim.
-    - by rewrite -assoc IH.` -/
+/-- Corresponds to Rocq's `big_sepL2_app`. -/
 theorem app' {Φ : Nat → A → B → PROP} {l1a l1b : List A} {l2a l2b : List B} :
     ([∗ list] k ↦ x1;x2 ∈ l1a;l2a, Φ k x1 x2) ⊢
       ([∗ list] k ↦ x1;x2 ∈ l1b;l2b, Φ (k + l1a.length) x1 x2) -∗
@@ -415,12 +364,7 @@ theorem app' {Φ : Nat → A → B → PROP} {l1a l1b : List A} {l2a l2b : List 
       refine (sep_mono_r sep_symm).trans ?_
       exact sep_mono_r (ih (Φ := fun n => Φ (n + 1)) (l2a := xs2))
 
-/-- Inverse direction of app: splitting an appended bigSepL2 requires one pair of lengths to match.
-    Uses disjunctive condition like Rocq's `big_sepL2_app_inv`.
-    Rocq proof: `revert Φ l1'. induction l1 ... - by rewrite left_id.
-    - destruct Hlen as [[=]|Hlen]. rewrite big_sepL2_length Hlen ... apply pure_elim'; lia.
-    - destruct Hlen as [[=]|Hlen]. rewrite big_sepL2_length -Hlen ... apply pure_elim'; lia.
-    - by rewrite -assoc IH; last lia.` -/
+/-- Inverse direction of app -/
 private theorem app_inv_core {Φ : Nat → A → B → PROP} {l1a l1b : List A} {l2a l2b : List B}
     (hlen : l1a.length = l2a.length ∨ l1b.length = l2b.length) :
     ([∗ list] k ↦ x1;x2 ∈ l1a ++ l1b;l2a ++ l2b, Φ k x1 x2) ⊢
@@ -465,8 +409,7 @@ private theorem app_inv_core {Φ : Nat → A → B → PROP} {l1a l1b : List A} 
       refine (sep_mono_r (sep_mono_r hcongr.2)).trans ?_
       exact sep_assoc.2
 
-/-- bi-entailment version when we know one pair of lengths match.
-    Uses disjunctive condition like Rocq's `big_sepL2_app_same_length`. -/
+/-- bi-entailment version when we know one pair of lengths match. -/
 theorem app {Φ : Nat → A → B → PROP} {l1a l1b : List A} {l2a l2b : List B}
     (hlen : l1a.length = l2a.length ∨ l1b.length = l2b.length) :
     ([∗ list] k ↦ x1;x2 ∈ l1a ++ l1b;l2a ++ l2b, Φ k x1 x2) ⊣⊢
@@ -481,8 +424,6 @@ theorem app_inv {Φ : Nat → A → B → PROP} {l1a l1b : List A} {l2a l2b : Li
       ([∗ list] k ↦ x1;x2 ∈ l1b;l2b, Φ (k + l1a.length) x1 x2) := by
   exact app hlen
 
-/-! ## Snoc Lemma -/
-
 /-- Corresponds to `big_sepL2_snoc` in Rocq Iris. -/
 theorem snoc {Φ : Nat → A → B → PROP} {l1 : List A} {l2 : List B} {x : A} {y : B} :
     ([∗ list] k ↦ x1;x2 ∈ l1 ++ [x];l2 ++ [y], Φ k x1 x2) ⊣⊢
@@ -490,8 +431,6 @@ theorem snoc {Φ : Nat → A → B → PROP} {l1 : List A} {l2 : List B} {x : A}
   have h := app (Φ := Φ) (l1a := l1) (l2a := l2) (l1b := [x]) (l2b := [y]) (Or.inr rfl)
   simp only [bigSepL2, Nat.zero_add] at h
   exact h.trans (sep_congr .rfl sep_emp)
-
-/-! ## Fmap Lemmas -/
 
 /-- Corresponds to `big_sepL2_fmap_l` in Rocq Iris. -/
 theorem fmap_l {C : Type _} (f : C → A) {Φ : Nat → A → B → PROP}
@@ -532,8 +471,6 @@ theorem fmap {C D : Type _} (f : C → A) (g : D → B) {Φ : Nat → A → B �
       ([∗ list] k ↦ x;y ∈ l1;l2, Φ k (f x) (g y)) :=
   (fmap_l f).trans (fmap_r g)
 
-/-! ## Flip Lemma -/
-
 /-- Corresponds to `big_sepL2_flip` in Rocq Iris. -/
 theorem flip {Φ : Nat → A → B → PROP} {l1 : List A} {l2 : List B} :
     ([∗ list] k ↦ x;y ∈ l2;l1, Φ k y x) ⊣⊢ ([∗ list] k ↦ x;y ∈ l1;l2, Φ k x y) := by
@@ -549,10 +486,7 @@ theorem flip {Φ : Nat → A → B → PROP} {l1 : List A} {l2 : List B} :
       simp only [bigSepL2]
       exact sep_congr .rfl (ih (Φ := fun n => Φ (n + 1)))
 
-/-! ## Fst/Snd Lemma -/
-
-/-- Corresponds to `big_sepL2_fst_snd` in Rocq Iris.
-    Rocq proof: `rewrite big_sepL2_alt !length_fmap. by rewrite pure_True // True_and zip_fst_snd.` -/
+/-- Corresponds to `big_sepL2_fst_snd` in Rocq Iris. -/
 theorem fst_snd {Φ : Nat → A → B → PROP} {l : List (A × B)} :
     ([∗ list] k ↦ x;y ∈ l.map Prod.fst;l.map Prod.snd, Φ k x y) ⊣⊢
       bigSepL (fun k p => Φ k p.1 p.2) l := by
@@ -564,21 +498,14 @@ theorem fst_snd {Φ : Nat → A → B → PROP} {l : List (A × B)} :
   simp only [List.length_map, zip_fst_snd]
   exact true_and
 
-/-! ## App Inverse Lemmas -/
-
-/-- When we have bigSepL2 of l1' ++ l1'' with some l2, we can split l2 to match.
-    Rocq proof: `rewrite -(exist_intro (take ...)) -(exist_intro (drop ...)) take_drop pure_True // left_id.
-    revert Φ l2. induction l1' ... [by rewrite left_id|...|apply False_elim|]. by rewrite IH -assoc.` -/
+/-- When we have bigSepL2 of l1' ++ l1'' with some l2, we can split l2 to match. -/
 theorem app_inv_l {Φ : Nat → A → B → PROP} {l1' l1'' : List A} {l2 : List B} :
     ([∗ list] k ↦ x1;x2 ∈ l1' ++ l1'';l2, Φ k x1 x2) ⊢
       iprop(∃ l2' l2'', ⌜l2 = l2' ++ l2''⌝ ∧
         (([∗ list] k ↦ x1;x2 ∈ l1';l2', Φ k x1 x2) ∗
          ([∗ list] k ↦ x1;x2 ∈ l1'';l2'', Φ (k + l1'.length) x1 x2))) := by
-  -- Rocq approach: first introduce witnesses take/drop, then simple induction
-  -- Step 1: Reduce to proving the inner part (after introducing existentials and pure)
   refine (exists_intro' (l2.take l1'.length) (exists_intro' (l2.drop l1'.length)
     (and_intro (pure_intro (List.take_append_drop l1'.length l2).symm) ?_)))
-  -- Now prove: bigSepL2 Φ (l1' ++ l1'') l2 ⊢ bigSepL2 Φ l1' (take ...) ∗ bigSepL2 Φ l1'' (drop ...)
   induction l1' generalizing l2 Φ with
   | nil =>
     simp only [List.nil_append, List.length_nil, List.take_zero, List.drop_zero, Nat.add_zero]
@@ -588,12 +515,10 @@ theorem app_inv_l {Φ : Nat → A → B → PROP} {l1' l1'' : List A} {l2 : List
     | nil => simp only [bigSepL2, List.cons_append]; exact false_elim
     | cons x2 xs2 =>
       simp only [bigSepL2, List.cons_append, List.length_cons, List.take_succ_cons, List.drop_succ_cons]
-      -- Rocq: by rewrite IH -assoc
       exact (sep_mono_r ih).trans (sep_assoc.symm.1.trans
         (sep_mono_r (mono' fun k _ _ => by simp only [Nat.add_assoc]; exact .rfl)))
 
-/-- When we have bigSepL2 of l1 with l2' ++ l2'', we can split l1 to match.
-    Rocq proof: Similar to app_inv_l but with flipped arguments. -/
+/-- When we have bigSepL2 of l1 with l2' ++ l2'', we can split l1 to match. -/
 theorem app_inv_r {Φ : Nat → A → B → PROP} {l1 : List A} {l2' l2'' : List B} :
     ([∗ list] k ↦ x1;x2 ∈ l1;l2' ++ l2'', Φ k x1 x2) ⊢
       iprop(∃ l1' l1'', ⌜l1 = l1' ++ l1''⌝ ∧
@@ -603,26 +528,16 @@ theorem app_inv_r {Φ : Nat → A → B → PROP} {l1 : List A} {l2' l2'' : List
   flip.symm.1.trans app_inv_l |>.trans <|
     exists_mono fun _ => exists_mono fun _ => and_mono .rfl (sep_mono flip.1 flip.1)
 
-/-! ## Lookup/Access Lemmas -/
-
-/-- Insert access pattern: extract element at index i and get a wand to restore with updated values.
-    Corresponds to big_sepL2_insert_acc in Rocq.
-    Rocq proof: `intros Hl1 Hl2. rewrite big_sepL2_alt. apply pure_elim_l=> Hl.
-    rewrite {1}big_sepL_insert_acc; ... apply sep_mono_r. apply forall_intro => y1. apply forall_intro => y2.
-    rewrite big_sepL2_alt !length_insert pure_True // left_id -insert_zip_with.
-    by rewrite (forall_elim (y1, y2)).` -/
+/-- Corresponds to `big_sepL2_insert_acc` in Rocq. -/
 theorem insert_acc {Φ : Nat → A → B → PROP} {l1 : List A} {l2 : List B} {i : Nat} {x1 : A} {x2 : B}
     (h1 : l1[i]? = some x1) (h2 : l2[i]? = some x2) :
     ([∗ list] k ↦ y1;y2 ∈ l1;l2, Φ k y1 y2) ⊢
       iprop(Φ i x1 x2 ∗ (∀ y1, ∀ y2, Φ i y1 y2 -∗
         [∗ list] k ↦ z1;z2 ∈ l1.set i y1;l2.set i y2, Φ k z1 z2)) := by
-  -- Following Rocq: rewrite big_sepL2_alt, pure_elim_l, then big_sepL_insert_acc
   refine alt.1.trans (pure_elim_l fun hlen => ?_)
   have hzip : (l1.zip l2)[i]? = some (x1, x2) := List.getElem?_zip_eq_some.mpr ⟨h1, h2⟩
   refine (BigSepL.insert_acc hzip).trans (sep_mono_r ?_)
-  -- Transform ∀ p to ∀ y1, ∀ y2
   refine forall_intro fun y1 => forall_intro fun y2 => (forall_elim (y1, y2)).trans (wand_mono_r ?_)
-  -- Key: (l1.zip l2).set i (y1, y2) = (l1.set i y1).zip (l2.set i y2)
   have hi1 : i < l1.length := List.getElem?_eq_some_iff.mp h1 |>.1
   have hi2 : i < l2.length := List.getElem?_eq_some_iff.mp h2 |>.1
   have hizip : i < (l1.zip l2).length := by simp only [List.length_zip, Nat.min_def]; split <;> omega
@@ -635,14 +550,10 @@ theorem insert_acc {Φ : Nat → A → B → PROP} {l1 : List A} {l2 : List B} {
   have hlen1 : (l1.set i y1).length = (l2.set i y2).length := by simp only [List.length_set]; exact hlen
   rw [hzip_set]; exact (and_intro (pure_intro hlen1) .rfl).trans alt.2
 
-/-- Lookup access pattern: extract element at index i and get a wand to restore.
-    Rocq proof: `intros. rewrite {1}big_sepL2_insert_acc // (forall_elim x1) (forall_elim x2).
-    by rewrite !list_insert_id.` -/
 theorem lookup_acc {Φ : Nat → A → B → PROP} {l1 : List A} {l2 : List B} {i : Nat} {x1 : A} {x2 : B}
     (h1 : l1[i]? = some x1) (h2 : l2[i]? = some x2) :
     ([∗ list] k ↦ y1;y2 ∈ l1;l2, Φ k y1 y2) ⊢
       iprop(Φ i x1 x2 ∗ (Φ i x1 x2 -∗ [∗ list] k ↦ y1;y2 ∈ l1;l2, Φ k y1 y2)) := by
-  -- Rocq approach: use insert_acc, eliminate foralls with x1, x2, then use list_set_id
   have hi1 : i < l1.length := List.getElem?_eq_some_iff.mp h1 |>.1
   have hi2 : i < l2.length := List.getElem?_eq_some_iff.mp h2 |>.1
   have hx1 : l1[i] = x1 := List.getElem?_eq_some_iff.mp h1 |>.2
@@ -652,17 +563,12 @@ theorem lookup_acc {Φ : Nat → A → B → PROP} {l1 : List A} {l2 : List B} {
   exact (insert_acc h1 h2).trans (sep_mono_r ((forall_elim x1).trans
     ((forall_elim x2).trans (hset1.symm ▸ hset2.symm ▸ .rfl))))
 
-/-- Corresponds to `big_sepL2_lookup` in Rocq Iris.
-    Rocq proof for affine case: `rewrite -(take_drop_middle l1 i x1) // -(take_drop_middle l2 i x2) //.
-    ... rewrite big_sepL2_app_same_length /= 2?length_take; last lia.
-    rewrite (_ : _ + 0 = i); last lia. rewrite sep_elim_r sep_elim_l //.`
-    Rocq proof for absorbing case: `rewrite big_sepL2_lookup_acc // sep_elim_l //.` -/
+/-- Corresponds to `big_sepL2_lookup` in Rocq Iris. -/
 theorem lookup {Φ : Nat → A → B → PROP} {l1 : List A} {l2 : List B} {i : Nat} {x1 : A} {x2 : B}
     (h1 : l1[i]? = some x1) (h2 : l2[i]? = some x2) :
     [TCOr (∀ j y1 y2, Affine (Φ j y1 y2)) (Absorbing (Φ i x1 x2))] →
     ([∗ list] k ↦ y1;y2 ∈ l1;l2, Φ k y1 y2) ⊢ Φ i x1 x2
   | TCOr.l => by
-    -- All Φ j y1 y2 are affine. Use take_drop_middle decomposition.
     have hi1 : i < l1.length := List.getElem?_eq_some_iff.mp h1 |>.1
     have hi2 : i < l2.length := List.getElem?_eq_some_iff.mp h2 |>.1
     have hx1 : l1[i] = x1 := List.getElem?_eq_some_iff.mp h1 |>.2
@@ -684,13 +590,7 @@ theorem lookup {Φ : Nat → A → B → PROP} {l1 : List A} {l2 : List B} {i : 
 
 /-! ## Higher-Order Lemmas -/
 
-/-- Introduction rule: from a persistent implication, construct bigSepL2.
-    Corresponds to big_sepL2_intro in Rocq.
-    Rocq proof: `revert l2 Φ. induction l1 as [|x1 l1 IH]=> -[|x2 l2] Φ ?; simplify_eq/=.
-    - rewrite sep_emp. apply _.
-    - rewrite intuitionistically_sep_dup. apply sep_mono.
-      + by rewrite !pure_True // !True_impl intuitionistically_elim.
-      + rewrite -IH //. f_equiv. by apply forall_intro=> k; by rewrite (forall_elim (S k)).` -/
+/-- Corresponds to `big_sepL2_intro` in Rocq Iris. -/
 theorem intro {Φ : Nat → A → B → PROP} {l1 : List A} {l2 : List B} :
     iprop(⌜l1.length = l2.length⌝ ∧
       □ (∀ k, ∀ x1, ∀ x2, iprop(⌜l1[k]? = some x1⌝ → ⌜l2[k]? = some x2⌝ → Φ k x1 x2))) ⊢
@@ -707,7 +607,6 @@ theorem intro {Φ : Nat → A → B → PROP} {l1 : List A} {l2 : List B} :
     | cons y2 ys2 =>
       simp only [List.length_cons, Nat.add_right_cancel_iff] at hlen
       simp only [bigSepL2]
-      -- Following Rocq: use intuitionistically_sep_dup, then sep_mono for head and tail
       have head_step : iprop(□ (∀ k, ∀ x1, ∀ x2,
           iprop(⌜(y1 :: ys1)[k]? = some x1⌝ → ⌜(y2 :: ys2)[k]? = some x2⌝ → Φ k x1 x2))) ⊢ Φ 0 y1 y2 :=
         intuitionistically_elim.trans ((forall_elim 0).trans ((forall_elim y1).trans ((forall_elim y2).trans
@@ -728,24 +627,15 @@ theorem wand {Φ Ψ : Nat → A → B → PROP} {l1 : List A} {l2 : List B} :
       ([∗ list] k ↦ x1;x2 ∈ l1;l2, Ψ k x1 x2) :=
   wand_intro <| sep_2.1.trans (mono fun _ _ _ _ _ => wand_elim_r)
 
-/-! ## impl: Specialized Introduction from Persistent Wand Implication -/
-
-/-- Corresponds to `big_sepL2_impl` in Rocq Iris.
-    Rocq proof: `apply entails_wand. rewrite -(idemp bi_and ...) {1}big_sepL2_length.
-    apply pure_elim_l=> ?. rewrite big_sepL2_intro //.
-    apply bi.wand_intro_l. rewrite -big_sepL2_sep. by setoid_rewrite wand_elim_l.` -/
+/-- Corresponds to `big_sepL2_impl` in Rocq Iris. -/
 theorem impl {Φ Ψ : Nat → A → B → PROP} {l1 : List A} {l2 : List B} :
     ([∗ list] k ↦ x1;x2 ∈ l1;l2, Φ k x1 x2) ⊢
       iprop(□ (∀ k, ∀ x1, ∀ x2,
         iprop(⌜l1[k]? = some x1⌝ → ⌜l2[k]? = some x2⌝ → Φ k x1 x2 -∗ Ψ k x1 x2))) -∗
       ([∗ list] k ↦ x1;x2 ∈ l1;l2, Ψ k x1 x2) := by
-  -- Following Rocq: use idemp (and_self), extract length, use intro, then wand_intro_l + sep_2
   refine wand_intro ?_
-  -- bigSepL2 Φ ∗ □(...) ⊢ bigSepL2 Ψ
-  -- Extract length from bigSepL2 Φ using and_self
   have hlen_extract : ([∗ list] k ↦ x1;x2 ∈ l1;l2, Φ k x1 x2) ⊢
       iprop(⌜l1.length = l2.length⌝ ∧ bigSepL2 Φ l1 l2) := and_self.2.trans (and_mono_l length)
-  -- Rearrange: (⌜len⌝ ∧ Φs) ∗ □(...) ⊢ ⌜len⌝ ∧ (Φs ∗ □(...))
   refine (sep_mono_l hlen_extract).trans ((sep_mono_l persistent_and_affinely_sep_l.1).trans
     (sep_assoc.1.trans (persistent_and_affinely_sep_l.symm.1.trans ?_)))
   refine pure_elim_l fun hlen => ?_
@@ -753,13 +643,7 @@ theorem impl {Φ Ψ : Nat → A → B → PROP} {l1 : List A} {l2 : List B} :
     (intro (Φ := fun k x1 x2 => iprop(Φ k x1 x2 -∗ Ψ k x1 x2)))
   exact (sep_mono_r hwands).trans (sep_2.1.trans (mono fun _ _ _ _ _ => wand_elim_r))
 
-/-- Corresponds to `big_sepL2_forall` in Rocq Iris.
-    Rocq proof: `apply (anti_symm _). { apply and_intro; [apply big_sepL2_length|].
-      apply forall_intro=> k. apply forall_intro=> x1. apply forall_intro=> x2.
-      do 2 (apply impl_intro_l; apply pure_elim_l=> ?). by apply: big_sepL2_lookup. }
-    apply pure_elim_l=> Hlen. ... induction l1 ... rewrite -persistent_and_sep_1. apply and_intro.
-    - rewrite (forall_elim 0) ... by rewrite !pure_True // !True_impl.
-    - rewrite -IH //. f_equiv. by apply forall_intro=> k; by rewrite (forall_elim (S k)).` -/
+/-- Corresponds to `big_sepL2_forall` in Rocq Iris. -/
 theorem forall' [BIAffine PROP] {Φ : Nat → A → B → PROP} {l1 : List A} {l2 : List B}
     (hPersistent : ∀ k x1 x2, Persistent (Φ k x1 x2)) :
     ([∗ list] k ↦ x1;x2 ∈ l1;l2, Φ k x1 x2) ⊣⊢
@@ -767,11 +651,9 @@ theorem forall' [BIAffine PROP] {Φ : Nat → A → B → PROP} {l1 : List A} {l
         (∀ k, ∀ x1, ∀ x2, iprop(⌜l1[k]? = some x1⌝ → ⌜l2[k]? = some x2⌝ → Φ k x1 x2))) := by
   haveI : ∀ k x1 x2, Persistent (Φ k x1 x2) := hPersistent
   constructor
-  · -- Forward direction: apply and_intro, then forall_intro + lookup
-    exact and_intro length (forall_intro fun k => forall_intro fun x1 => forall_intro fun x2 =>
+  · exact and_intro length (forall_intro fun k => forall_intro fun x1 => forall_intro fun x2 =>
       imp_intro' (pure_elim_l fun h1 => imp_intro' (pure_elim_l fun h2 => lookup h1 h2)))
-  · -- Backward direction: pure_elim_l, then induction
-    refine pure_elim_l fun hlen => ?_
+  · refine pure_elim_l fun hlen => ?_
     induction l1 generalizing l2 Φ hPersistent with
     | nil => cases l2 with
       | nil => simp only [bigSepL2]; exact Affine.affine
@@ -782,7 +664,6 @@ theorem forall' [BIAffine PROP] {Φ : Nat → A → B → PROP} {l1 : List A} {l
         simp only [List.length_cons, Nat.add_right_cancel_iff] at hlen
         simp only [bigSepL2]
         haveI : ∀ k x1 x2, Persistent (Φ k x1 x2) := hPersistent
-        -- Following Rocq: persistent_and_sep_1.symm, and_intro for head and tail
         have head_step : iprop(∀ k, ∀ x1, ∀ x2,
             iprop(⌜(y1 :: ys1)[k]? = some x1⌝ → ⌜(y2 :: ys2)[k]? = some x2⌝ → Φ k x1 x2)) ⊢ Φ 0 y1 y2 :=
           ((forall_elim 0).trans ((forall_elim y1).trans ((forall_elim y2).trans
@@ -800,16 +681,14 @@ theorem forall' [BIAffine PROP] {Φ : Nat → A → B → PROP} {l1 : List A} {l
 
 /-! ## Modality Interaction -/
 
-/-- Corresponds to `big_sepL2_persistently` in Rocq Iris.
-    Rocq proof: `by rewrite !big_sepL2_alt persistently_and persistently_pure big_sepL_persistently.` -/
+/-- Corresponds to `big_sepL2_persistently` in Rocq Iris. -/
 theorem persistently [BIAffine PROP] {Φ : Nat → A → B → PROP} {l1 : List A} {l2 : List B} :
     iprop(<pers> [∗ list] k ↦ x1;x2 ∈ l1;l2, Φ k x1 x2) ⊣⊢
       ([∗ list] k ↦ x1;x2 ∈ l1;l2, <pers> Φ k x1 x2) :=
   (persistently_congr alt).trans persistently_and |>.trans (and_congr persistently_pure .rfl) |>.trans
     (and_congr .rfl BigSepL.persistently) |>.trans (alt (Φ := fun k x1 x2 => iprop(<pers> Φ k x1 x2))).symm
 
-/-- Corresponds to `big_sepL2_later_2` in Rocq Iris.
-    Rocq proof: `rewrite !big_sepL2_alt later_and big_sepL_later_2. ...` -/
+/-- Corresponds to `big_sepL2_later_2` in Rocq Iris. -/
 theorem later_2 {Φ : Nat → A → B → PROP} {l1 : List A} {l2 : List B} :
     ([∗ list] k ↦ x1;x2 ∈ l1;l2, ▷ Φ k x1 x2) ⊢
       iprop(▷ [∗ list] k ↦ x1;x2 ∈ l1;l2, Φ k x1 x2) :=
@@ -857,8 +736,6 @@ theorem laterN [BIAffine PROP] {Φ : Nat → A → B → PROP} {l1 : List A} {l2
   ⟨laterN_1, laterN_2⟩
  -/
 
-/-! ## Interaction with BigSepL -/
-
 /-- Corresponds to `big_sepL2_sepL` in Rocq Iris. -/
 theorem sepL {Φ1 : Nat → A → PROP} {Φ2 : Nat → B → PROP} {l1 : List A} {l2 : List B} :
     ([∗ list] k ↦ x1;x2 ∈ l1;l2, Φ1 k x1 ∗ Φ2 k x2) ⊣⊢
@@ -876,15 +753,10 @@ theorem sepL_2 {Φ1 : Nat → A → PROP} {Φ2 : Nat → B → PROP} {l1 : List 
   exact (sep_mono_l persistent_and_affinely_sep_l.1).trans sep_assoc.1
     |>.trans persistent_and_affinely_sep_l.symm.1 |>.trans sepL.2
 
-/-! ## Reverse Lemmas -/
-
-/-- Corresponds to `big_sepL2_reverse_2` in Rocq Iris.
-    Rocq proof: `revert l2. induction l1 ... rewrite !reverse_cons (comm bi_sep) IH.
-    by rewrite (big_sepL2_app _ _ [x1] _ [x2]) big_sepL2_singleton wand_elim_l.` -/
+/-- Corresponds to `big_sepL2_reverse_2` in Rocq Iris. -/
 theorem reverse_2 {Φ : A → B → PROP} {l1 : List A} {l2 : List B} :
     ([∗ list] _k ↦ x1;x2 ∈ l1;l2, Φ x1 x2) ⊢
       ([∗ list] _k ↦ x1;x2 ∈ l1.reverse;l2.reverse, Φ x1 x2) := by
-  -- Rocq approach: pure_elim on length, then induction with setoid_rewrite
   refine (and_self.2.trans (and_mono_l length)).trans (pure_elim_l fun hlen => ?_)
   induction l1 generalizing l2 with
   | nil => cases l2 <;> simp only [bigSepL2, List.reverse_nil] <;> first | exact .rfl | simp at hlen
@@ -894,7 +766,6 @@ theorem reverse_2 {Φ : A → B → PROP} {l1 : List A} {l2 : List B} :
     | cons x2 xs2 =>
       simp only [List.length_cons] at hlen
       simp only [bigSepL2, List.reverse_cons]
-      -- Rocq: rewrite (comm bi_sep) IH (big_sepL2_app ...) big_sepL2_singleton wand_elim_l
       exact sep_comm.1.trans (sep_mono_l (ih (Nat.succ.inj hlen))) |>.trans
         (snoc (Φ := fun _ => Φ)).2
 
@@ -903,8 +774,7 @@ theorem reverse {Φ : A → B → PROP} {l1 : List A} {l2 : List B} :
     ([∗ list] _k ↦ x1;x2 ∈ l1.reverse;l2.reverse, Φ x1 x2) ⊣⊢
       ([∗ list] _k ↦ x1;x2 ∈ l1;l2, Φ x1 x2) := by
   constructor
-  · -- reverse.reverse = id
-    have h1 := reverse_2 (Φ := Φ) (l1 := l1.reverse) (l2 := l2.reverse)
+  · have h1 := reverse_2 (Φ := Φ) (l1 := l1.reverse) (l2 := l2.reverse)
     simp only [List.reverse_reverse] at h1
     exact h1
   · exact reverse_2
@@ -935,8 +805,6 @@ theorem replicate_r {Φ : Nat → A → B → PROP} {l : List A} {x : B} :
     simp only [List.length_cons, List.replicate_succ, bigSepL2, bigSepL, bigOpL]
     exact sep_congr .rfl (ih (Φ := fun n => Φ (n + 1)))
 
-/-! ## App Same Length -/
-
 /-- Corresponds to `big_sepL2_app_same_length` in Rocq Iris. -/
 theorem app_same_length {Φ : Nat → A → B → PROP} {l1a l1b : List A} {l2a l2b : List B}
     (hlen : l1a.length = l2a.length ∨ l1b.length = l2b.length) :
@@ -945,13 +813,10 @@ theorem app_same_length {Φ : Nat → A → B → PROP} {l1a l1b : List A} {l2a 
             ([∗ list] k ↦ x1;x2 ∈ l1b;l2b, Φ (l1a.length + k) x1 x2)) :=
   (app hlen).trans (sep_congr .rfl (congr fun k _ _ => by simp only [Nat.add_comm]; exact .rfl))
 
-/-! ## Const SepL Lemmas -/
-
 /-- No direct Rocq equivalent; when Φ doesn't depend on second argument. -/
 theorem const_sepL_l {Φ : Nat → A → PROP} {l1 : List A} {l2 : List B} :
     ([∗ list] k ↦ x1;_x2 ∈ l1;l2, Φ k x1) ⊣⊢
       iprop(⌜l1.length = l2.length⌝ ∧ bigSepL Φ l1) := by
-  -- Following Coq: rewrite via alt, then use BigSepL.fmap
   have fst_zip : ∀ hlen : l1.length = l2.length, (l1.zip l2).map Prod.fst = l1 := by
     intro hlen; clear Φ
     induction l1 generalizing l2 with
@@ -975,41 +840,24 @@ theorem const_sepL_r {Φ : Nat → B → PROP} {l1 : List A} {l2 : List B} :
       iprop(⌜l1.length = l2.length⌝ ∧ bigSepL Φ l2) :=
   flip.trans const_sepL_l |>.trans ⟨and_mono (pure_mono Eq.symm) .rfl, and_mono (pure_mono Eq.symm) .rfl⟩
 
-/-! ## Sep SepL Lemmas -/
-
-/-- Corresponds to `big_sepL2_sep_sepL_l` in Rocq Iris.
-    Rocq proof: `rewrite big_sepL2_sep big_sepL2_const_sepL_l. apply (anti_symm _).
-    - rewrite and_elim_r. done.
-    - rewrite !big_sepL2_alt [(_ ∗ _)%I]comm -!persistent_and_sep_assoc.
-      apply pure_elim_l=>Hl. apply and_intro; ...` -/
+/-- Corresponds to `big_sepL2_sep_sepL_l` in Rocq Iris. -/
 theorem sep_sepL_l [BIAffine PROP] {Φ : Nat → A → PROP} {Ψ : Nat → A → B → PROP} {l1 : List A} {l2 : List B} :
     ([∗ list] k ↦ x1;x2 ∈ l1;l2, Φ k x1 ∗ Ψ k x1 x2) ⊣⊢
       iprop(bigSepL Φ l1 ∗ [∗ list] k ↦ x1;x2 ∈ l1;l2, Ψ k x1 x2) := by
-  -- Following Rocq: rewrite sep' const_sepL_l, then (anti_symm _) with and_elim_r
   refine sep'.trans (sep_congr_l const_sepL_l) |>.trans ⟨sep_mono and_elim_r .rfl, ?bwd⟩
-  -- Backward: need to recover the pure length from bigSepL2 Ψ
   refine (sep_mono_r <| (and_intro length .rfl).trans persistent_and_affinely_sep_l.1 |>.trans
     (sep_mono_l affinely_elim)).trans sep_assoc.2 |>.trans (sep_mono_l ?_)
-  -- Transform: bigSepL Φ l1 ∗ ⌜len⌝ ⊢ ⌜len⌝ ∧ bigSepL Φ l1
   exact and_intro (sep_comm.1.trans (sep_mono_l persistently_intro) |>.trans
     persistently_absorb_l |>.trans persistently_elim) sep_elim_l
 
-/-- Corresponds to `big_sepL2_sep_sepL_r` in Rocq Iris.
-    Rocq proof: `rewrite !(big_sepL2_flip _ _ l1). setoid_rewrite (comm bi_sep).
-    by rewrite big_sepL2_sep_sepL_l.` -/
+/-- Corresponds to `big_sepL2_sep_sepL_r` in Rocq Iris. -/
 theorem sep_sepL_r [BIAffine PROP] {Φ : Nat → B → PROP} {Ψ : Nat → A → B → PROP} {l1 : List A} {l2 : List B} :
     ([∗ list] k ↦ x1;x2 ∈ l1;l2, Φ k x2 ∗ Ψ k x1 x2) ⊣⊢
       iprop(bigSepL Φ l2 ∗ [∗ list] k ↦ x1;x2 ∈ l1;l2, Ψ k x1 x2) :=
-  -- Following Rocq: flip, sep_comm, sep_sepL_l, then flip back
   (congr fun _ _ _ => sep_comm).trans flip |>.trans
     ((congr fun _ _ _ => sep_comm).trans sep_sepL_l) |>.trans (sep_congr_r flip)
 
-/-! ## Delete Lemmas -/
-
-/-- Corresponds to `big_sepL2_delete` in Rocq Iris.
-    Rocq proof: `intros. rewrite -(take_drop_middle l1 i x1) // -(take_drop_middle l2 i x2) //.
-    ... rewrite !big_sepL2_app_same_length /=; ... rewrite assoc -!(comm _ (Φ _ _ _)) -assoc.
-    do 2 f_equiv. - apply big_sepL2_proper=> ... - apply big_sepL2_proper=> ...` -/
+/-- Corresponds to `big_sepL2_delete` in Rocq Iris. -/
 theorem delete {Φ : Nat → A → B → PROP} {l1 : List A} {l2 : List B} {i : Nat}
     {x1 : A} {x2 : B}
     (h1 : l1[i]? = some x1) (h2 : l2[i]? = some x2) :
@@ -1027,13 +875,11 @@ theorem delete {Φ : Nat → A → B → PROP} {l1 : List A} {l2 : List B} {i : 
         simp only [List.getElem?_cons_zero, Option.some.injEq] at h1 h2
         subst h1 h2
         simp only [bigSepL2, ↓reduceIte]
-        -- Rocq: rewrite decide_True // left_id
-        exact sep_congr_r <| (proper fun k _ _ _ _ => by simp [Nat.add_one_ne_zero]).trans emp_sep.symm
+        exact sep_congr_r <| (proper fun k _ _ _ _ => by simp).trans emp_sep.symm
       | succ j =>
         simp only [List.getElem?_cons_succ] at h1 h2
         simp only [bigSepL2]
         have ih' := ih (i := j) (Φ := fun n => Φ (n + 1)) h1 h2
-        -- Rocq: rewrite assoc -!(comm _ (Φ _ _ _)) -assoc. do 2 f_equiv.
         refine (sep_congr_r ih').trans sep_left_comm |>.trans (sep_congr_r ?_)
         simp only [Nat.zero_ne_add_one, ↓reduceIte]
         exact sep_congr_r <| proper fun k _ _ _ _ => by
@@ -1045,22 +891,14 @@ theorem delete' [BIAffine PROP] {Φ : Nat → A → B → PROP} {l1 : List A} {l
     (h1 : l1[i]? = some x1) (h2 : l2[i]? = some x2) :
     ([∗ list] k ↦ y1;y2 ∈ l1;l2, Φ k y1 y2) ⊣⊢
       iprop(Φ i x1 x2 ∗ [∗ list] k ↦ y1;y2 ∈ l1;l2, ⌜k ≠ i⌝ → Φ k y1 y2) :=
-  -- Following Rocq: rewrite using delete, then convert (if k = i then emp else Φ) to (⌜k ≠ i⌝ → Φ)
   (delete h1 h2).trans <| sep_congr .rfl <| congr fun k y1 y2 => by
     by_cases hki : k = i
-    · -- k = i: need emp ⊣⊢ ⌜False⌝ → Φ k y1 y2
-      subst hki; simp only [↓reduceIte, ne_eq, not_true_eq_false]
+    · subst hki; simp only [↓reduceIte, ne_eq, not_true_eq_false]
       exact ⟨imp_intro' ((pure_elim_l (fun hf => False.elim hf)).trans .rfl), Affine.affine⟩
-    · -- k ≠ i: need Φ k y1 y2 ⊣⊢ ⌜True⌝ → Φ k y1 y2
-      simp only [hki, ↓reduceIte, ne_eq, not_false_eq_true]; exact true_imp.symm
+    · simp only [hki, ↓reduceIte, ne_eq, not_false_eq_true]; exact true_imp.symm
 
 
-/-- Corresponds to `big_sepL2_lookup_acc_impl` in Rocq Iris.
-    Rocq proof: `intros. rewrite big_sepL2_delete //. apply entails_wand, sep_mono_r, forall_intro=> Ψ.
-    apply wand_intro_r, wand_intro_l. rewrite (big_sepL2_delete Ψ l1 l2 i) //. apply sep_mono_r.
-    eapply wand_apply; [apply wand_entails, big_sepL2_impl|apply sep_mono_r].
-    apply intuitionistically_intro' ... destruct (decide _) as [->|]; [by apply: affine|].
-    by rewrite pure_True //left_id intuitionistically_elim wand_elim_l.` -/
+/-- Corresponds to `big_sepL2_lookup_acc_impl` in Rocq Iris. -/
 theorem lookup_acc_impl {Φ : Nat → A → B → PROP} {l1 : List A} {l2 : List B} {i : Nat} {x1 : A} {x2 : B}
     (h1 : l1[i]? = some x1) (h2 : l2[i]? = some x2) :
     ([∗ list] k ↦ y1;y2 ∈ l1;l2, Φ k y1 y2) ⊢
@@ -1068,26 +906,17 @@ theorem lookup_acc_impl {Φ : Nat → A → B → PROP} {l1 : List A} {l2 : List
         iprop(⌜l1[k]? = some y1⌝ → ⌜l2[k]? = some y2⌝ → ⌜k ≠ i⌝ →
           Φ k y1 y2 -∗ Ψ k y1 y2)) -∗
         Ψ i x1 x2 -∗ bigSepL2 Ψ l1 l2) := by
-  -- Rocq: rewrite big_sepL2_delete, sep_mono_r, forall_intro, wand_intro_r, wand_intro_l
   refine (delete h1 h2).1.trans (sep_mono_r <| forall_intro fun Ψ => wand_intro <| wand_intro ?_)
-  -- Goal: (bigSepL2 (if k = i then emp else Φ) ∗ □ (...)) ∗ Ψ i x1 x2 ⊢ bigSepL2 Ψ
-  -- Rocq: rewrite (big_sepL2_delete Ψ l1 l2 i), sep_mono_r
   refine sep_comm.1.trans (sep_mono_r ?_) |>.trans (delete h1 h2).2
-  -- Goal: bigSepL2 (if emp else Φ) ∗ □ (...) ⊢ bigSepL2 (if emp else Ψ)
-  -- Rocq: wand_apply big_sepL2_impl
   have himpl := impl (Φ := fun k y1 y2 => if k = i then emp else Φ k y1 y2)
                      (Ψ := fun k y1 y2 => if k = i then emp else Ψ k y1 y2) (l1 := l1) (l2 := l2)
   refine (sep_mono_r ?_).trans (wand_elim himpl)
-  -- Transform: □(∀ k y1 y2, ⌜...⌝ → ⌜...⌝ → ⌜k ≠ i⌝ → Φ -∗ Ψ) ⊢ □(∀ k y1 y2, ⌜...⌝ → ⌜...⌝ → (if emp else Φ) -∗ (if emp else Ψ))
   refine intuitionistically_intro' <| forall_intro fun k => forall_intro fun y1 => forall_intro fun y2 =>
     imp_intro' <| pure_elim_l fun hk1 => imp_intro' <| pure_elim_l fun hk2 => ?_
   by_cases hki : k = i
-  · -- k = i case: emp -∗ emp
-    subst hki; simp only [↓reduceIte]
+  · subst hki; simp only [↓reduceIte]
     exact wand_intro (sep_emp.1.trans Affine.affine)
-  · -- k ≠ i case: use the hypothesis
-    simp only [hki, ↓reduceIte]
-    -- Rocq: pure_True // left_id intuitionistically_elim wand_elim_l
+  · simp only [hki, ↓reduceIte]
     exact intuitionistically_elim.trans <| (forall_elim k).trans ((forall_elim y1).trans (forall_elim y2))
       |>.trans ((and_intro (pure_intro hk1) .rfl).trans imp_elim_r)
       |>.trans ((and_intro (pure_intro hk2) .rfl).trans imp_elim_r)
@@ -1097,27 +926,18 @@ end BigSepL2
 
 namespace BigSepL
 
-/-! ## SepL2 Diagonal -/
-
 /-- No direct Rocq equivalent; diagonal BigSepL to BigSepL2. -/
 theorem sepL2_diag {Φ : Nat → A → A → PROP} {l : List A} :
     bigSepL (fun k x => Φ k x x) l ⊢ bigSepL2 Φ l l := by
-  -- Key observation: l.zip l = l.map (fun x => (x, x))
   have hzip : l.zip l = l.map (fun x => (x, x)) := by
     induction l with
     | nil => simp
     | cons hd tl ih => simp [ih]
-  -- The inner equivalence proof: bigSepL over l equals bigSepL over l.zip l
   have inner_eq : bigSepL (fun k x => Φ k x x) l ⊣⊢
       bigSepL (fun k p => Φ k p.1 p.2) (l.zip l) := by
     rw [hzip]
-    -- fmap says: bigSepL Φ (l.map f) ⊣⊢ bigSepL (fun k x => Φ k (f x)) l
-    -- We have: bigSepL (fun k p => Φ k p.1 p.2) (l.map (fun x => (x, x)))
-    --        ⊣⊢ bigSepL (fun k x => (fun k p => Φ k p.1 p.2) k ((fun x => (x, x)) x)) l
-    --        = bigSepL (fun k x => Φ k x x) l
     exact (equiv_iff.mp (BigSepL.fmap (PROP := PROP) (Φ := fun k p => Φ k p.1 p.2)
         (fun x => (x, x)) (l := l))).symm
-  -- Now build the full entailment using inner_eq
   exact (and_intro (pure_intro rfl) .rfl).trans (and_mono .rfl inner_eq.1) |>.trans BigSepL2.alt.2
 
 end BigSepL
