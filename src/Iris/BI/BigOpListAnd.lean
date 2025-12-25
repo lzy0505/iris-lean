@@ -30,36 +30,43 @@ namespace BigAndL
 
 /-! ## Basic Structural Lemmas -/
 
+/-- Corresponds to `big_andL_nil` in Rocq Iris. -/
 @[simp]
 theorem nil {Φ : Nat → A → PROP} :
     ([∧ list] k ↦ x ∈ ([] : List A), Φ k x) ⊣⊢ iprop(True) := by
   simp only [bigAndL, bigOpL]
   exact .rfl
 
+/-- Corresponds to `big_andL_nil'` in Rocq Iris. -/
 theorem nil' {Φ : Nat → A → PROP} {l : List A} (h : l = []) :
     ([∧ list] k ↦ x ∈ l, Φ k x) ⊣⊢ iprop(True) := by
   subst h; exact nil
 
+/-- Corresponds to `big_andL_cons` in Rocq Iris. -/
 theorem cons {Φ : Nat → A → PROP} {x : A} {xs : List A} :
     ([∧ list] k ↦ y ∈ (x :: xs), Φ k y) ⊣⊢ Φ 0 x ∧ [∧ list] n ↦ y ∈ xs, Φ (n + 1) y := by
   simp only [bigAndL, bigOpL]
   exact .rfl
 
+/-- Corresponds to `big_andL_singleton` in Rocq Iris. -/
 theorem singleton {Φ : Nat → A → PROP} {x : A} :
     ([∧ list] k ↦ y ∈ [x], Φ k y) ⊣⊢ Φ 0 x :=
   equiv_iff.mp (BigOpL.singleton Φ x)
 
+/-- Corresponds to `big_andL_app` in Rocq Iris. -/
 theorem app {Φ : Nat → A → PROP} {l₁ l₂ : List A} :
     ([∧ list] k ↦ x ∈ (l₁ ++ l₂), Φ k x) ⊣⊢
       ([∧ list] k ↦ x ∈ l₁, Φ k x) ∧ [∧ list] n ↦ x ∈ l₂, Φ (n + l₁.length) x :=
   equiv_iff.mp (BigOpL.append Φ l₁ l₂)
 
+/-- Corresponds to `big_andL_snoc` in Rocq Iris. -/
 theorem snoc {Φ : Nat → A → PROP} {l : List A} {x : A} :
     ([∧ list] k ↦ y ∈ (l ++ [x]), Φ k y) ⊣⊢ ([∧ list] k ↦ y ∈ l, Φ k y) ∧ Φ l.length x :=
   equiv_iff.mp (BigOpL.snoc Φ l x)
 
 /-! ## Monotonicity and Congruence -/
 
+/-- Corresponds to `big_andL_mono` in Rocq Iris. -/
 theorem mono {Φ Ψ : Nat → A → PROP} {l : List A}
     (h : ∀ k x, l[k]? = some x → Φ k x ⊢ Ψ k x) :
     ([∧ list] k ↦ x ∈ l, Φ k x) ⊢ [∧ list] k ↦ x ∈ l, Ψ k x := by
@@ -73,11 +80,13 @@ theorem mono {Φ Ψ : Nat → A → PROP} {l : List A}
       intro k x hget
       exact h (k + 1) x hget
 
+/-- Corresponds to `big_andL_proper` in Rocq Iris. -/
 theorem proper {Φ Ψ : Nat → A → PROP} {l : List A}
     (h : ∀ k x, l[k]? = some x → Φ k x ≡ Ψ k x) :
     ([∧ list] k ↦ x ∈ l, Φ k x) ≡ [∧ list] k ↦ x ∈ l, Ψ k x :=
   BigOpL.congr h
 
+/-- Unconditional version of proper. No direct Rocq equivalent. -/
 theorem congr {Φ Ψ : Nat → A → PROP} {l : List A}
     (h : ∀ k x, Φ k x ≡ Ψ k x) :
     ([∧ list] k ↦ x ∈ l, Φ k x) ≡ [∧ list] k ↦ x ∈ l, Ψ k x :=
@@ -85,6 +94,7 @@ theorem congr {Φ Ψ : Nat → A → PROP} {l : List A}
 
 /-! ## Typeclass Closure -/
 
+/-- Corresponds to `big_andL_persistent'` in Rocq Iris. -/
 instance persistent {Φ : Nat → A → PROP} {l : List A} [∀ k x, Persistent (Φ k x)] :
     Persistent ([∧ list] k ↦ x ∈ l, Φ k x) where
   persistent := by
@@ -98,6 +108,7 @@ instance persistent {Φ : Nat → A → PROP} {l : List A} [∀ k x, Persistent 
       have h2 : ([∧ list] n ↦ y ∈ xs, Φ (n + 1) y) ⊢ <pers> [∧ list] n ↦ y ∈ xs, Φ (n + 1) y := ih
       exact (and_mono h1 h2).trans persistently_and.2
 
+/-- No direct Rocq equivalent; BIAffine version for affine contexts. -/
 instance affine {Φ : Nat → A → PROP} {l : List A} [BIAffine PROP] :
     Affine ([∧ list] k ↦ x ∈ l, Φ k x) where
   affine := by
@@ -111,17 +122,20 @@ instance affine {Φ : Nat → A → PROP} {l : List A} [BIAffine PROP] :
 
 /-! ## Unit/True Lemma -/
 
+/-- Corresponds to `big_andL_emp` in Rocq Iris. -/
 theorem true_l {l : List A} :
     ([∧ list] _x ∈ l, iprop(True : PROP)) ≡ iprop(True) :=
   BigOpL.unit_const l
 
 /-! ## Distribution over And -/
 
+/-- Corresponds to `big_andL_and` in Rocq Iris. -/
 theorem and' {Φ Ψ : Nat → A → PROP} {l : List A} :
     ([∧ list] k ↦ x ∈ l, iprop(Φ k x ∧ Ψ k x)) ≡
       iprop(([∧ list] k ↦ x ∈ l, Φ k x) ∧ [∧ list] k ↦ x ∈ l, Ψ k x) :=
   BigOpL.op_distr Φ Ψ l
 
+/-- No direct Rocq equivalent; reverse direction of `and'`. -/
 theorem and_2 {Φ Ψ : Nat → A → PROP} {l : List A} :
     iprop(([∧ list] k ↦ x ∈ l, Φ k x) ∧ [∧ list] k ↦ x ∈ l, Ψ k x) ≡
       [∧ list] k ↦ x ∈ l, iprop(Φ k x ∧ Ψ k x) :=
@@ -129,6 +143,7 @@ theorem and_2 {Φ Ψ : Nat → A → PROP} {l : List A} :
 
 /-! ## Take and Drop -/
 
+/-- Corresponds to `big_andL_take_drop` in Rocq Iris. -/
 theorem take_drop {Φ : Nat → A → PROP} {l : List A} {n : Nat} :
     ([∧ list] k ↦ x ∈ l, Φ k x) ≡
       iprop(([∧ list] k ↦ x ∈ (l.take n), Φ k x) ∧ [∧ list] k ↦ x ∈ (l.drop n), Φ (n + k) x) :=
@@ -136,6 +151,7 @@ theorem take_drop {Φ : Nat → A → PROP} {l : List A} {n : Nat} :
 
 /-! ## Fmap -/
 
+/-- Corresponds to `big_andL_fmap` in Rocq Iris. -/
 theorem fmap {B : Type _} (f : A → B) {Φ : Nat → B → PROP} {l : List A} :
     ([∧ list] k ↦ y ∈ (l.map f), Φ k y) ≡ [∧ list] k ↦ x ∈ l, Φ k (f x) := by
   induction l generalizing Φ with
@@ -146,8 +162,9 @@ theorem fmap {B : Type _} (f : A → B) {Φ : Nat → B → PROP} {l : List A} :
 
 /-! ## Lookup Lemmas -/
 
--- Extract an element from bigAndL using the lookup function
--- This is simpler than the sep version because and is idempotent
+/-- Corresponds to `big_andL_lookup` in Rocq Iris.
+    Extract an element from bigAndL using the lookup function.
+    This is simpler than the sep version because and is idempotent. -/
 theorem lookup {Φ : Nat → A → PROP} {l : List A} {i : Nat} {x : A}
     (h : l[i]? = some x) :
     ([∧ list] k ↦ y ∈ l, Φ k y) ⊢ Φ i x := by
@@ -168,7 +185,8 @@ theorem lookup {Φ : Nat → A → PROP} {l : List A} {i : Nat} {x : A}
 
 /-! ## Higher-Order Lemmas -/
 
--- Introduction rule: if P entails each Φ k x, then P entails the big and
+/-- Corresponds to `big_andL_intro` in Rocq Iris.
+    Introduction rule: if P entails each Φ k x, then P entails the big and. -/
 theorem intro {P : PROP} {Φ : Nat → A → PROP} {l : List A}
     (h : ∀ k x, l[k]? = some x → P ⊢ Φ k x) :
     P ⊢ [∧ list] k ↦ x ∈ l, Φ k x := by
@@ -182,7 +200,8 @@ theorem intro {P : PROP} {Φ : Nat → A → PROP} {l : List A}
     · exact h 0 y rfl
     · exact ih (fun k x hget => h (k + 1) x hget)
 
--- bigAndL is equivalent to forall
+/-- Corresponds to `big_andL_forall` in Rocq Iris.
+    bigAndL is equivalent to forall. -/
 theorem forall' {Φ : Nat → A → PROP} {l : List A} :
     ([∧ list] k ↦ x ∈ l, Φ k x) ⊣⊢ ∀ k, ∀ x, iprop(⌜l[k]? = some x⌝ → Φ k x) := by
   constructor
@@ -205,7 +224,8 @@ theorem forall' {Φ : Nat → A → PROP} {l : List A} :
           apply (and_intro Entails.rfl (pure_intro hget)).trans
           exact imp_elim Entails.rfl
 
--- Implication under bigAndL
+/-- Corresponds to `big_andL_impl` in Rocq Iris.
+    Implication under bigAndL. -/
 theorem impl {Φ Ψ : Nat → A → PROP} {l : List A} :
     ([∧ list] k ↦ x ∈ l, Φ k x) ∧ (∀ k x, iprop(⌜l[k]? = some x⌝ → Φ k x → Ψ k x)) ⊢
       [∧ list] k ↦ x ∈ l, Ψ k x := by
@@ -250,6 +270,7 @@ theorem impl {Φ Ψ : Nat → A → PROP} {l : List A} :
 
 /-! ## Modality Interaction -/
 
+/-- Corresponds to `big_andL_persistently` in Rocq Iris. -/
 theorem persistently {Φ : Nat → A → PROP} {l : List A} :
     iprop(<pers> [∧ list] k ↦ x ∈ l, Φ k x) ⊣⊢ [∧ list] k ↦ x ∈ l, iprop(<pers> Φ k x) := by
   induction l generalizing Φ with
@@ -265,6 +286,7 @@ theorem persistently {Φ : Nat → A → PROP} {l : List A} :
 
 /-! ## Pure Propositions -/
 
+/-- Corresponds to `big_andL_pure_1` in Rocq Iris. -/
 theorem pure_1 {φ : Nat → A → Prop} {l : List A} :
     ([∧ list] k ↦ x ∈ l, iprop(⌜φ k x⌝ : PROP)) ⊢ iprop(⌜∀ k x, l[k]? = some x → φ k x⌝ : PROP) := by
   -- Use forall' to convert to BI forall, then use pure_forall and pure_imp
@@ -277,6 +299,7 @@ theorem pure_1 {φ : Nat → A → Prop} {l : List A} :
     _ ⊢ iprop(⌜∀ k, ∀ x, l[k]? = some x → φ k x⌝ : PROP) :=
         pure_forall.1
 
+/-- Corresponds to `big_andL_pure_2` in Rocq Iris. -/
 theorem pure_2 {φ : Nat → A → Prop} {l : List A} :
     iprop(⌜∀ k x, l[k]? = some x → φ k x⌝ : PROP) ⊢ [∧ list] k ↦ x ∈ l, iprop(⌜φ k x⌝ : PROP) := by
   -- Use forall' backward direction
@@ -288,6 +311,7 @@ theorem pure_2 {φ : Nat → A → Prop} {l : List A} :
         forall_mono fun _ => forall_mono fun _ => pure_imp_2
     _ ⊢ [∧ list] k ↦ x ∈ l, iprop(⌜φ k x⌝ : PROP) := forall'.2
 
+/-- Corresponds to `big_andL_pure` in Rocq Iris. -/
 theorem pure {φ : Nat → A → Prop} {l : List A} :
     ([∧ list] k ↦ x ∈ l, iprop(⌜φ k x⌝ : PROP)) ⊣⊢ iprop(⌜∀ k x, l[k]? = some x → φ k x⌝ : PROP) :=
   ⟨pure_1, pure_2⟩
@@ -296,7 +320,8 @@ theorem pure {φ : Nat → A → Prop} {l : List A} :
 
 /-! ## Element Access -/
 
--- Extract an element from bigAndL using membership
+/-- Corresponds to `big_andL_elem_of` in Rocq Iris.
+    Extract an element from bigAndL using membership. -/
 theorem elem_of {Φ : A → PROP} {l : List A} {x : A}
     (h : x ∈ l) :
     ([∧ list] y ∈ l, Φ y) ⊢ Φ x := by
@@ -306,7 +331,8 @@ theorem elem_of {Φ : A → PROP} {l : List A} {x : A}
 
 /-! ## Zip with Sequence -/
 
-/-- Big and over zip with a shifted sequence.
+/-- Corresponds to `big_andL_zip_seq` in Rocq Iris.
+    Big and over zip with a shifted sequence.
     Relates `[∧ list] ky ∈ zip (range' n len) l, Φ ky` to `[∧ list] k↦y ∈ l, Φ (n + k, y)`.
     This lemma allows rewriting a big conjunction over a zipped list with an enumeration
     starting at `n` into a big conjunction with indexed access where indices are offset by `n`. -/
@@ -315,7 +341,8 @@ theorem zip_seq {Φ : Nat × A → PROP} {n : Nat} {l : List A} :
       [∧ list] i ↦ x ∈ l, Φ (n + i, x) :=
   BigOpL.zip_seq (op := and) (unit := iprop(True)) Φ n l
 
-/-- Big and over zip with a sequence starting at 0.
+/-- Corresponds to `big_andL_zip_seqZ` in Rocq Iris (uses Nat, not Z).
+    Big and over zip with a sequence starting at 0.
     Relates `[∧ list] ky ∈ zip (range len) l, Φ ky` to `[∧ list] k↦y ∈ l, Φ (k, y)`.
     This is a special case of `zip_seq` with `n = 0`, useful for converting between
     explicit enumeration via zip and implicit indexed big conjunction. -/
@@ -326,6 +353,7 @@ theorem zip_seqZ {Φ : Nat × A → PROP} {l : List A} :
 
 /-! ## Bind -/
 
+/-- Corresponds to `big_andL_bind` in Rocq Iris (uses flatMap). -/
 theorem bind {B : Type _} (f : A → List B) {Φ : B → PROP} {l : List A} :
     ([∧ list] y ∈ (l.flatMap f), Φ y) ⊣⊢
       [∧ list] x ∈ l, [∧ list] y ∈ (f x), Φ y := by
@@ -337,6 +365,7 @@ theorem bind {B : Type _} (f : A → List B) {Φ : B → PROP} {l : List A} :
 
 /-! ## Later Modality -/
 
+/-- Corresponds to `big_andL_later` in Rocq Iris. -/
 theorem later {Φ : Nat → A → PROP} {l : List A} :
     iprop(▷ [∧ list] k ↦ x ∈ l, Φ k x) ⊣⊢ [∧ list] k ↦ x ∈ l, iprop(▷ Φ k x) := by
   induction l generalizing Φ with
@@ -350,6 +379,7 @@ theorem later {Φ : Nat → A → PROP} {l : List A} :
       _ ⊣⊢ iprop(▷ Φ 0 x ∧ [∧ list] n ↦ y ∈ xs, iprop(▷ Φ (n + 1) y)) :=
           and_congr .rfl ih
 
+/-- Corresponds to `big_andL_laterN` in Rocq Iris. -/
 theorem laterN {Φ : Nat → A → PROP} {l : List A} {n : Nat} :
     iprop(▷^[n] [∧ list] k ↦ x ∈ l, Φ k x) ⊣⊢ [∧ list] k ↦ x ∈ l, iprop(▷^[n] Φ k x) := by
   induction n with
@@ -363,9 +393,20 @@ theorem laterN {Φ : Nat → A → PROP} {l : List A} {n : Nat} :
 
 /-! ## Permutation -/
 
+/-- Corresponds to `big_andL_Permutation` in Rocq Iris (via BigOpL.perm). -/
 theorem perm {Φ : A → PROP} {l₁ l₂ : List A} (hp : l₁.Perm l₂) :
     ([∧ list] x ∈ l₁, Φ x) ≡ [∧ list] x ∈ l₂, Φ x :=
   BigOpL.perm Φ hp
+
+/-! ## Missing Lemmas from Rocq Iris
+
+The following lemmas from Rocq Iris are not ported:
+- `big_andL_submseteq`: Uses stdpp's `⊆+` relation (use `perm` instead)
+- `big_andL_ne`: OFE-level non-expansiveness (handled at algebra layer)
+- `big_andL_mono'`, `big_andL_id_mono'`: Convenience wrappers (use `mono` directly)
+- `big_andL_absorbing`, `big_andL_absorbing'`: Absorbing typeclass (not implemented)
+- `big_andL_timeless`, `big_andL_timeless'`: Requires `and_timeless` infrastructure
+-/
 
 end BigAndL
 

@@ -1137,6 +1137,13 @@ theorem zip_with {B C : Type _} (f : A → B → C) {Φ : Nat → C → PROP}
       have ih' := ih (l₂ := ys) (Φ := fun n => Φ (n + 1))
       exact ⟨sep_mono_r ih'.1, sep_mono_r ih'.2⟩
 
+/-! ## Missing Lemmas from Rocq Iris
+
+The following lemmas from Rocq Iris are not ported:
+- `big_sepL_timeless`, `big_sepL_timeless'`, `big_sepL_timeless_id`: Requires `sep_timeless` infrastructure
+- `big_sepL_zip_seqZ`: Uses Z (integers); only Nat version available
+-/
+
 end BigSepL
 
 end Iris.BI
