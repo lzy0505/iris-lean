@@ -5,6 +5,7 @@ import Iris.Std.FiniteMapInst
 import Iris.Std.FiniteSet
 import Iris.Std.FiniteSetInst
 import Iris.Std.Nat
+import Iris.Std.NonExpansive
 import Iris.Std.Prod
 import Iris.Std.Qq
 import Iris.Std.Rewrite

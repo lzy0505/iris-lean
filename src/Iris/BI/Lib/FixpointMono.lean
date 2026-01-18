@@ -5,7 +5,7 @@ Authors: Zongyuan Liu
 -/
 import Iris.BI
 import Iris.ProofMode
-
+import Iris.Std.NonExpansive
 
 /-!
 # Least and Greatest Fixpoints for Monotone Predicates
@@ -45,25 +45,19 @@ def fp (F : (A → PROP) → (A → PROP)) (x : A) : PROP :=
 
 variable (F : (A → PROP) → (A → PROP)) [BiMonoPred F]
 
+/-- Automatically derive PreservesNonExpansive from BiMonoPred -/
+instance [BiMonoPred F] : PreservesNonExpansive F where
+  preserves Φ hΦ := by
+    haveI := hΦ
+    exact BiMonoPred.bi_mono_pred_ne Φ
+
 /-- Non-expansiveness of the least fixpoint in the inner variable -/
-theorem ne' (H : ∀ Φ, NonExpansive Φ → NonExpansive (F Φ)) :
+instance ne' [PreservesNonExpansive F] :
     NonExpansive (fp F) := by
   constructor
   intros n x y eq
   simp [fp]
-  apply forall_ne
-  intro Φ
-  apply wand_ne.ne
-  · apply intuitionistically_ne.ne
-    apply forall_ne
-    intro y'
-    apply wand_ne.ne
-    · have : NonExpansive Φ.f := Φ.ne
-      apply (H Φ.f this).ne
-      apply Dist.rfl
-    · apply Dist.rfl
-  · apply Φ.ne.ne
-    exact eq
+  f_nonexp
 
 /-- The least fixpoint is proper with respect to equivalence -/
 theorem proper :
@@ -71,18 +65,11 @@ theorem proper :
     (∀ Φ x, F Φ x ≡ G Φ x) → ∀ x, fp F x ≡ fp G x := by
   intros F G H_equiv x
   simp [fp]
+
   apply OFE.equiv_dist.2
   intro n
-  apply forall_ne
-  intro Φ
-  apply wand_ne.ne
-  · apply intuitionistically_ne.ne
-    apply forall_ne
-    intro y
-    apply wand_ne.ne
-    exact (H_equiv Φ.f y).dist
-    apply Dist.rfl
-  · apply Dist.rfl
+  f_nonexp
+  exact (H_equiv ?_ ?_).dist
 
 /-- Folding direction: F applied to the least fixpoint entails the least fixpoint -/
 theorem unfold_2 (x : A) :
@@ -90,9 +77,7 @@ theorem unfold_2 (x : A) :
   simp [fp]
   iintro HF Φ □Hincl
   iapply Hincl
-  iapply (BiMonoPred.bi_mono_pred (Ψ := Φ)) $$ [], HF
-  · sorry
-  · sorry
+  iapply (BiMonoPred.bi_mono_pred (Ψ := Φ)) $$ [], HF <;> solve_nonexp
 
   istop
   apply intuitionistically_intro'
@@ -106,46 +91,99 @@ theorem unfold_2 (x : A) :
 theorem unfold_1 (x : A) :
     iprop(fp F x ⊢ F (fp F) x) := by
   iintro HF
-  -- have ne_fp : NonExpansive (fp F) := sorry
   simp [fp]
 
-  -- have ne_fp : True := sorry
-  iapply HF $$ %(⟨F (fp F), _⟩)
+  iapply HF $$ %(⟨F (fp F), (by solve_nonexp)⟩)
 
   istop
   refine intuitionistically_emp.2.trans (intuitionistically_mono ?_)
-  -- iintro y Hy
-  -- simp
-  -- iapply Hy
-  -- iintro Φ □Hincl
-  -- iapply □Hincl
-  sorry
-  sorry
 
+  iintro _ y Hy
+  simp
+  iapply BiMonoPred.bi_mono_pred $$ [], Hy <;> solve_nonexp
+  istop
+  refine intuitionistically_emp.2.trans (intuitionistically_mono ?_)
+  iintro _ z Hz
+  iapply unfold_2
+  trivial
+  iexact Hz
 
 /-- The least fixpoint satisfies the fixpoint equation -/
 theorem unfold (x : A) :
     fp F x ≡ F (fp F) x := by
-  sorry
+  apply BI.equiv_iff.mpr
+  constructor
+  apply unfold_1
+  apply unfold_2
 
+omit [BiMonoPred F] in
 /-- Basic induction principle for least fixpoints.
     To prove Φ holds for the least fixpoint, it suffices to show that
     F preserves Φ intuitionistically. -/
 theorem iter (Φ : A → PROP) [NonExpansive Φ] :
-    iprop(⊢ □ (∀ (y : A), F Φ y -∗ Φ y) -∗ (∀ (x : A), fp F x -∗ Φ x)) := by
-  sorry
+    □ (∀ (y : A), F Φ y -∗ Φ y) ⊢ (∀ (x : A), fp F x -∗ Φ x) := by
+  iintro □HΦ x HF
+  simp [fp]
+  iapply HF $$ %(⟨Φ, _⟩)
+  iapply HΦ
+  trivial
 
+omit [BiMonoPred F] in
 /-- If F preserves affine predicates, then the least fixpoint is affine -/
 theorem affine
     (H : ∀ x, Affine (F (fun _ => iprop(emp)) x)) :
     ∀ x, Affine (fp F x) := by
-  sorry
+  intro _
+  constructor
+  iintro H
+  iapply @iter (A := A) (F := F) (Φ := (fun _ => (iprop(emp): PROP))) _
+  · apply OFE.ne_of_contractive
+  istop
+  refine intuitionistically_emp.2.trans (intuitionistically_mono ?_)
+
+  iintro _ y
+  cases (H y) with
+  | mk affine => iapply affine
+
+  iexact H
 
 /-- If F preserves absorbing predicates, then the least fixpoint is absorbing -/
 theorem absorbing
     (H : ∀ Φ, (∀ x, Absorbing (Φ x)) → (∀ x, Absorbing (F Φ x))) :
     ∀ x, Absorbing (fp F x) := by
-  sorry
+  intro x
+  constructor
+  simp [BI.absorbingly]
+  iintro ⟨Htrue, H⟩
+  iapply BI.wand_elim_r (PROP:= PROP) (P := (iprop(True) : PROP))
+
+  isplitl [Htrue]
+  · iexact Htrue
+  · irevert H
+    irevert x
+    iapply iter <;> solve_nonexp
+    istop
+    refine intuitionistically_emp.2.trans (intuitionistically_mono ?_)
+    iintro Hemp y HF Htrue
+    iapply unfold_2
+    trivial
+
+    have H : (∀ y, emp ⊢ (F (fun x => iprop(True -∗ fp F x)) y) -∗ True -∗ F (fun (x : A) => iprop(True -∗ fp F x)) y) := by
+      intro y
+      iintro _ HF Htrue
+      have hh : (Absorbing (F (fun x => iprop(True -∗ fp F x)) y)) := by
+        apply H
+        infer_instance
+      iclear Htrue
+      iexact HF
+    ihave HF := (H y) $$ Hemp, HF, Htrue
+
+    iapply BiMonoPred.bi_mono_pred $$ [], %y, HF <;> solve_nonexp
+    istop
+    refine intuitionistically_emp.2.trans (intuitionistically_mono ?_)
+    iintro Hemp x HH
+    iapply HH
+    iapply (BI.true_intro (PROP:= PROP)) $$ Hemp
 
 /-- If F preserves both affine and persistent predicates,
     then the least fixpoint is persistent -/
@@ -153,7 +191,53 @@ theorem persistent_affine
     (H_affine : ∀ Φ, (∀ x, Affine (Φ x)) → (∀ x, Affine (F Φ x)))
     (H_pers : ∀ Φ, (∀ x, Persistent (Φ x)) → (∀ x, Persistent (F Φ x))) :
     ∀ x, Persistent (fp F x) := by
-  sorry
+  intros x
+  constructor
+
+  suffices h : ∀ x, fp F x ⊢ □ fp F x by
+    exact (h x).trans persistently_of_intuitionistically
+
+  intro y
+  iintro HF
+  iapply (@iter (A := A) (F := F) (Φ := fun z => iprop(□ fp F z))) _ <;> solve_nonexp
+  istop
+  refine intuitionistically_emp.2.trans (intuitionistically_mono ?_)
+
+  iintro Hemp z HF
+  istop
+  apply emp_sep.1.trans
+  iintro HF
+
+  have hpers : Persistent (F (fun z => iprop(□ fp F z)) z) := by
+    apply H_pers
+    intro w
+    infer_instance
+
+  istop
+
+  have haff : Affine (F (fun z => iprop(□ fp F z)) z) := by
+    apply H_affine
+    intro w
+    infer_instance
+
+  apply (affine_affinely (F (fun z => iprop(□ fp F z)) z)).2.trans
+  apply (affinely_mono (persistent (P := F (fun z => iprop(□ fp F z)) z))).trans
+  apply intuitionistically_mono
+
+  iintro HF
+  iapply unfold_2
+  trivial
+
+  iapply BiMonoPred.bi_mono_pred $$ [], HF <;> solve_nonexp
+  istop
+  refine intuitionistically_emp.2.trans (intuitionistically_mono ?_)
+
+  iintro Hemp w HH
+  iapply intuitionistically_elim
+  iexact HH
+
+  iexact HF
+
 
 /-- If F preserves both absorbing and persistent predicates,
     then the least fixpoint is persistent -/
@@ -161,28 +245,128 @@ theorem persistent_absorbing
     (H_absorb : ∀ Φ, (∀ x, Absorbing (Φ x)) → (∀ x, Absorbing (F Φ x)))
     (H_pers : ∀ Φ, (∀ x, Persistent (Φ x)) → (∀ x, Persistent (F Φ x))) :
     ∀ x, Persistent (fp F x) := by
-  sorry
+  intro x
+  have H_absorb_fp := absorbing (F := F) H_absorb
+  constructor
+  iintro HF
+  iapply (@iter (A := A) (F := F) (Φ := fun z => iprop(<pers> fp F z))) _ <;> solve_nonexp
+  istop
+  refine intuitionistically_emp.2.trans (intuitionistically_mono ?_)
+  iintro Hemp y HF
+  istop
+  apply emp_sep.1.trans
+  iintro HF
 
+  have hpers : Persistent (F (fun z => iprop(<pers> fp F z)) y) := by
+    apply H_pers
+    intro w
+    infer_instance
+
+  istop
+
+  apply (persistent (P := F (fun z => iprop(<pers> fp F z)) y)).trans
+  apply BI.persistently_mono
+
+  iintro HF
+  iapply unfold_2
+  trivial
+  iapply BiMonoPred.bi_mono_pred $$ [], HF <;> solve_nonexp
+  istop
+  refine intuitionistically_emp.2.trans (intuitionistically_mono ?_)
+  iintro Hemp x HH
+  iapply persistently_elim
+  iexact HH
+
+  iexact HF
+
+omit [BiMonoPred F] in
 /-- Strong monotonicity for least fixpoints -/
 theorem strong_mono
     (G : (A → PROP) → (A → PROP)) [BiMonoPred G] :
     iprop(⊢ □ (∀ (Φ : A → PROP) (x : A), F Φ x -∗ G Φ x) -∗
             (∀ (x : A), fp F x -∗ fp G x)) := by
-  sorry
+  iintro □Hmon
+  iapply @iter (PROP := PROP) (Φ := fp G) <;> solve_nonexp
+  istop
+  apply intuitionistically_intro'
+  iintro Hmon y IH
+  iapply unfold_2
+  trivial
+  iapply Hmon $$ IH
+
+section LeastFixpointInd
+
+variable [BI PROP] [OFE A] (F : (A → PROP) → (A → PROP)) [BiMonoPred F]
+
+local instance [NonExpansive Φ]: BiMonoPred (fun (Ψ: A → PROP) => (fun (a: A) => iprop(Φ a ∧ F Ψ a))) := by
+constructor
+· intro Ψ Ψ' Hne Hne'
+  iintro □Mon x Ha
+  isplit
+  · icases Ha with ⟨Ha, -⟩
+    iexact Ha
+  · icases Ha with ⟨-, Hr⟩
+    iapply BiMonoPred.bi_mono_pred $$ [], Hr <;> try infer_instance
+    iexact Mon
+· intro ?_ ?_
+  constructor
+  intro ?_ ?_ ?_ ?_
+  f_nonexp
 
 /-- Well-founded induction principle for least fixpoints.
     Allows assuming the property holds for arbitrary many unfoldings. -/
 theorem ind_wf (Φ : A → PROP) [NonExpansive Φ] :
     iprop(⊢ □ (∀ (y : A), F (fp (fun Ψ a => iprop(Φ a ∧ F Ψ a))) y -∗ Φ y) -∗
             (∀ (x : A), fp F x -∗ Φ x)) := by
-  sorry
+  iintro □Hmon x Hfp
+  ihave Hx := unfold_1 (A:=A) (PROP:=PROP) $$ Hfp
+  infer_instance
+  iapply Hmon
+  iapply BiMonoPred.bi_mono_pred $$ [], Hx <;> solve_nonexp
+
+  istop
+  apply intuitionistically_intro'
+
+  iintro □Hmon
+  iapply iter<;> solve_nonexp
+  istop
+  apply intuitionistically_intro'
+  iintro □Hmon y Hy
+  iapply unfold_2
+  infer_instance
+  isplit
+  iapply Hmon <;> iexact Hy
+  iexact Hy
 
 /-- Standard induction principle for least fixpoints.
     Allows assuming both the property Φ and the fixpoint itself under F. -/
 theorem ind (Φ : A → PROP) [NonExpansive Φ] :
     iprop(⊢ □ (∀ (y : A), F (fun x => iprop(Φ x ∧ fp F x)) y -∗ Φ y) -∗
             (∀ (x : A), fp F x -∗ Φ x)) := by
-  sorry
+  iintro □Hmon
+  iapply ind_wf<;> try infer_instance
+  istop
+  apply intuitionistically_intro'
+  iintro □Hmon y Hy
+  iapply Hmon
+  iapply BiMonoPred.bi_mono_pred $$ [], Hy <;> solve_nonexp
+  istop
+  apply intuitionistically_intro'
+  iintro □Hmon x Hx
+  isplit
+  · ihave Hx := unfold_1 (A:=A) (PROP:= PROP) $$ Hx
+    infer_instance
+    icases Hx with ⟨Ha, -⟩
+    iexact Ha
+  · iapply strong_mono $$ [], Hx
+    infer_instance
+
+    istop
+    apply intuitionistically_intro'
+    iintro Hmon _ _ ⟨-, H⟩
+    iexact H
+
+end LeastFixpointInd
 
 end LeastFixpoint
 

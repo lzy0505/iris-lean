@@ -865,7 +865,7 @@ instance absorbingly_persistent [BI PROP] (P : PROP) [Persistent P] :
 
 /-! # The intuitionistic modality -/
 
-theorem intuitionistically_ne [BI PROP] : OFE.NonExpansive (@intuitionistically PROP _) where
+instance intuitionistically_ne [BI PROP] : OFE.NonExpansive (@intuitionistically PROP _) where
   ne _ _ _ h := affinely_ne.1 (persistently_ne.1 h)
 
 @[rw_mono_rule]
