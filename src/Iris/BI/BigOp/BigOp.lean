@@ -288,32 +288,6 @@ def delabBigAndM : Delab := do
       `([∧map]  $k ↦ $v ∈ $m, $P $v)
   | _ => failure
 
-/-- Delaborator for `bigSepM2` with key - always includes key binding -/
-@[delab app.Iris.BI.bigSepM2]
-def delabBigSepM2 : Delab := do
-  let e ← getExpr
-  unless e.isApp do failure
-  unless e.getAppFn.isConstOf ``bigSepM2 do failure
-  let args := e.getAppArgs
-  unless args.size == 9 do failure
-  let m1 ← withNaryArg 7 delab
-  let m2 ← withNaryArg 8 delab
-  let fn := args[6]!
-  match fn with
-  | .lam kn _ body _ =>
-    match body with
-    | .lam v1n _ body2 _ =>
-      match body2 with
-      | .lam v2n _ _ _ =>
-        let k := mkIdent kn
-        let v1 := mkIdent v1n
-        let v2 := mkIdent v2n
-        let P ← withNaryArg 6 <| withBindingBody v2n <| withBindingBody v1n <| withBindingBody kn <| delab
-        `([∗map]  $k ↦ $v1 ; $v2 ∈ $m1 ; $m2, $P)
-      | _ => failure
-    | _ => failure
-  | _ => failure
-
 end Map
 
 /-! # BI-Instantiated Big Operators over Sets
