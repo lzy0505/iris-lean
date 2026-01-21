@@ -117,7 +117,6 @@ theorem id_mono' {Ps Qs : List PROP}
     | nil => simp at hlen
     | cons Q Qs' =>
       simp only [List.length_cons, Nat.add_right_cancel_iff] at hlen
-      simp only [bigSepL, bigOpL]
       apply sep_mono
       · exact h 0 P Q rfl rfl
       · apply ih hlen
@@ -130,10 +129,8 @@ instance persistent {Φ : Nat → A → PROP} {l : List A} [∀ k x, Persistent 
   persistent := by
     induction l generalizing Φ with
     | nil =>
-      simp only [bigSepL, bigOpL]
       exact persistently_emp_2
     | cons x xs ih =>
-      simp only [bigSepL, bigOpL]
       have h1 : Φ 0 x ⊢ <pers> Φ 0 x := Persistent.persistent
       have h2 : bigSepL (fun n => Φ (n + 1)) xs ⊢ <pers> bigSepL (fun n => Φ (n + 1)) xs := ih
       exact (sep_mono h1 h2).trans persistently_sep_2
@@ -144,13 +141,9 @@ instance affine {Φ : Nat → A → PROP} {l : List A} [∀ k x, Affine (Φ k x)
   affine := by
     induction l generalizing Φ with
     | nil =>
-      simp only [bigSepL, bigOpL]
       exact Entails.rfl
     | cons x xs ih =>
-      simp only [bigSepL, bigOpL]
-      have h1 : Φ 0 x ⊢ emp := Affine.affine
-      have h2 : bigSepL (fun n => Φ (n + 1)) xs ⊢ emp := ih
-      exact (sep_mono h1 h2).trans sep_emp.1
+      exact (sep_mono Affine.affine ih).trans sep_emp.1
 
 /-- Corresponds to `big_sepL_persistent_id` in Rocq Iris. -/
 theorem persistent_id {Ps : List PROP} (hPs : ∀ P, P ∈ Ps → Persistent P) :
@@ -158,10 +151,8 @@ theorem persistent_id {Ps : List PROP} (hPs : ∀ P, P ∈ Ps → Persistent P) 
   persistent := by
     induction Ps with
     | nil =>
-      simp only [bigSepL, bigOpL]
       exact persistently_emp_2
     | cons P Ps' ih =>
-      simp only [bigSepL, bigOpL]
       have hP : Persistent P := hPs P List.mem_cons_self
       have hPs' : ∀ Q, Q ∈ Ps' → Persistent Q := fun Q hQ => hPs Q (List.mem_cons_of_mem _ hQ)
       have : Persistent (bigSepL (fun _ (P : PROP) => P) Ps') := ⟨ih hPs'⟩
@@ -176,10 +167,8 @@ theorem affine_id {Ps : List PROP} (hPs : ∀ P, P ∈ Ps → Affine P) :
   affine := by
     induction Ps with
     | nil =>
-      simp only [bigSepL, bigOpL]
       exact Entails.rfl
     | cons P Ps' ih =>
-      simp only [bigSepL, bigOpL]
       have hP : Affine P := hPs P List.mem_cons_self
       have hPs' : ∀ Q, Q ∈ Ps' → Affine Q := fun Q hQ => hPs Q (List.mem_cons_of_mem _ hQ)
       have : Affine (bigSepL (fun _ (P : PROP) => P) Ps') := ⟨ih hPs'⟩
@@ -194,10 +183,8 @@ theorem persistent_cond {Φ : Nat → A → PROP} {l : List A}
   persistent := by
     induction l generalizing Φ with
     | nil =>
-      simp only [bigSepL, bigOpL]
       exact persistently_emp_2
     | cons y ys ih =>
-      simp only [bigSepL, bigOpL]
       have h0 : Persistent (Φ 0 y) := h 0 y rfl
       have hrest : ∀ k x, ys[k]? = some x → Persistent (Φ (k + 1) x) :=
         fun k x hget => h (k + 1) x hget
