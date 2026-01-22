@@ -370,7 +370,7 @@ end LeastFixpointInd
 
 end LeastFixpoint
 
-section GreatestFixpoint
+namespace GreatestFixpoint
 
 variable (F : (A → PROP) → (A → PROP)) [BiMonoPred F]
 
