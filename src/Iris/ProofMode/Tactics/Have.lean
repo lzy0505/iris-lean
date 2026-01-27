@@ -10,7 +10,7 @@ import Iris.ProofMode.Tactics.Specialize
 namespace Iris.ProofMode
 open Lean Elab Tactic Meta Qq BI Std
 
-theorem have_asEmpValid [BI PROP] {φ} {P Q : PROP}
+private theorem have_asEmpValid [BI PROP] {φ} {P Q : PROP}
     [h1 : AsEmpValid .into φ P] (h : φ) : Q ⊢ Q ∗ P :=
   sep_emp.2.trans (sep_mono_r (asEmpValid_1 _ h))
 
@@ -44,7 +44,7 @@ private def iHaveCore {e} (hyps : @Hyps u prop bi e)
     let ⟨uniq', hyps⟩ ← Hyps.addWithInfo bi name q(false) hyp hyps
     return ⟨uniq', _, hyps, q(have_asEmpValid $val)⟩
 
-def iHave{e} (hyps : @Hyps u prop bi e)
+def iHave {e} (hyps : @Hyps u prop bi e)
   (pmt : PMTerm) (name : TSyntax ``binderIdent) (keep : Bool) (mayPostpone := false) : ProofModeM (Name × (e' : _) × Hyps bi e' × Q($e ⊢ $e')) := do
   let ⟨uniq, _, hyps', pf⟩ ← iHaveCore hyps pmt.term name keep mayPostpone
   let ⟨_, hyps'', pf'⟩ ← iSpecializeCore hyps' uniq pmt.spats

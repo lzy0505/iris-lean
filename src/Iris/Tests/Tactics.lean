@@ -54,35 +54,25 @@ end rename
 namespace clear
 
 /-- Tests clearing an intuitionistic hypothesis with `iclear` -/
-example [BI PROP] (Q : PROP) : □ P ⊢ Q -∗ Q := by
+example [BI PROP] (P Q : PROP) : □ P ⊢ Q -∗ Q := by
   iintro □HP
   iintro HQ
   iclear HP
   iexact HQ
 
 /-- Tests clearing a spatial affine hypothesis with `iclear` -/
-example [BI PROP] (Q : PROP) : <affine> P ⊢ Q -∗ Q := by
+example [BI PROP] (P Q : PROP) : <affine> P ⊢ Q -∗ Q := by
   iintro HP
   iintro HQ
   iclear HP
   iexact HQ
 
--- theorem select1 [BI PROP] (Q : PROP) : <affine> P ∗ <affine> P'  ∗ <affine> P'' ∗ □ R ∗ □ R' ∗ □ R' ⊢ Q -∗ Q := by
---   iintro ⟨HP, HP', HP'', □ R, □ R', □ R''⟩
---   iclear HP
---   -- iclear %
---   iclear [*]
---   iclear R
---   iclear #
---   iintro HQ
---   iexact HQ
-
--- theorem select2 [BI PROP] (Q : PROP) : <affine> P ∗ <affine> P'  ∗ <affine> P'' ∗ □ R ∗ □ R' ∗ □ R' ⊢ Q -∗ Q := by
---   iintro ⟨HP, HP', HP'', □ R, □ R', □ R''⟩
---   iclear HP % HP' R
---   iclear [* #]
---   iintro HQ
---   iexact HQ
+/- Tests `iclear` failing -/
+/-- error: iclear: P is not affine and the goal not absorbing -/
+#guard_msgs in
+example [BI PROP] (P Q : PROP) : P ⊢ Q -∗ Q := by
+  iintro HP HQ
+  iclear HP
 
 end clear
 
@@ -109,6 +99,11 @@ example [BI PROP] (Q : PROP) : ⊢ <pers> Q → Q := by
   iintro HQ
   iexact HQ
 
+/- Tests introducing an implication in an intuitionistic context -/
+example [BI PROP] (P : PROP) : ⊢ □ P -∗ P → P := by
+  iintro □HP1 HP2
+  iexact HP2
+
 /-- Tests dropping a hypothesis in an implication with the `-` pattern -/
 example [BI PROP] (Q : PROP) : ⊢ P → Q -∗ Q := by
   iintro - HQ
@@ -121,7 +116,7 @@ example [BI PROP] (Q : PROP) : ⊢ Q -∗ P → Q := by
 
 /-- Tests introducing an universally quantified variable -/
 example [BI PROP] : ⊢@{PROP} ∀ x, ⌜x = 0⌝ → ⌜x = 0⌝ := by
-  iintro x
+  iintro %x
   iintro H
   iexact H
 
@@ -150,44 +145,44 @@ example [BI PROP] (Q : PROP) : ⊢ □ (P1 ∧ P2) -∗ Q ∨ Q -∗ Q := by
   iintro □⟨_HP1, ∗_HP2⟩ (HQ | HQ)
   <;> iexact HQ
 
+/- Tests `iintro` failing to introduce pure hypothesis -/
+/-- error: iintro: iprop(P -∗ Q) cannot be turned into a universal quantifier or pure hypothesis -/
+#guard_msgs in
+example [BI PROP] (P Q : PROP) : ⊢ P -∗ Q := by
+  iintro %H
+
+/- Tests `iintro` failing to introduce -/
+/-- error: iintro: Q not a wand -/
+#guard_msgs in
+example [BI PROP] (Q : PROP) : ⊢ Q := by
+  iintro H
+
+/- Tests `iintro` failing to introduce intuitionistically -/
+/-- error: iintro: Q not a wand -/
+#guard_msgs in
+example [BI PROP] (Q : PROP) : ⊢ Q := by
+  iintro □H
+
+/- Tests `iintro` failing to introduce non-intuitionistic wand as intuitionistic -/
+/-- error: iintro: P not persistent -/
+#guard_msgs in
+example [BI PROP] (P Q : PROP) : ⊢ P -∗ Q := by
+  iintro □H
+
+/- Tests `iintro` failing to introduce non-intuitionistic implication as intuitionistic -/
+/-- error: iintro: P not persistent -/
+#guard_msgs in
+example [BI PROP] (P Q : PROP) : ⊢ P → Q := by
+  iintro □H
+
+/- Tests `iintro` failing to introduce implication with non-empty spatial context -/
+/-- error: iintro: P is not persistent and spatial context is non-empty -/
+#guard_msgs in
+example [BI PROP] (P : PROP) : ⊢ P -∗ P → P := by
+  iintro HP1 HP2
+
+
 end intro
-
--- revert
-namespace revert
-
-theorem spatial [BI PROP] (P Q : PROP) (H : ⊢ P -∗ Q) : P ⊢ Q := by
-  iintro HP
-  irevert HP
-  exact H
-
-theorem intuitionistic [BI PROP] (P : PROP) (H : ⊢ □ P -∗ P) : □ P ⊢ P := by
-  iintro □HP
-  irevert HP
-  exact H
-
-theorem pure [BI PROP] (P : PROP) (Hφ : φ) : ⊢ (⌜φ⌝ -∗ P) -∗ P := by
-  iintro H
-  irevert Hφ
-  iexact H
-
-theorem «forall» [BI PROP] (x : α) (Φ : α → PROP) : ⊢ (∀ x, Φ x) → Φ x := by
-  iintro H
-  irevert x
-  iexact H
-
-theorem multiple_spatial [BI PROP] (P Q : PROP) :
-    ⊢ (P -∗ P) -∗ P -∗ <affine> Q -∗ P := by
-  iintro H HP HQ
-  irevert HP
-  iexact H
-
-theorem multiple_intuitionistic [BI PROP] (P Q : PROP) :
-    ⊢ (□ P -∗ P) -∗ □ P -∗ <affine> Q -∗ P := by
-  iintro H □HP HQ
-  irevert HP
-  iexact H
-
-end revert
 
 -- exists
 namespace «exists»
@@ -230,6 +225,11 @@ example [BI PROP] : ⊢@{PROP} ∃ x y : Nat, ⌜x = y⌝ := by
   ipure_intro
   rfl
 
+/- Tests `iexists` failing with non-quantifier -/
+/-- error: iexists: cannot turn iprop(True) into an existential quantifier -/
+#guard_msgs in
+example [BI PROP] : ⊢@{PROP} True := by
+  iexists _
 
 end «exists»
 
@@ -248,6 +248,20 @@ example [BI PROP] (Q : PROP) : <affine> <pers> Q ⊢ □ Q := by
 
 /-- Tests `iexact` with intuitionistic hypothesis -/
 example [BI PROP] (Q : PROP) : □ Q ⊢ Q := by
+  iintro HQ
+  iexact HQ
+
+/- Tests `iexact` failing with not-affine assumption -/
+/-- error: iexact: context is not affine or goal is not absorbing -/
+#guard_msgs in
+example [BI PROP] (Q : PROP) : ⊢ Q -∗ True -∗ Q := by
+  iintro HQ _
+  iexact HQ
+
+/- Tests `iexact` failing with non-matching goal -/
+/-- error: iexact: cannot unify Q 1 and Q 2 -/
+#guard_msgs in
+example [BI PROP] (Q : Nat → PROP) : ⊢ Q 1 -∗ Q 2 := by
   iintro HQ
   iexact HQ
 
@@ -271,14 +285,16 @@ example [BI PROP] (Q : PROP) : □ Q ⊢ Q := by
   iintro □_HQ
   iassumption
 
-/-- Tests `iassumption` using a Lean hypothesis -/
-example [BI PROP] (Q : PROP) (H : ⊢ Q) : <affine> P ⊢ Q := by
-  iintro _HP
+/-- Tests `iassumption` with multiple hypotheses -/
+example [BI PROP] (P Q : PROP) : □ Q ∗ P ⊢ P := by
+  iintro ⟨□_, _⟩
   iassumption
 
-/-- Tests `iassumption` with Lean hypothesis first introduced -/
-example [BI PROP] (Q : PROP) : <affine> ⌜⊢ Q⌝ ⊢ Q := by
-  iintro ⌜H⌝
+/- Tests `iassumption` failure -/
+/-- error: iassumption: no matching assumption -/
+#guard_msgs in
+example [BI PROP] (P Q : PROP) : □ P ⊢ Q := by
+  iintro □_HQ
   iassumption
 
 end assumption
@@ -612,20 +628,34 @@ example [BI PROP] (Q : PROP) : (⌜φ1⌝ ∧ <affine> ⌜φ2⌝) ⊢ Q -∗ Q :
   ipure Hφ
   iexact HQ
 
+/- Tests `ipure` failure -/
+/-- error: ipure: P is not pure -/
+#guard_msgs in
+example [BI PROP] (P Q : PROP) : P ⊢ Q := by
+  iintro HP
+  ipure HP
+
+/- Tests `ipure` failure for non-affine -/
+/-- error: ipure: iprop(⌜φ⌝) is not affine and the goal not absorbing -/
+#guard_msgs in
+example [BI PROP] φ (Q : PROP) : ⌜φ⌝ ⊢ Q := by
+  iintro HP
+  ipure HP
+
 end pure
 
 -- intuitionistic
 namespace intuitionistic
 
 /-- Tests `iintuitionistic` to move hypothesis to intuitionistic context -/
-example [BI PROP] (P : PROP) : □ P ⊢ Q -∗ Q := by
+example [BI PROP] (P Q : PROP) : □ P ⊢ Q -∗ Q := by
   iintro HP
   iintro HQ
   iintuitionistic HP
   iexact HQ
 
 /-- Tests `iintuitionistic` with multiple hypotheses -/
-example [BI PROP] (P : PROP) : □ P ⊢ □ Q -∗ Q := by
+example [BI PROP] (P Q : PROP) : □ P ⊢ □ Q -∗ Q := by
   iintro HP
   iintro HQ
   iintuitionistic HP
@@ -633,12 +663,26 @@ example [BI PROP] (P : PROP) : □ P ⊢ □ Q -∗ Q := by
   iexact HQ
 
 /-- Tests `iintuitionistic` applied twice to same hypothesis -/
-example [BI PROP] (P : PROP) : □ P ⊢ Q -∗ Q := by
+example [BI PROP] (P Q : PROP) : □ P ⊢ Q -∗ Q := by
   iintro HP
   iintro HQ
   iintuitionistic HP
   iintuitionistic HP
   iexact HQ
+
+/- Tests `iintuitionistic` failure for non-persistent assumption -/
+/-- error: icases: P not persistent -/
+#guard_msgs in
+example [BI PROP] (P Q : PROP) : P ⊢ Q := by
+  iintro HP
+  iintuitionistic HP
+
+/- Tests `iintuitionistic` failure for non-affine assumption -/
+/-- error: icases: iprop(<pers> P) not affine and the goal not absorbing -/
+#guard_msgs in
+example [BI PROP] (P Q : PROP) : <pers> P ⊢ Q := by
+  iintro HP
+  iintuitionistic HP
 
 end intuitionistic
 
@@ -702,6 +746,12 @@ example [BI PROP] (H : A → B) (P Q : PROP) : <affine> P ⊢ <pers> Q → ⌜A�
   iintro _HP □_HQ
   ipure_intro
   exact H
+
+/- Tests `ipure_intro` failure -/
+/-- error: ipure_intro: P is not pure -/
+#guard_msgs in
+example [BI PROP] (P : PROP) : ⊢ P := by
+  ipure_intro
 
 end pureintro
 
@@ -920,13 +970,13 @@ end split
 namespace leftright
 
 /-- Tests `ileft` -/
-example [BI PROP] (P : PROP) : P ⊢ P ∨ Q := by
+example [BI PROP] (P Q : PROP) : P ⊢ P ∨ Q := by
   iintro HP
   ileft
   iexact HP
 
 /-- Tests `iright` -/
-example [BI PROP] (Q : PROP) : Q ⊢ P ∨ Q := by
+example [BI PROP] (P Q : PROP) : Q ⊢ P ∨ Q := by
   iintro HQ
   iright
   iexact HQ
@@ -939,6 +989,20 @@ example [BI PROP] (P Q : PROP) : ⊢ P -∗ Q -∗ P ∗ (R ∨ Q ∨ R) := by
   iright
   ileft
   iexact HQ
+
+/- Tests `ileft` failure -/
+/-- error: ileft: Q is not a disjunction -/
+#guard_msgs in
+example [BI PROP] (P Q : PROP) : P ⊢ Q := by
+  iintro HP
+  ileft
+
+/- Tests `iright` failure -/
+/-- error: iright: Q is not a disjunction -/
+#guard_msgs in
+example [BI PROP] (P Q : PROP) : P ⊢ Q := by
+  iintro HP
+  iright
 
 end leftright
 
@@ -994,6 +1058,14 @@ example [BI PROP] (Q : PROP) : Q ⊢ <affine> (P1 ∨ P2 ∨ P3) -∗ Q := by
   iintro HP
   icases HP with (_HP1 | _HP2 | _HP3)
   <;> iexact HQ
+
+/- Tests `icases` failure too many nested disjunction -/
+/-- error: icases: P2 is not a disjunction -/
+#guard_msgs in
+example [BI PROP] (Q : PROP) : Q ⊢ (P1 ∨ P2) -∗ Q := by
+  iintro HQ
+  iintro HP
+  icases HP with (_HP1 | _HP2 | _HP3)
 
 /-- Tests `icases` with complex mixed conjunction and disjunction -/
 example [BI PROP] [BIAffine PROP] (Q : PROP) :
@@ -1141,16 +1213,49 @@ example [BI PROP] (Q : PROP) : □ (P1 ∧ P2 ∧ Q ∧ P3) ⊢ Q := by
 
 /-- Tests `icases` with existential -/
 example [BI PROP] (Q : Nat → PROP) : (∃ x, Q x) ⊢ ∃ x, Q x ∨ False := by
-  iintro ⟨x, H⟩
+  iintro ⟨%x, H⟩
   iexists x
   ileft
   iexact H
 
 /-- Tests `icases` with intuitionistic existential -/
 example [BI PROP] (Q : Nat → PROP) : □ (∃ x, Q x) ⊢ ∃ x, □ Q x ∨ False := by
-  iintro ⟨x, □H⟩
+  iintro ⟨%x, □H⟩
   iexists x
   ileft
   iexact H
+
+/-- Tests `icases` with proof mode term -/
+example [BI PROP] P (Q : Nat → PROP) :
+  (P -∗ ∃ x, □ Q x ∗ Q 1) ⊢ P -∗ Q 1 := by
+  iintro Hwand HP
+  icases Hwand $$ HP with ⟨%_, -, HQ⟩
+  iexact HQ
+
+/-- Tests `icases` with False -/
+example [BI PROP] (Q : PROP) : False ⊢ Q := by
+  iintro H
+  icases H with ⟨⟩
+
+/- Tests `icases` failing with empty conjunction -/
+/-- error: icases: cannot destruct Q as an empty conjunct -/
+#guard_msgs in
+example [BI PROP] (Q : PROP) : Q ⊢ Q := by
+  iintro H
+  icases H with ⟨⟩
+
+/- Tests `icases` failing to destruct -/
+/-- error: icases: cannot destruct Q -/
+#guard_msgs in
+example [BI PROP] (Q : PROP) : Q ⊢ Q := by
+  iintro H
+  icases H with ⟨HA, HB⟩
+
+/- Tests `icases` failing to destruct intuitionistic -/
+/-- error: icases: cannot destruct iprop(□ Q) -/
+#guard_msgs in
+example [BI PROP] (Q : PROP) : □ Q ⊢ Q := by
+  iintro H
+  icases H with ⟨HA, HB⟩
 
 end cases

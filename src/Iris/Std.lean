@@ -4,6 +4,9 @@ import Iris.Std.FiniteMap
 import Iris.Std.FiniteMapInst
 import Iris.Std.FiniteSet
 import Iris.Std.FiniteSetInst
+import Iris.Std.Heap
+import Iris.Std.HeapInstances
+import Iris.Std.Infinite
 import Iris.Std.Nat
 import Iris.Std.NonExpansive
 import Iris.Std.Prod
