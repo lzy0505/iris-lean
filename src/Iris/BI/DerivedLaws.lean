@@ -1,7 +1,7 @@
 /-
 Copyright (c) 2022 Lars König. All rights reserved.
 Released under Apache 2.0 license as described in the file LICENSE.
-Authors: Lars König, Mario Carneiro, Markus de Medeiros
+Authors: Lars König, Mario Carneiro, Markus de Medeiros, Michael Sammler
 -/
 import Iris.BI.Classes
 import Iris.BI.Extensions
@@ -194,20 +194,84 @@ theorem imp_trans [BI PROP] {P Q R : PROP} : (P → Q) ∧ (Q → R) ⊢ P → R
 theorem false_imp [BI PROP] {P : PROP} : (False → P) ⊣⊢ True :=
   ⟨true_intro, imp_intro <| and_elim_r.trans false_elim⟩
 
-theorem and_left_comm [BI PROP] {P Q R : PROP} : P ∧ Q ∧ R ⊣⊢ Q ∧ P ∧ R :=
-  and_assoc.symm.trans <| (and_congr_l and_comm).trans and_assoc
+theorem exists_impl_forall [BI PROP] {Ψ : α → PROP} {P : PROP} :
+    ((∃ x, Ψ x) → P) ⊣⊢ ∀ x, Ψ x → P :=
+  ⟨forall_intro fun x => imp_mono (exists_intro x) .rfl,
+   imp_intro <| imp_elim' <| exists_elim fun x =>
+     imp_intro <| and_comm.1.trans <| (and_mono (forall_elim x) .rfl).trans imp_elim_l⟩
 
-instance [BI PROP] : Associative (α := PROP) BiEntails and := ⟨and_assoc⟩
+theorem forall_unit [BI PROP] {Ψ : Unit → PROP} : (∀ x, Ψ x) ⊣⊢ Ψ () :=
+  ⟨forall_elim (), forall_intro fun () => .rfl⟩
+
+theorem exists_unit [BI PROP] {Ψ : Unit → PROP} : (∃ x, Ψ x) ⊣⊢ Ψ () :=
+  ⟨exists_elim fun () => .rfl, exists_intro ()⟩
+
+theorem exists_exists [BI PROP] {Ψ : α → β → PROP} : (∃ x y, Ψ x y) ⊣⊢ (∃ y x, Ψ x y) :=
+  ⟨exists_elim fun x => exists_elim fun y =>
+     (exists_intro (Ψ:=λ x => Ψ x y) x).trans (exists_intro (Ψ:=λ y => (∃ x, Ψ x y)) y),
+   exists_elim fun y => exists_elim fun x =>
+     (exists_intro (Ψ:=λ y => Ψ x y) y).trans (exists_intro (Ψ:=λ x => (∃ y, Ψ x y)) x)⟩
+
+theorem forall_forall [BI PROP] {Ψ : α → β → PROP} : (∀ x y, Ψ x y) ⊣⊢ (∀ y x, Ψ x y) :=
+  ⟨forall_intro fun y => forall_intro fun x => (forall_elim x).trans (forall_elim y),
+   forall_intro fun x => forall_intro fun y => (forall_elim y).trans (forall_elim x)⟩
+
+theorem exists_forall [BI PROP] {Ψ : α → β → PROP} : (∃ x, ∀ y, Ψ x y) ⊢ (∀ y, ∃ x, Ψ x y) :=
+  forall_intro fun y => exists_elim fun x =>
+    (forall_elim y).trans (exists_intro (Ψ := λ x => Ψ x y) x)
+
+theorem impl_curry [BI PROP] {P Q R : PROP} : (P → Q → R) ⊣⊢ (P ∧ Q → R) :=
+  ⟨imp_intro <| and_assoc.2.trans <| (and_mono_l imp_elim_l).trans imp_elim_l,
+   imp_intro <| imp_intro <| and_assoc.1.trans <| imp_elim_l⟩
+
+theorem or_and_l [BI PROP] {P Q R : PROP} : P ∨ (Q ∧ R) ⊣⊢ (P ∨ Q) ∧ (P ∨ R) :=
+  ⟨or_elim (and_intro or_intro_l or_intro_l) (and_mono or_intro_r or_intro_r),
+   imp_elim' <| or_elim (imp_intro <| or_intro_l' and_elim_l) <|
+     imp_intro <| imp_elim' <| or_elim (imp_intro <| or_intro_l' and_elim_l)
+       (imp_intro <| or_intro_r' <| and_intro and_elim_l and_elim_r)⟩
+
+theorem or_and_r [BI PROP] {P Q R : PROP} : (P ∧ Q) ∨ R ⊣⊢ (P ∨ R) ∧ (Q ∨ R) :=
+  (or_comm.trans <| or_and_l.trans <| and_congr or_comm or_comm)
 
 theorem and_or_l [BI PROP] {P Q R : PROP} : P ∧ (Q ∨ R) ⊣⊢ P ∧ Q ∨ P ∧ R :=
   ⟨imp_elim' <| or_elim (imp_intro' or_intro_l) (imp_intro' or_intro_r),
    and_intro (or_elim and_elim_l and_elim_l)
     (or_elim (or_intro_l' and_elim_r) (or_intro_r' and_elim_r))⟩
 
+theorem and_or_r [BI PROP] {P Q R : PROP} : (P ∨ Q) ∧ R ⊣⊢ (P ∧ R) ∨ (Q ∧ R) :=
+  and_comm.trans <| and_or_l.trans <| or_congr and_comm and_comm
+
 theorem and_exists_l [BI PROP] {P : PROP} {Ψ : α → PROP} : P ∧ (∃ a, Ψ a) ⊣⊢ ∃ a, P ∧ Ψ a :=
   ⟨imp_elim' <| exists_elim fun _ =>
     imp_intro' (exists_intro (Ψ := fun a => iprop(P ∧ Ψ a)) _),
    exists_elim fun _ => and_mono_r (exists_intro _)⟩
+
+theorem and_exists_r [BI PROP] {Φ : α → PROP} {P : PROP} : (∃ a, Φ a) ∧ P ⊣⊢ ∃ a, Φ a ∧ P :=
+  and_comm.trans <| and_exists_l.trans <| exists_congr fun _ => and_comm
+
+theorem or_exists [BI PROP] {Φ Ψ : α → PROP} : (∃ a, Φ a ∨ Ψ a) ⊣⊢ (∃ a, Φ a) ∨ (∃ a, Ψ a) :=
+  ⟨exists_elim fun a => or_elim (or_intro_l' (exists_intro a)) (or_intro_r' (exists_intro a)),
+   or_elim (exists_mono fun _ => or_intro_l) (exists_mono fun _ => or_intro_r)⟩
+
+theorem and_forall_bool [BI PROP] {P Q : PROP} :
+    P ∧ Q ⊣⊢ «forall» (fun b : Bool => if b then P else Q) :=
+  ⟨forall_intro (·.casesOn and_elim_r and_elim_l),
+   and_intro (forall_elim true) (forall_elim false)⟩
+@[deprecated and_forall_bool (since := "2026-01-29") ]
+abbrev and_alt := @and_forall_bool -- name used by Iris Rocq
+
+theorem or_exists_bool [BI PROP] {P Q : PROP} :
+    P ∨ Q ⊣⊢ «exists» (fun b : Bool => if b then P else Q) :=
+  ⟨or_elim (exists_intro (Ψ:=λ b => if b then P else Q) true)
+           (exists_intro (Ψ:=λ b => if b then P else Q) false),
+   exists_elim (Bool.rec or_intro_r or_intro_l ·)⟩
+@[deprecated or_exists_bool (since := "2026-01-29") ]
+abbrev or_alt := @or_exists_bool -- name used by Iris Rocq
+
+theorem and_left_comm [BI PROP] {P Q R : PROP} : P ∧ Q ∧ R ⊣⊢ Q ∧ P ∧ R :=
+  and_assoc.symm.trans <| (and_congr_l and_comm).trans and_assoc
+
+instance [BI PROP] : Associative (α := PROP) BiEntails and := ⟨and_assoc⟩
 
 theorem or_eq_ite [BI PROP] {P Q : PROP} : P ∨ Q ⊣⊢ ∃ (b : Bool), if b then P else Q := by
   constructor
@@ -1478,18 +1542,6 @@ instance imp_absorbing [BI PROP] (P Q : PROP) [Persistent P] [Absorbing P] [Abso
     Absorbing iprop(P → Q) where
   absorbing := imp_intro' <| persistent_and_affinely_sep_l.1.trans <| absorbingly_sep_r.1.trans <|
     (absorbingly_mono <| persistent_and_affinely_sep_l.2.trans imp_elim_r).trans absorbing
-
-/-! # Reduction to boolean comparisons -/
-
-theorem and_forall_bool [BI PROP] {P Q : PROP} :
-    P ∧ Q ⊣⊢ «forall» (fun b : Bool => if b then P else Q) :=
-  ⟨forall_intro (·.casesOn and_elim_r and_elim_l),
-   and_intro (forall_elim true) (forall_elim false)⟩
-
-theorem or_exists_bool [BI PROP] {P Q : PROP} :
-    P ∨ Q ⊣⊢ «exists» (fun b : Bool => if b then P else Q) :=
-  ⟨or_elim (exists_intro' true .rfl) (exists_intro' false .rfl),
-   exists_elim (Bool.rec or_intro_r or_intro_l ·)⟩
 
 /-! # Later -/
 
