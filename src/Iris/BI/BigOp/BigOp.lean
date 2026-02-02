@@ -5,6 +5,7 @@ Authors: Zongyuan Liu
 -/
 import Iris.Algebra.BigOp
 import Iris.BI.DerivedLaws
+import Iris.BI.DerivedLawsLater
 import Iris.Std.FiniteMap
 import Iris.Std.FiniteSet
 import Lean
