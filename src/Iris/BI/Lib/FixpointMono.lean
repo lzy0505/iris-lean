@@ -79,10 +79,8 @@ theorem unfold_2 (x : A) :
   iapply Hincl
   iapply (BiMonoPred.bi_mono_pred (Ψ := Φ)) $$ [], HF <;> solve_nonexp
 
-  istop
-  apply intuitionistically_intro'
-
-  iintro Hincl %y Hy
+  imodintro
+  iintro %y Hy
   simp [fp]
   iapply Hy
   iapply Hincl
@@ -95,15 +93,12 @@ theorem unfold_1 (x : A) :
 
   iapply HF $$ %(⟨F (fp F), (by solve_nonexp)⟩)
 
-  istop
-  refine intuitionistically_emp.2.trans (intuitionistically_mono ?_)
-
-  iintro _ %y Hy
+  imodintro
+  iintro %y Hy
   simp
   iapply BiMonoPred.bi_mono_pred $$ [], Hy <;> solve_nonexp
-  istop
-  refine intuitionistically_emp.2.trans (intuitionistically_mono ?_)
-  iintro _ %z Hz
+  imodintro
+  iintro %z Hz
   iapply unfold_2
   trivial
   iexact Hz
@@ -138,13 +133,9 @@ theorem affine
   iintro H
   iapply @iter (A := A) (F := F) (Φ := (fun _ => (iprop(emp): PROP))) _
   · apply OFE.ne_of_contractive
-  istop
-  refine intuitionistically_emp.2.trans (intuitionistically_mono ?_)
-
-  iintro _ %y
-  cases (H y) with
-  | mk affine => iapply affine
-
+  imodintro
+  iintro %y
+  iapply (H y).1
   iexact H
 
 /-- If F preserves absorbing predicates, then the least fixpoint is absorbing -/
@@ -197,45 +188,35 @@ theorem persistent_affine
   constructor
 
   suffices h : ∀ x, fp F x ⊢ □ fp F x by
-    exact (h x).trans persistently_of_intuitionistically
+    iintro H
+    ihave □ H:= h $$ H
+    iexact H
 
   intro y
   iintro HF
   iapply (@iter (A := A) (F := F) (Φ := fun z => iprop(□ fp F z))) _ <;> solve_nonexp
-  istop
-  refine intuitionistically_emp.2.trans (intuitionistically_mono ?_)
-
-  iintro Hemp %z HF
-  istop
-  apply emp_sep.1.trans
-  iintro HF
+  imodintro
+  iintro %z HF
 
   have hpers : Persistent (F (fun z => iprop(□ fp F z)) z) := by
     apply H_pers
     intro w
     infer_instance
 
-  istop
-
   have haff : Affine (F (fun z => iprop(□ fp F z)) z) := by
     apply H_affine
     intro w
     infer_instance
+  icases HF with □HF
 
-  apply (affine_affinely (F (fun z => iprop(□ fp F z)) z)).2.trans
-  apply (affinely_mono (persistent (P := F (fun z => iprop(□ fp F z)) z))).trans
-  apply intuitionistically_mono
+  imodintro
 
-  iintro HF
   iapply unfold_2
   trivial
 
   iapply BiMonoPred.bi_mono_pred $$ [], HF <;> solve_nonexp
-  istop
-  refine intuitionistically_emp.2.trans (intuitionistically_mono ?_)
-
-  iintro Hemp %w HH
-  iapply intuitionistically_elim
+  imodintro
+  iintro %w HH
   iexact HH
 
   iexact HF
@@ -252,31 +233,23 @@ theorem persistent_absorbing
   constructor
   iintro HF
   iapply (@iter (A := A) (F := F) (Φ := fun z => iprop(<pers> fp F z))) _ <;> solve_nonexp
-  istop
-  refine intuitionistically_emp.2.trans (intuitionistically_mono ?_)
-  iintro Hemp %y HF
-  istop
-  apply emp_sep.1.trans
-  iintro HF
+  imodintro
+  iintro %y HF
 
   have hpers : Persistent (F (fun z => iprop(<pers> fp F z)) y) := by
     apply H_pers
     intro w
     infer_instance
 
-  istop
+  icases HF with □HF
+  imodintro
 
-  apply (persistent (P := F (fun z => iprop(<pers> fp F z)) y)).trans
-  apply BI.persistently_mono
-
-  iintro HF
   iapply unfold_2
   trivial
   iapply BiMonoPred.bi_mono_pred $$ [], HF <;> solve_nonexp
-  istop
-  refine intuitionistically_emp.2.trans (intuitionistically_mono ?_)
-  iintro Hemp %x HH
-  iapply persistently_elim
+  imodintro
+  iintro %x □HH
+
   iexact HH
 
   iexact HF
@@ -289,9 +262,8 @@ theorem strong_mono
             (∀ (x : A), fp F x -∗ fp G x)) := by
   iintro □Hmon
   iapply @iter (PROP := PROP) (Φ := fp G) <;> solve_nonexp
-  istop
-  apply intuitionistically_intro'
-  iintro Hmon %y IH
+  imodintro
+  iintro %y IH
   iapply unfold_2
   trivial
   iapply Hmon $$ IH
@@ -325,15 +297,10 @@ theorem ind_wf (Φ : A → PROP) [NonExpansive Φ] :
   infer_instance
   iapply Hmon
   iapply BiMonoPred.bi_mono_pred $$ [], Hx <;> solve_nonexp
-
-  istop
-  apply intuitionistically_intro'
-
-  iintro □Hmon
+  imodintro
   iapply iter<;> solve_nonexp
-  istop
-  apply intuitionistically_intro'
-  iintro □Hmon %y Hy
+  imodintro
+  iintro %y Hy
   iapply unfold_2
   infer_instance
   isplit
@@ -347,14 +314,12 @@ theorem ind (Φ : A → PROP) [NonExpansive Φ] :
             (∀ (x : A), fp F x -∗ Φ x)) := by
   iintro □Hmon
   iapply ind_wf<;> try infer_instance
-  istop
-  apply intuitionistically_intro'
-  iintro □Hmon %y Hy
+  imodintro
+  iintro %y Hy
   iapply Hmon
   iapply BiMonoPred.bi_mono_pred $$ [], Hy <;> solve_nonexp
-  istop
-  apply intuitionistically_intro'
-  iintro □Hmon %x Hx
+  imodintro
+  iintro %x Hx
   isplit
   · ihave Hx := unfold_1 (A:=A) (PROP:= PROP) $$ Hx
     infer_instance
@@ -362,10 +327,8 @@ theorem ind (Φ : A → PROP) [NonExpansive Φ] :
     iexact Ha
   · iapply strong_mono $$ [], Hx
     infer_instance
-
-    istop
-    apply intuitionistically_intro'
-    iintro Hmon %_ %_ ⟨-, H⟩
+    imodintro
+    iintro %_ %_ ⟨-, H⟩
     iexact H
 
 end LeastFixpointInd
