@@ -736,14 +736,13 @@ namespace BigSepL2
 /-- Corresponds to `big_sepL2_nil` in Rocq Iris. -/
 @[simp]
 theorem nil {Φ : Nat → A → B → PROP} :
-    ([∗list] k ↦ x;x' ∈ ([] : List A);([] : List B), Φ k x x') ⊣⊢ emp := by
+    ([∗list] k ↦ x;x' ∈ ([] : List A);([] : List B), Φ k x x') = emp := by
   simp only [bigSepL2]
-  exact .rfl
 
 /-- Corresponds to `big_sepL2_nil'` in Rocq Iris. -/
 theorem nil' {P : PROP} [Affine P] {Φ : Nat → A → B → PROP} :
-    P ⊢ ([∗list] k ↦ x;x' ∈ ([] : List A);([] : List B), Φ k x x') :=
-  Affine.affine.trans nil.2
+    P ⊢ ([∗list] k ↦ x;x' ∈ ([] : List A);([] : List B), Φ k x x') := by
+  exact Affine.affine
 
 /-- Corresponds to `big_sepL2_nil_inv_l` in Rocq Iris. -/
 theorem nil_inv_l {Φ : Nat → A → B → PROP} {l2 : List B} :
@@ -760,11 +759,10 @@ theorem nil_inv_r {Φ : Nat → A → B → PROP} {l1 : List A} :
   | cons x xs => simp only [bigSepL2]; exact false_elim
 
 /-- Corresponds to `big_sepL2_cons` in Rocq Iris. -/
-theorem cons {Φ : Nat → A → B → PROP} {x1 : A} {x2 : B} {xs1 : List A} {xs2 : List B} :
-    ([∗list] k ↦ y1;y2 ∈ x1 :: xs1;x2 :: xs2, Φ k y1 y2) ⊣⊢
-      Φ 0 x1 x2 ∗ [∗list] k ↦ y1;y2 ∈ xs1;xs2, Φ (k + 1) y1 y2 := by
+@[simp] theorem cons {Φ : Nat → A → B → PROP} {x1 : A} {x2 : B} {xs1 : List A} {xs2 : List B} :
+    iprop([∗list] k ↦ y1;y2 ∈ x1 :: xs1;x2 :: xs2, Φ k y1 y2) =
+      iprop(Φ 0 x1 x2 ∗ [∗list] k ↦ y1;y2 ∈ xs1;xs2, Φ (k + 1) y1 y2) := by
   simp only [bigSepL2]
-  exact .rfl
 
 /-- Corresponds to `big_sepL2_cons_inv_l` in Rocq Iris. -/
 theorem cons_inv_l {Φ : Nat → A → B → PROP} {x1 : A} {xs1 : List A} {l2 : List B} :
@@ -1199,7 +1197,7 @@ theorem app_inv_l {Φ : Nat → A → B → PROP} {l1' l1'' : List A} {l2 : List
   induction l1' generalizing l2 Φ with
   | nil =>
     simp only [List.nil_append, List.length_nil, List.take_zero, List.drop_zero, Nat.add_zero]
-    exact emp_sep.symm.1.trans (sep_mono_l nil.symm.1)
+    exact emp_sep.symm.1
   | cons x1 xs1 ih =>
     cases l2 with
     | nil => simp only [bigSepL2, List.cons_append]; exact false_elim

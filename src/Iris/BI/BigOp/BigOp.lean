@@ -200,14 +200,14 @@ def delabBigSepL2 : Delab := do
   unless e.isApp do failure
   unless e.getAppFn.isConstOf ``bigSepL2 do failure
   let args := e.getAppArgs
-  unless args.size == 6 do failure
+  unless args.size == 7 do failure
 
-  -- Delab the two list arguments (args 4 and 5)
-  let l1 ← withNaryArg 4 delab
-  let l2 ← withNaryArg 5 delab
+  -- Delab the two list arguments (args 5 and 6)
+  let l1 ← withNaryArg 5 delab
+  let l2 ← withNaryArg 6 delab
 
-  -- Get the function argument (arg 3)
-  let fn := args[3]!
+  -- Get the function argument (arg 4)
+  let fn := args[4]!
 
   match fn with
   | .lam xn _ body _ =>
@@ -219,7 +219,7 @@ def delabBigSepL2 : Delab := do
         let xUsed := fnBody.hasLooseBVar 2  -- Check if index variable is used
         let y1 := mkIdent y1n
         let y2 := mkIdent y2n
-        let P ← withNaryArg 3 <| withBindingBody y2n <| withBindingBody y1n <| withBindingBody xn <| delab
+        let P ← withNaryArg 4 <| withBindingBody xn <| withBindingBody y1n <| withBindingBody y2n <| delab
 
         if xUsed then
           let x := mkIdent xn
@@ -232,14 +232,14 @@ def delabBigSepL2 : Delab := do
         let k := mkIdent xn
         let x1 := mkIdent y1n
         let x2 := mkIdent `x2
-        let P ← withNaryArg 3 <| withBindingBody y1n <| withBindingBody xn <| delab
+        let P ← withNaryArg 4 <| withBindingBody xn <| withBindingBody y1n <| delab
         `([∗list]  $k ↦ $x1;$x2 ∈ $l1;$l2, $P $x2)
     | _ =>
       -- Single-parameter lambda: fun n => Φ (n + 1)
       let k := mkIdent xn
       let x1 := mkIdent `x1
       let x2 := mkIdent `x2
-      let P ← withNaryArg 3 <| withBindingBody xn <| delab
+      let P ← withNaryArg 4 <| withBindingBody xn <| delab
       `([∗list]  $k ↦ $x1;$x2 ∈ $l1;$l2, $P $x1 $x2)
   | _ => failure
 
