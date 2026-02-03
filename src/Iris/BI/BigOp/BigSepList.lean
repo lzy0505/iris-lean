@@ -730,27 +730,6 @@ namespace BigSepL2
 
 variable {PROP : Type _} [BI PROP] {A B : Type _}
 
-def bigSepL2 [BI PROP] {A B : Type _} (Φ : Nat → A → B → PROP)
-    (l1 : List A) (l2 : List B) : PROP :=
-  match l1, l2 with
-  | [], [] => emp
-  | x1 :: xs1, x2 :: xs2 => sep (Φ 0 x1 x2) (bigSepL2 (fun n => Φ (n + 1)) xs1 xs2)
-  | _, _ => iprop(False)
-
-syntax "[∗ " "list" "] " ident ";" ident " ∈ " term ";" term ", " term : term
-syntax "[∗ " "list" "] " ident " ↦ " ident ";" ident " ∈ " term ";" term ", " term : term
-
-macro_rules
-  | `([∗list] $x1:ident;$x2:ident ∈ $l1;$l2, $P) =>
-      `(bigSepL2 (fun _ $x1 $x2 => $P) $l1 $l2)
-  | `([∗list] $k:ident ↦ $x1:ident;$x2:ident ∈ $l1;$l2, $P) =>
-      `(bigSepL2 (fun $k $x1 $x2 => $P) $l1 $l2)
-
-macro_rules
-  | `(iprop([∗list] $x1:ident;$x2:ident ∈ $l1;$l2, $P)) =>
-      `(bigSepL2 (fun _ $x1 $x2 => iprop($P)) $l1 $l2)
-  | `(iprop([∗list] $k:ident ↦ $x1:ident;$x2:ident ∈ $l1;$l2, $P)) =>
-      `(bigSepL2 (fun $k $x1 $x2 => iprop($P)) $l1 $l2)
 
 namespace BigSepL2
 
