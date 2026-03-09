@@ -636,7 +636,7 @@ theorem lookup_acc_impl {Φ : K → V → PROP} {m : M V} {k : K} {v : V}
       have hne : k' ≠ k := by
         intro heq
         rw [heq, lookup_delete_eq] at hget_erase
-        exact Option.noConfusion hget_erase
+        exact nomatch hget_erase
       have hget_m : get? m k' = some v' := by
         rw [lookup_delete_ne m k k' hne.symm] at hget_erase
         exact hget_erase
@@ -780,7 +780,7 @@ theorem fn_insert {B : Type _} {Ψ : K → V → B → PROP} {f : K → B} {m : 
     have hne : k ≠ i := by
       intro heq
       rw [heq, h] at hget
-      exact Option.noConfusion hget
+      exact nomatch hget
     simp only [fnInsert_ne f i b k hne]
     exact OFE.Equiv.rfl
   exact hins.trans ⟨(sep_mono hhead.1 htail.1), (sep_mono hhead.2 htail.2)⟩
@@ -922,7 +922,7 @@ theorem impl_strong {M₂ : Type _ → Type _} {V₂ : Type _}
            iprop(⌜get? m k = some y'⌝ → Ψ k y'))) := by
         apply intuitionistically_mono; apply forall_mono; intro k; apply forall_mono; intro y'
         apply wand_mono_r; apply imp_intro'; apply pure_elim_l; intro hget_m
-        have hne : k ≠ i := by intro heq; rw [heq] at hget_m; exact Option.noConfusion (hi ▸ hget_m)
+        have hne : k ≠ i := by intro heq; rw [heq] at hget_m; exact nomatch (hi ▸ hget_m)
         rw [lookup_insert_ne m i k y hne.symm] at *
         exact (and_intro (pure_intro hget_m) .rfl).trans imp_elim_r
       have hfilter_eq : FiniteMap.filter (fun k _ => decide ((get? (Std.insert m i y) k).isNone)) m₁ =
@@ -930,7 +930,7 @@ theorem impl_strong {M₂ : Type _ → Type _} {V₂ : Type _}
         simp only [FiniteMap.filter]; congr 1
         apply List.filter_congr; intro ⟨j, v⟩ hjv
         have hget : get? m₁ j = some v := (FiniteMapLaws.elem_of_map_to_list m₁ j v).mp hjv
-        have hne : j ≠ i := by intro heq; rw [heq] at hget; exact Option.noConfusion (hm₁i ▸ hget)
+        have hne : j ≠ i := by intro heq; rw [heq] at hget; exact nomatch (hm₁i ▸ hget)
         rw [lookup_insert_ne _ _ _ _ hne.symm]
       rw [hfilter_eq]
       exact (sep_mono_r hΨ_from_hyp).trans <| (sep_mono_l (sep_mono_r hweaken)).trans <|
@@ -951,7 +951,7 @@ theorem impl_strong {M₂ : Type _ → Type _} {V₂ : Type _}
            iprop(⌜get? m k = some y'⌝ → Ψ k y'))) := by
         apply intuitionistically_mono; apply forall_mono; intro k; apply forall_mono; intro y'
         apply wand_intro; apply imp_intro'; apply pure_elim_l; intro hget_m
-        have hne : k ≠ i := by intro heq; rw [heq] at hget_m; exact Option.noConfusion (hi ▸ hget_m)
+        have hne : k ≠ i := by intro heq; rw [heq] at hget_m; exact nomatch (hi ▸ hget_m)
         have hlookup_insert_ne : get? (Std.insert m i y) k = some y' := by
           rw [lookup_insert_ne m i k y hne.symm]; exact hget_m
         rw [lookup_delete_ne m₁ i k hne.symm]
@@ -980,7 +980,7 @@ theorem impl_strong {M₂ : Type _ → Type _} {V₂ : Type _}
           apply List.filter_congr; intro ⟨k, v⟩ hkv
           have hne : k ≠ i := by
             intro heq; have hlookup := (FiniteMapLaws.elem_of_map_to_list (Std.delete m₁ i) k v).mp hkv
-            rw [heq, lookup_delete_eq] at hlookup; exact Option.noConfusion hlookup
+            rw [heq, lookup_delete_eq] at hlookup; exact nomatch hlookup
           exact hpred_eq k hne
         exact equiv_iff.mp (BigOpL.perm (Φ := fun (kv : K × V) => Φ kv.1 kv.2)
           (hperm1.trans ((hfilter_eq ▸ hfilter_perm1).trans hperm2.symm)))

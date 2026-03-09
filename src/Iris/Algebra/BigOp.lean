@@ -763,7 +763,7 @@ private theorem closed_aux (P : M → Prop) (Φ : K → V → M)
       · intro heq
         subst heq
         rw [hget'] at hm''
-        exact Option.noConfusion hm''
+        exact nomatch hm''
 
 theorem closed (P : M → Prop) (Φ : K → V → M) (m : M' V)
     (hproper : ∀ x y, x ≡ y → (P x ↔ P y))

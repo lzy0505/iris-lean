@@ -426,7 +426,7 @@ theorem list_to_map_to_list (m : M V) :
         (elem_of_list_to_map (M := M) (K := K) (toList m) i val (NoDup_map_to_list_keys m)).mpr heq'
       have : get? m i = some val := (elem_of_map_to_list m i val).mp hmem
       rw [heq] at this
-      exact Option.noConfusion this
+      exact nomatch this
   · rename_i val
     have hmem : (i, val) ∈ toList m := (elem_of_map_to_list m i val).mpr heq
     have : get? (ofList (toList m) : M V) i = some val :=
@@ -575,7 +575,7 @@ theorem map_to_list_empty : toList (∅ : M V) = [] := by
   -- Now we have get? ∅ i = some x, but lookup_empty says get? ∅ i = none
   rw [lookup_empty] at hmem
   -- Contradiction: none ≠ some x
-  exact Option.noConfusion hmem
+  exact nomatch hmem
 
   /-- Corresponds to Rocq's `map_to_list_insert`. -/
 theorem map_to_list_insert [DecidableEq V] : ∀ (m : M V) k v, get? m k = none →
@@ -592,7 +592,7 @@ theorem map_to_list_insert [DecidableEq V] : ∀ (m : M V) k v, get? m k = none 
       subst hk_eq
       have : get? m k' = some v' := (elem_of_map_to_list m k' v').mp hmem
       rw [hk_none] at this
-      exact Option.noConfusion this
+      exact nomatch this
     · exact NoDup_map_to_list_keys m
   · rw [list_to_map_to_list]
     rw [ofList_cons, list_to_map_to_list]
@@ -770,7 +770,7 @@ theorem insert_subset (m : M V) (i : K) (x : V) :
     have h2 : get? (insert m i x) i = some x := lookup_insert_eq m i x
     rw [← heq] at h2
     rw [hi] at h2
-    exact Option.noConfusion h2
+    exact nomatch h2
 
 /-- Corresponds to Rocq's `delete_mono`. -/
 theorem delete_mono (m₁ m₂ : M V) (i : K) :

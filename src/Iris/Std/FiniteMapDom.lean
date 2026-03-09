@@ -44,7 +44,7 @@ theorem not_elem_of_domSet : ∀ (m : M V) k, get? m k = none ↔ k ∉ (domSet 
     subst h_eq
     have : get? m k' = some v := (FiniteMapLaws.elem_of_map_to_list m k' v).mp h_mem
     rw [h_none] at this
-    exact Option.noConfusion this
+    exact nomatch this
   · intro h_not_in
     cases h : get? m k
     · rfl
