@@ -23,6 +23,34 @@ end ExclAuth
 ```
 
 This creates `Rocq.excl_auth_agreeN` as a `@[deprecated]` alias for `ExclAuth.agreeN`.
+
+## Naming Convention
+
+The name given to `@[rocq_alias]` must be the **fully qualified Rocq name**.
+If the Rocq definition lives inside a `Module`, include the module prefix.
+Rocq `Section`s do not affect name qualification.
+
+For example, in Rocq:
+```
+Module bi.
+  Lemma absorbingly_timeless P : ...
+End bi.
+```
+the fully qualified name is `bi.absorbingly_timeless`, so the alias should be:
+```
+@[rocq_alias bi.absorbingly_timeless]
+```
+
+Conversely, definitions inside a `Section` (not a `Module`) are **not** prefixed:
+```
+Section internal_eq.
+  Lemma internal_eq_ne : ...
+End internal_eq.
+```
+Here the name is just `internal_eq_ne`, so:
+```
+@[rocq_alias internal_eq_ne]
+```
 -/
 
 open Lean Elab Command

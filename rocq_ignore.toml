@@ -1,0 +1,24 @@
+# Configuration for the porting completeness checker.
+
+# Iris-Rocq revision to track against.
+[rocq]
+commit = "ad2f70c4dbac0d3cc710d0375546c4b9aa440aa6"
+
+# Ignore all definitions under these directory prefixes.
+[directories]
+ignore = [
+  "iris/prelude/",
+  "iris/deprecated/",
+]
+
+# Ignore all definitions in these specific files.
+[files]
+ignore = [
+  "iris/proofmode/string_ident.v",
+  "iris/proofmode/tokens.v",
+  "iris/proofmode/ident_name.v",
+]
+
+# Ignore individual definition names.
+[names]
+ignore = []

@@ -18,3 +18,9 @@ name = "Iris"
 [[lean_lib]]
 name = "IrisTest"
 globs = ["Iris.*"]
+
+[[lean_exe]]
+name = "dumpRocqAliases"
+srcDir = "../scripts"
+root = "DumpRocqAliases"
+supportInterpreter = true

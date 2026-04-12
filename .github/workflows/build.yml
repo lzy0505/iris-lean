@@ -7,6 +7,12 @@ on:
     branches: ["master"]
   workflow_dispatch:
 
+# Allow deployment to GitHub Pages
+permissions:
+  contents: read
+  pages: write
+  id-token: write
+
 jobs:
   build:
     runs-on: ubuntu-latest
@@ -15,3 +21,45 @@ jobs:
       - uses: actions/checkout@v6
       # uses lean standard action with all default input values
       - uses: leanprover/lean-action@v1
+      - name: Read Rocq commit from config
+        id: rocq-commit
+        run: |
+          sha=$(python3 -c "import tomllib; print(tomllib.load(open('rocq_ignore.toml','rb')).get('rocq',{}).get('commit',''))")
+          echo "sha=$sha" >> "$GITHUB_OUTPUT"
+      - name: Cache Rocq definitions
+        uses: actions/cache@v4
+        with:
+          path: .lake/iris-rocq-cache
+          key: rocq-defs-${{ steps.rocq-commit.outputs.sha }}
+      - name: Check porting completeness
+        run: python3 scripts/check_porting.py --format summary
+      - name: Generate porting reports
+        run: |
+          mkdir -p _site
+          python3 scripts/check_porting.py --no-build --format html -o _site/index.html
+          python3 scripts/check_porting.py --no-build --format csv -o _site/report.csv
+      - name: Upload porting report
+        uses: actions/upload-artifact@v4
+        with:
+          name: porting-report
+          path: |
+            _site/index.html
+            _site/report.csv
+      - name: Upload Pages artifact
+        if: github.ref == 'refs/heads/master'
+        uses: actions/upload-pages-artifact@v3
+
+  deploy:
+    if: github.ref == 'refs/heads/master'
+    needs: build
+    runs-on: ubuntu-latest
+    permissions:
+      pages: write
+      id-token: write
+    environment:
+      name: github-pages
+      url: ${{ steps.deployment.outputs.page_url }}
+    steps:
+      - name: Deploy to GitHub Pages
+        id: deployment
+        uses: actions/deploy-pages@v4
