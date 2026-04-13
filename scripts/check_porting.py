@@ -71,7 +71,6 @@ MODULE_END_RE = re.compile(r"^\s*End\s+(\w+)\s*\.", re.MULTILINE)
 SECTION_START_RE = re.compile(r"^\s*Section\s+(\w+)", re.MULTILINE)
 SECTION_END_RE = re.compile(r"^\s*End\s+(\w+)\s*\.", re.MULTILINE)
 
-# Skip local definitions
 # Lines to skip entirely
 SKIP_LINE_RE = re.compile(
     r"^\s*(?:Notation|Ltac|Ltac2|Tactic\s+Notation|Hint|Arguments|"
@@ -480,7 +479,7 @@ def output_csv(report: Report, path: str) -> None:
 
 
 def output_html(report: Report, path: str) -> None:
-    """Generate a self-contained HTML report."""
+    """Generate a self-contained HTML report from the template."""
     # Per-file data
     files_data: dict[str, list[ReportEntry]] = defaultdict(list)
     stale_entries: list[ReportEntry] = []
@@ -496,18 +495,15 @@ def output_html(report: Report, path: str) -> None:
     missing = len(report.missing)
     pct = ported / total * 100 if total > 0 else 0
 
-    # Collect top-level folders for the folder filter
+    # Collect top-level folders
     folders: set[str] = set()
     for filepath in files_data:
-        display = filepath.removeprefix(ROCQ_SRC_PREFIX)
-        folder = display.split("/")[0]
-        folders.add(folder)
+        folders.add(filepath.removeprefix(ROCQ_SRC_PREFIX).split("/")[0])
 
-    # Compute per-folder summary
+    # Per-folder summary
     folder_stats: dict[str, dict[str, int]] = defaultdict(lambda: defaultdict(int))
     for filepath, entries in files_data.items():
-        display = filepath.removeprefix(ROCQ_SRC_PREFIX)
-        folder = display.split("/")[0]
+        folder = filepath.removeprefix(ROCQ_SRC_PREFIX).split("/")[0]
         for e in entries:
             folder_stats[folder][e.status] += 1
             folder_stats[folder]["total"] += 1
@@ -517,251 +513,103 @@ def output_html(report: Report, path: str) -> None:
         fs = folder_stats[folder]
         f_total = fs["total"]
         f_done = fs.get("ported", 0) + fs.get("ignored", 0)
-        f_pct = f_done / f_total * 100 if f_total > 0 else 0
         folder_buttons += (
             f'<button class="folder-btn" onclick="setFolder(\'{folder}\')">'
             f'{folder}/ <small>{f_done}/{f_total}</small></button>\n'
         )
 
-    file_rows = []
+    # Build file sections
+    COLGROUP = (
+        '<colgroup><col class="col-name"><col class="col-status">'
+        '<col class="col-detail"></colgroup>'
+    )
+    BADGE_CLS = {
+        "ported": "badge-ported",
+        "ignored": "badge-ignored",
+        "missing": "badge-missing",
+    }
+
+    file_sections = []
     for filepath in sorted(files_data.keys()):
         entries = files_data[filepath]
         display = filepath.removeprefix(ROCQ_SRC_PREFIX)
         folder = display.split("/")[0]
         n_ported = sum(1 for e in entries if e.status == "ported")
         n_ignored = sum(1 for e in entries if e.status == "ignored")
-        n_missing = sum(1 for e in entries if e.status == "missing")
         n_total = len(entries)
         n_done = n_ported + n_ignored
         file_pct = n_done / n_total * 100 if n_total > 0 else 0
-
-        rows_html = []
-        for e in sorted(entries, key=lambda x: (x.status != "missing", x.rocq_name)):
-            badge_cls = {
-                "ported": "badge-ported",
-                "ignored": "badge-ignored",
-                "missing": "badge-missing",
-            }.get(e.status, "")
-            detail = e.lean_name if e.status == "ported" else e.reason
-            rows_html.append(
-                f'<tr class="entry {e.status}" data-name="{e.rocq_name}">'
-                f'<td>{e.rocq_name}</td>'
-                f'<td><span class="badge {badge_cls}"></span></td>'
-                f"<td>{detail}</td>"
-                f"</tr>"
-            )
-
-        bar_w = file_pct
-
         rocq_link = f"{GITLAB_WEB_BASE}/-/blob/{report.rocq_commit}/{filepath}"
 
-        file_rows.append(f"""
-        <div class="file-section" data-file="{display}" data-folder="{folder}">
-          <div class="file-header" onclick="this.parentElement.classList.toggle('open')">
-            <span class="arrow">&#9654;</span>
-            <code class="file-name">{display}</code>
-            <a class="file-link" href="{rocq_link}" target="_blank" onclick="event.stopPropagation()">[src]</a>
-            <span class="file-stats">{n_done}/{n_total} ({file_pct:.0f}%)</span>
-            <span class="mini-bar"><span class="mini-bar-fill" style="width:{bar_w:.1f}%"></span></span>
-          </div>
-          <table class="file-table">
-            <thead><tr><th>Rocq Name</th><th>Status</th><th>Details</th></tr></thead>
-            <tbody>{"".join(rows_html)}</tbody>
-          </table>
-        </div>""")
+        rows = []
+        for e in sorted(entries, key=lambda x: (x.status != "missing", x.rocq_name)):
+            badge = BADGE_CLS.get(e.status, "")
+            detail = e.lean_name if e.status == "ported" else e.reason
+            rows.append(
+                f'<tr class="entry {e.status}" data-name="{e.rocq_name}">'
+                f"<td>{e.rocq_name}</td>"
+                f'<td><span class="badge {badge}"></span></td>'
+                f"<td>{detail}</td></tr>"
+            )
 
-    stale_html = ""
+        file_sections.append(
+            f'<div class="file-section" data-file="{display}" data-folder="{folder}">'
+            f'<div class="file-header" onclick="this.parentElement.classList.toggle(\'open\')">'
+            f'<span class="arrow">&#9654;</span>'
+            f'<code class="file-name">{display}</code>'
+            f'<a class="file-link" href="{rocq_link}" target="_blank"'
+            f' onclick="event.stopPropagation()">[src]</a>'
+            f'<span class="file-stats">{n_done}/{n_total} ({file_pct:.0f}%)</span>'
+            f'<span class="mini-bar"><span class="mini-bar-fill"'
+            f' style="width:{file_pct:.1f}%"></span></span>'
+            f"</div>"
+            f'<table class="file-table">{COLGROUP}'
+            f"<thead><tr><th>Rocq Name</th><th>Status</th><th>Details</th></tr></thead>"
+            f'<tbody>{"".join(rows)}</tbody></table></div>'
+        )
+
+    # Stale section
+    stale_section = ""
     if stale_entries:
         stale_rows = []
         for e in stale_entries:
-            badge_cls = "badge-stale"
             detail = e.lean_name if e.status == "stale_alias" else e.reason
             stale_rows.append(
                 f'<tr class="entry stale_alias" data-name="{e.rocq_name}">'
-                f'<td>{e.rocq_name}</td>'
-                f'<td><span class="badge {badge_cls}"></span></td>'
+                f"<td>{e.rocq_name}</td>"
+                f'<td><span class="badge badge-stale"></span></td>'
                 f"<td>{detail}</td></tr>"
             )
-        stale_html = f"""
-        <div class="file-section open" data-file="stale" data-folder="_stale">
-          <div class="file-header" onclick="this.parentElement.classList.toggle('open')">
-            <span class="arrow">&#9654;</span>
-            <code class="file-name">Stale Entries</code>
-            <span class="file-stats">{len(stale_entries)} entries</span>
-          </div>
-          <table class="file-table">
-            <thead><tr><th>Name</th><th>Status</th><th>Details</th></tr></thead>
-            <tbody>{"".join(stale_rows)}</tbody>
-          </table>
-        </div>"""
+        stale_section = (
+            f'<div class="file-section open" data-file="stale" data-folder="_stale">'
+            f'<div class="file-header" onclick="this.parentElement.classList.toggle(\'open\')">'
+            f'<span class="arrow">&#9654;</span>'
+            f'<code class="file-name">Stale Entries</code>'
+            f'<span class="file-stats">{len(stale_entries)} entries</span></div>'
+            f'<table class="file-table">{COLGROUP}'
+            f"<thead><tr><th>Name</th><th>Status</th><th>Details</th></tr></thead>"
+            f'<tbody>{"".join(stale_rows)}</tbody></table></div>'
+        )
 
-    html = f"""<!DOCTYPE html>
-<html lang="en">
-<head>
-<meta charset="utf-8">
-<title>Iris Porting Status</title>
-<style>
-  * {{ box-sizing: border-box; margin: 0; padding: 0; }}
-  body {{ font-family: "Georgia", "Times New Roman", serif;
-         max-width: 960px; margin: 0 auto; padding: 24px;
-         background: #fff; color: #222; line-height: 1.5; }}
-  h1 {{ font-size: 1.6em; margin-bottom: 4px; font-weight: normal; }}
-  h2 {{ font-size: 1.1em; font-weight: normal; margin: 18px 0 8px; border-bottom: 1px solid #ccc; padding-bottom: 4px; }}
-  .meta {{ font-size: 0.85em; color: #666; margin-bottom: 16px; }}
-  .meta a {{ color: #555; }}
+    # Load template and fill placeholders
+    template_path = Path(__file__).parent / "report_template.html"
+    template = template_path.read_text()
 
-  /* Summary table */
-  .summary {{ border-collapse: collapse; margin: 12px 0 20px; width: 100%; }}
-  .summary td {{ padding: 6px 0; text-align: center; font-size: 0.85em; color: #666;
-                 border-right: 1px solid #ddd; }}
-  .summary td:last-child {{ border-right: none; }}
-  .summary .num {{ display: block; font-family: "SF Mono", "Menlo", "Consolas", monospace;
-                   font-size: 1.6em; font-weight: bold; color: #222; }}
-
-  /* Progress */
-  .progress-bar {{ height: 14px; background: #ddd; margin: 0 0 20px; }}
-  .progress-fill {{ height: 100%; background: #4a4; }}
-
-  /* Search + filters */
-  .controls {{ margin: 16px 0; }}
-  .search {{ width: 100%; padding: 6px 8px; font-size: 0.95em;
-             border: 1px solid #999; font-family: inherit; margin-bottom: 8px; }}
-  .filter-row {{ display: flex; gap: 6px; flex-wrap: wrap; margin-bottom: 6px; }}
-  .filter-btn, .folder-btn {{
-    padding: 3px 10px; border: 1px solid #aaa; background: #f8f8f8;
-    cursor: pointer; font-size: 0.82em; font-family: inherit; }}
-  .filter-btn:hover, .folder-btn:hover {{ background: #eee; }}
-  .filter-btn.active {{ background: #333; color: #fff; border-color: #333; }}
-  .folder-btn.active {{ background: #555; color: #fff; border-color: #555; }}
-  .folder-btn small {{ color: inherit; opacity: 0.7; }}
-
-  /* File sections */
-  .file-section {{ border-top: 1px solid #ddd; }}
-  .file-section:last-child {{ border-bottom: 1px solid #ddd; }}
-  .file-header {{ padding: 6px 0; cursor: pointer; display: flex;
-                  align-items: center; gap: 8px; user-select: none; }}
-  .file-header:hover {{ background: #fafafa; }}
-  .arrow {{ font-size: 0.65em; width: 1em; text-align: center; }}
-  .file-section.open .arrow {{ transform: rotate(90deg); }}
-  .file-name {{ font-size: 0.92em; font-family: "SF Mono", "Menlo", "Consolas", monospace; }}
-  .file-link {{ font-size: 0.75em; color: #888; text-decoration: none; }}
-  .file-link:hover {{ color: #24a; }}
-  .file-stats {{ color: #666; font-size: 0.82em; margin-left: auto; white-space: nowrap; font-family: "SF Mono", "Menlo", "Consolas", monospace; }}
-  .mini-bar {{ display: inline-block; width: 80px; height: 4px; background: #ddd; vertical-align: middle; margin-left: 8px; }}
-  .mini-bar-fill {{ display: block; height: 100%; background: #4a4; }}
-
-  /* Tables */
-  .file-table {{ width: 100%; border-collapse: collapse; display: none; margin-bottom: 8px; }}
-  .file-section.open .file-table {{ display: table; }}
-  .file-table th {{ text-align: left; padding: 4px 8px; font-weight: normal;
-                    font-size: 0.8em; color: #888; border-bottom: 1px solid #eee; }}
-  .file-table td {{ padding: 3px 8px; border-bottom: 1px solid #f0f0f0;
-                    font-size: 0.85em; font-family: "SF Mono", "Menlo", "Consolas", monospace; }}
-  .file-table td:nth-child(2) {{ font-family: inherit; }}
-
-  /* Badges */
-  .badge {{ font-size: 0.75em; font-family: "SF Mono", "Menlo", "Consolas", monospace;
-            letter-spacing: 0.03em; text-transform: uppercase; }}
-  .badge-ported {{ color: #2a6e2a; }}
-  .badge-ported::before {{ content: "ported"; }}
-  .badge-ignored {{ color: #888; }}
-  .badge-ignored::before {{ content: "ignored"; }}
-  .badge-missing {{ color: #b33; }}
-  .badge-missing::before {{ content: "missing"; }}
-  .badge-stale {{ color: #96600a; }}
-  .badge-stale::before {{ content: "stale"; }}
-
-  a {{ color: #24a; }}
-  a:hover {{ color: #126; }}
-  .hidden {{ display: none !important; }}
-</style>
-</head>
-<body>
-<h1>Iris Porting Status</h1>
-<p class="meta">Tracking against Rocq
-  <a href="{GITLAB_WEB_BASE}/-/commit/{report.rocq_commit}">{report.rocq_commit[:12]}</a>
-</p>
-
-<table class="summary">
-  <tr>
-    <td>Total<br><span class="num">{total}</span></td>
-    <td>Ported<br><span class="num">{ported}</span></td>
-    <td>Ignored<br><span class="num">{ignored}</span></td>
-    <td>Missing<br><span class="num">{missing}</span></td>
-    <td>Stale<br><span class="num">{len(report.stale_alias)}</span></td>
-    <td>Progress<br><span class="num">{pct:.1f}%</span></td>
-  </tr>
-</table>
-
-<div class="progress-bar"><div class="progress-fill" style="width:{pct:.1f}%"></div></div>
-
-<div class="controls">
-  <input type="text" class="search" placeholder="Search definitions..." oninput="applyFilters()">
-
-  <div class="filter-row">
-    <b style="font-size:0.85em;line-height:2">Status:</b>
-    <button class="filter-btn active" onclick="setFilter('all')">all</button>
-    <button class="filter-btn" onclick="setFilter('ported')">ported</button>
-    <button class="filter-btn" onclick="setFilter('missing')">missing</button>
-    <button class="filter-btn" onclick="setFilter('ignored')">ignored</button>
-    <button class="filter-btn" onclick="setFilter('stale_alias')">stale</button>
-  </div>
-
-  <div class="filter-row">
-    <b style="font-size:0.85em;line-height:2">Folder:</b>
-    <button class="folder-btn active" onclick="setFolder('all')">all/</button>
-    {folder_buttons}
-  </div>
-</div>
-
-<div id="files">
-{"".join(file_rows)}
-{stale_html}
-</div>
-
-<script>
-let currentFilter = 'all';
-let currentFolder = 'all';
-
-function setFilter(f) {{
-  currentFilter = f;
-  document.querySelectorAll('.filter-btn').forEach(b => b.classList.remove('active'));
-  event.target.classList.add('active');
-  applyFilters();
-}}
-
-function setFolder(f) {{
-  currentFolder = f;
-  document.querySelectorAll('.folder-btn').forEach(b => b.classList.remove('active'));
-  event.target.classList.add('active');
-  applyFilters();
-}}
-
-function applyFilters() {{
-  const q = document.querySelector('.search').value.toLowerCase();
-  document.querySelectorAll('.file-section').forEach(section => {{
-    const folder = section.dataset.folder;
-    if (currentFolder !== 'all' && folder !== currentFolder) {{
-      section.classList.add('hidden');
-      return;
-    }}
-    let anyVisible = false;
-    section.querySelectorAll('.entry').forEach(row => {{
-      const name = row.dataset.name.toLowerCase();
-      const matchesSearch = !q || name.includes(q);
-      const matchesFilter = currentFilter === 'all' || row.classList.contains(currentFilter);
-      const visible = matchesSearch && matchesFilter;
-      row.classList.toggle('hidden', !visible);
-      if (visible) anyVisible = true;
-    }});
-    // For stale section, always show if folder matches
-    if (!section.querySelectorAll('.entry').length) anyVisible = true;
-    section.classList.toggle('hidden', !anyVisible);
-  }});
-}}
-</script>
-</body>
-</html>"""
+    html = (
+        template
+        .replace("{{gitlab_web_base}}", GITLAB_WEB_BASE)
+        .replace("{{rocq_commit}}", report.rocq_commit)
+        .replace("{{rocq_commit_short}}", report.rocq_commit[:12])
+        .replace("{{total}}", str(total))
+        .replace("{{ported}}", str(ported))
+        .replace("{{ignored}}", str(ignored))
+        .replace("{{missing}}", str(missing))
+        .replace("{{stale}}", str(len(report.stale_alias)))
+        .replace("{{pct}}", f"{pct:.1f}")
+        .replace("{{folder_buttons}}", folder_buttons)
+        .replace("{{file_sections}}", "\n".join(file_sections))
+        .replace("{{stale_section}}", stale_section)
+    )
 
     with open(path, "w") as f:
         f.write(html)

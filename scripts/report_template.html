@@ -1,0 +1,172 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<title>Iris Porting Status</title>
+<style>
+  * { box-sizing: border-box; margin: 0; padding: 0; }
+  body { font-family: "Georgia", "Times New Roman", serif;
+         max-width: 960px; margin: 0 auto; padding: 24px;
+         background: #fff; color: #222; line-height: 1.5; }
+  h1 { font-size: 1.6em; margin-bottom: 4px; font-weight: normal; }
+  .meta { font-size: 0.85em; color: #666; margin-bottom: 16px; }
+  .meta a { color: #555; }
+
+  /* Summary table */
+  .summary { border-collapse: collapse; margin: 12px 0 20px; width: 100%; }
+  .summary td { padding: 6px 0; text-align: center; font-size: 0.85em; color: #666;
+                border-right: 1px solid #ddd; }
+  .summary td:last-child { border-right: none; }
+  .summary .num { display: block; font-family: "SF Mono", "Menlo", "Consolas", monospace;
+                  font-size: 1.6em; font-weight: bold; color: #222; }
+
+  /* Progress */
+  .progress-bar { height: 14px; background: #ddd; margin: 0 0 20px; }
+  .progress-fill { height: 100%; background: #4a4; }
+
+  /* Search + filters */
+  .controls { margin: 16px 0; }
+  .search { width: 100%; padding: 6px 8px; font-size: 0.95em;
+            border: 1px solid #999; font-family: inherit; margin-bottom: 8px; }
+  .filter-row { display: flex; gap: 6px; flex-wrap: wrap; margin-bottom: 6px; }
+  .filter-btn, .folder-btn {
+    padding: 3px 10px; border: 1px solid #aaa; background: #f8f8f8;
+    cursor: pointer; font-size: 0.82em; font-family: inherit; }
+  .filter-btn:hover, .folder-btn:hover { background: #eee; }
+  .filter-btn.active { background: #333; color: #fff; border-color: #333; }
+  .folder-btn.active { background: #555; color: #fff; border-color: #555; }
+  .folder-btn small { color: inherit; opacity: 0.7; }
+
+  /* File sections */
+  .file-section { border-top: 1px solid #ddd; }
+  .file-section:last-child { border-bottom: 1px solid #ddd; }
+  .file-header { padding: 6px 0; cursor: pointer; display: flex;
+                 align-items: center; gap: 8px; user-select: none; }
+  .file-header:hover { background: #fafafa; }
+  .arrow { font-size: 0.65em; width: 1em; text-align: center; }
+  .file-section.open .arrow { transform: rotate(90deg); }
+  .file-name { font-size: 0.92em; font-family: "SF Mono", "Menlo", "Consolas", monospace; }
+  .file-link { font-size: 0.75em; color: #888; text-decoration: none; }
+  .file-link:hover { color: #24a; }
+  .file-stats { color: #666; font-size: 0.82em; margin-left: auto; white-space: nowrap;
+                font-family: "SF Mono", "Menlo", "Consolas", monospace; }
+  .mini-bar { display: inline-block; width: 80px; height: 4px; background: #ddd;
+              vertical-align: middle; margin-left: 8px; }
+  .mini-bar-fill { display: block; height: 100%; background: #4a4; }
+
+  /* Tables */
+  .file-table { width: 100%; border-collapse: collapse; display: none;
+                margin-bottom: 8px; table-layout: fixed; }
+  .file-section.open .file-table { display: table; }
+  .file-table th { text-align: left; padding: 4px 8px; font-weight: normal;
+                   font-size: 0.8em; color: #888; border-bottom: 1px solid #eee; }
+  .file-table td { padding: 3px 8px; border-bottom: 1px solid #f0f0f0;
+                   font-size: 0.85em; font-family: "SF Mono", "Menlo", "Consolas", monospace;
+                   overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+  .file-table td:nth-child(2) { font-family: inherit; }
+  .file-table col.col-name { width: 40%; }
+  .file-table col.col-status { width: 10%; }
+  .file-table col.col-detail { width: 50%; }
+
+  /* Badges */
+  .badge { font-size: 0.75em; font-family: "SF Mono", "Menlo", "Consolas", monospace;
+           letter-spacing: 0.03em; text-transform: uppercase; }
+  .badge-ported { color: #2a6e2a; }
+  .badge-ported::before { content: "ported"; }
+  .badge-ignored { color: #888; }
+  .badge-ignored::before { content: "ignored"; }
+  .badge-missing { color: #b33; }
+  .badge-missing::before { content: "missing"; }
+  .badge-stale { color: #96600a; }
+  .badge-stale::before { content: "stale"; }
+
+  a { color: #24a; }
+  a:hover { color: #126; }
+  .hidden { display: none !important; }
+</style>
+</head>
+<body>
+<h1>Iris Porting Status</h1>
+<p class="meta">Tracking against Rocq
+  <a href="{{gitlab_web_base}}/-/commit/{{rocq_commit}}">{{rocq_commit_short}}</a>
+</p>
+
+<table class="summary">
+  <tr>
+    <td>Total<br><span class="num">{{total}}</span></td>
+    <td>Ported<br><span class="num">{{ported}}</span></td>
+    <td>Ignored<br><span class="num">{{ignored}}</span></td>
+    <td>Missing<br><span class="num">{{missing}}</span></td>
+    <td>Stale<br><span class="num">{{stale}}</span></td>
+    <td>Progress<br><span class="num">{{pct}}%</span></td>
+  </tr>
+</table>
+
+<div class="progress-bar"><div class="progress-fill" style="width:{{pct}}%"></div></div>
+
+<div class="controls">
+  <input type="text" class="search" placeholder="Search definitions..." oninput="applyFilters()">
+
+  <div class="filter-row">
+    <b style="font-size:0.85em;line-height:2">Status:</b>
+    <button class="filter-btn active" onclick="setFilter('all')">all</button>
+    <button class="filter-btn" onclick="setFilter('ported')">ported</button>
+    <button class="filter-btn" onclick="setFilter('missing')">missing</button>
+    <button class="filter-btn" onclick="setFilter('ignored')">ignored</button>
+    <button class="filter-btn" onclick="setFilter('stale_alias')">stale</button>
+  </div>
+
+  <div class="filter-row">
+    <b style="font-size:0.85em;line-height:2">Folder:</b>
+    <button class="folder-btn active" onclick="setFolder('all')">all/</button>
+    {{folder_buttons}}
+  </div>
+</div>
+
+<div id="files">
+{{file_sections}}
+{{stale_section}}
+</div>
+
+<script>
+let currentFilter = 'all';
+let currentFolder = 'all';
+
+function setFilter(f) {
+  currentFilter = f;
+  document.querySelectorAll('.filter-btn').forEach(b => b.classList.remove('active'));
+  event.target.classList.add('active');
+  applyFilters();
+}
+
+function setFolder(f) {
+  currentFolder = f;
+  document.querySelectorAll('.folder-btn').forEach(b => b.classList.remove('active'));
+  event.target.classList.add('active');
+  applyFilters();
+}
+
+function applyFilters() {
+  const q = document.querySelector('.search').value.toLowerCase();
+  document.querySelectorAll('.file-section').forEach(section => {
+    const folder = section.dataset.folder;
+    if (currentFolder !== 'all' && folder !== currentFolder) {
+      section.classList.add('hidden');
+      return;
+    }
+    let anyVisible = false;
+    section.querySelectorAll('.entry').forEach(row => {
+      const name = row.dataset.name.toLowerCase();
+      const matchesSearch = !q || name.includes(q);
+      const matchesFilter = currentFilter === 'all' || row.classList.contains(currentFilter);
+      const visible = matchesSearch && matchesFilter;
+      row.classList.toggle('hidden', !visible);
+      if (visible) anyVisible = true;
+    });
+    if (!section.querySelectorAll('.entry').length) anyVisible = true;
+    section.classList.toggle('hidden', !anyVisible);
+  });
+}
+</script>
+</body>
+</html>
