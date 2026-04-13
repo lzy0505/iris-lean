@@ -75,18 +75,17 @@ def load_config(path: str = "rocq_ignore.toml") -> Config:
     with open(path, "rb") as f:
         data = tomllib.load(f)
 
+    # Set rocq_commit
     cfg.rocq_commit = data.get("rocq", {}).get("commit", "")
+
+    # Set ignored paths
     for key in ("files", "directories"):
         for p in data.get(key, {}).get("ignore", []):
             cfg.ignored_paths.add(p)
+    # Set ignored names
     for n in data.get("names", {}).get("ignore", []):
         cfg.ignored_names.add(n)
 
-    if cfg.ignored_paths or cfg.ignored_names:
-        log(
-            f"Loaded {len(cfg.ignored_paths)} ignored paths and "
-            f"{len(cfg.ignored_names)} ignored names from {path}"
-        )
     return cfg
 
 
@@ -112,7 +111,7 @@ _DEF_RE = re.compile(
 )
 
 # Module/Section tracking: Modules qualify names (e.g., Module bi -> bi.foo),
-# but Sections do not (matching Rocq's actual scoping semantics).
+# but Sections do not. 
 _MODULE_START_RE = re.compile(r"^\s*Module\s+(\w+)", re.MULTILINE)
 _MODULE_TYPE_RE = re.compile(r"^\s*Module\s+Type\b")  # Module Types are skipped
 _SECTION_START_RE = re.compile(r"^\s*Section\s+(\w+)", re.MULTILINE)
@@ -156,7 +155,7 @@ def _strip_comments(text: str) -> str:
 def parse_rocq_file(text: str) -> list[str]:
     """Extract fully-qualified definition names from a Rocq .v file.
 
-    Module prefixes are included; Section prefixes are not (matching Rocq semantics).
+    Module prefixes are included; Section prefixes are not.
     """
     text = _strip_comments(text)
 
@@ -208,10 +207,9 @@ def _resolve_commit(ref: str) -> str:
     try:
         with urllib.request.urlopen(url, timeout=30) as resp:
             return json.loads(resp.read())["id"]
-    except Exception as e:
-        log(f"Warning: could not resolve ref '{ref}': {e}")
+    except Exception:
+        log(f"Warning: could not resolve ref '{ref}', use default")
         return ref
-
 
 def download_iris_rocq(commit: str, cache_dir: Path) -> tuple[dict[str, list[str]], str]:
     """Download and parse Iris-Rocq definitions, caching the result as JSON.
