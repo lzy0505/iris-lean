@@ -10,12 +10,13 @@ Usage:
 
 Options:
   --format summary|csv|html   Output format (default: summary)
-  --output PATH               Output file path (default: stdout for summary/csv,
-                               report.html for html)
-  --rocq-commit SHA           Iris-Rocq commit to check against
+  --output PATH               Output file path
+  --rocq-commit SHA           Iris-Rocq revision to check against
   --no-build                  Skip running lake exe dumpRocqAliases
   --cache-dir DIR             Cache directory (default: .lake/iris-rocq-cache)
 """
+
+from __future__ import annotations
 
 import argparse
 import csv
@@ -29,127 +30,169 @@ import tarfile
 import tomllib
 import urllib.request
 from collections import defaultdict
+from dataclasses import dataclass, field
 from pathlib import Path
 
 # ============================================================================
 # Configuration
 # ============================================================================
 
-DEFAULT_ROCQ_COMMIT = "master"
-GITLAB_PROJECT_ID = "iris%2Firis"  # URL-encoded iris/iris
+DEFAULT_ROCQ_REVISION = "master"
+
+# Iris-Rocq is hosted on the MPI-SWS GitLab instance.
+GITLAB_PROJECT_ID = "iris%2Firis"  # URL-encoded "iris/iris"
 GITLAB_API_BASE = "https://gitlab.mpi-sws.org/api/v4"
 GITLAB_WEB_BASE = "https://gitlab.mpi-sws.org/iris/iris"
 
-# Subdirectory within the Iris-Rocq repo containing the source
+# Within the Iris-Rocq tarball, source files live under this prefix.
 ROCQ_SRC_PREFIX = "iris/"
+
+# HTML report template, kept separate for readability.
+TEMPLATE_PATH = Path(__file__).parent / "report_template.html"
+
+
+def log(msg: str) -> None:
+    print(msg, file=sys.stderr)
+
+
+# ============================================================================
+# TOML Config
+# ============================================================================
+
+@dataclass
+class Config:
+    rocq_commit: str = ""
+    ignored_paths: set[str] = field(default_factory=set)
+    ignored_names: set[str] = field(default_factory=set)
+
+
+def load_config(path: str = "rocq_ignore.toml") -> Config:
+    """Load commit SHA and ignore lists from the TOML config file."""
+    cfg = Config()
+    if not os.path.exists(path):
+        return cfg
+
+    with open(path, "rb") as f:
+        data = tomllib.load(f)
+
+    cfg.rocq_commit = data.get("rocq", {}).get("commit", "")
+    for key in ("files", "directories"):
+        for p in data.get(key, {}).get("ignore", []):
+            cfg.ignored_paths.add(p)
+    for n in data.get("names", {}).get("ignore", []):
+        cfg.ignored_names.add(n)
+
+    if cfg.ignored_paths or cfg.ignored_names:
+        log(
+            f"Loaded {len(cfg.ignored_paths)} ignored paths and "
+            f"{len(cfg.ignored_names)} ignored names from {path}"
+        )
+    return cfg
 
 
 # ============================================================================
 # Rocq Definition Parsing
 # ============================================================================
 
-# Regex for definition keywords
-_DEF_KW = (
+# Rocq vernacular keywords that introduce named definitions.
+_DEF_KEYWORDS = (
     r"Definition|Lemma|Theorem|Instance|Class|Record|Structure|"
     r"Inductive|Fixpoint|CoFixpoint|Variant|Corollary|Proposition|"
     r"Fact|Remark|Example"
 )
 
-# Match a definition line, optionally prefixed by Global/Program/#[export]/#[global]
-DEF_RE = re.compile(
+# Matches a named definition line. Captures the identifier (group 1).
+# Handles optional prefixes like "Global", "Local", "Program", "#[export]".
+# Identifiers may contain apostrophes (e.g., csum_updateP'_l).
+_DEF_RE = re.compile(
     rf"^\s*(?:(?:Global|Local|Program|#\[(?:export|global)\])\s+)*"
-    rf"({_DEF_KW})\s+"
+    rf"(?:{_DEF_KEYWORDS})\s+"
     rf"(\w[\w']*)",
     re.MULTILINE,
 )
 
-# Module start/end (affects name qualification)
-MODULE_START_RE = re.compile(r"^\s*Module\s+(\w+)", re.MULTILINE)
-MODULE_END_RE = re.compile(r"^\s*End\s+(\w+)\s*\.", re.MULTILINE)
+# Module/Section tracking: Modules qualify names (e.g., Module bi -> bi.foo),
+# but Sections do not (matching Rocq's actual scoping semantics).
+_MODULE_START_RE = re.compile(r"^\s*Module\s+(\w+)", re.MULTILINE)
+_MODULE_TYPE_RE = re.compile(r"^\s*Module\s+Type\b")  # Module Types are skipped
+_SECTION_START_RE = re.compile(r"^\s*Section\s+(\w+)", re.MULTILINE)
+_END_RE = re.compile(r"^\s*End\s+(\w+)\s*\.", re.MULTILINE)
 
-# Section start/end (tracked for scope but does NOT qualify names)
-SECTION_START_RE = re.compile(r"^\s*Section\s+(\w+)", re.MULTILINE)
-SECTION_END_RE = re.compile(r"^\s*End\s+(\w+)\s*\.", re.MULTILINE)
-
-# Lines to skip entirely
-SKIP_LINE_RE = re.compile(
+# Lines starting with these keywords are not definitions and are skipped.
+# This includes tactics (Ltac), notations, hints, scope commands, etc.
+_SKIP_RE = re.compile(
     r"^\s*(?:Notation|Ltac|Ltac2|Tactic\s+Notation|Hint|Arguments|"
-    r"Typeclasses\s+Opaque|Typeclasses\s+Transparent|"
+    r"Typeclasses\s+(?:Opaque|Transparent)|"
     r"Existing\s+Instance|Params|Canonical|"
-    r"Declare\s+Scope|Delimit\s+Scope|Bind\s+Scope|"
-    r"Open\s+Scope|Close\s+Scope|"
+    r"(?:Declare|Delimit|Bind|Open|Close)\s+Scope|"
     r"Coercion|Import|Export|Require|From|Set|Unset)\b"
 )
 
 
-def strip_comments(text: str) -> str:
-    """Remove Rocq (* ... *) comments (nested)."""
-    result = []
+def _strip_comments(text: str) -> str:
+    """Remove nested Rocq (* ... *) comments.
+
+    Rocq comments nest, so (* (* inner *) outer *) is one comment.
+    We strip them to avoid picking up commented-out definitions.
+    """
+    out: list[str] = []
     depth = 0
     i = 0
     while i < len(text):
-        if text[i:i+2] == "(*":
+        if text[i : i + 2] == "(*":
             depth += 1
             i += 2
-        elif text[i:i+2] == "*)" and depth > 0:
+        elif text[i : i + 2] == "*)" and depth > 0:
             depth -= 1
             i += 2
         elif depth == 0:
-            result.append(text[i])
+            out.append(text[i])
             i += 1
         else:
             i += 1
-    return "".join(result)
+    return "".join(out)
 
 
 def parse_rocq_file(text: str) -> list[str]:
-    """Extract all definition names from a Rocq .v file.
+    """Extract fully-qualified definition names from a Rocq .v file.
 
-    Returns fully-qualified names (with Module prefixes, but not Section prefixes).
+    Module prefixes are included; Section prefixes are not (matching Rocq semantics).
     """
-    text = strip_comments(text)
+    text = _strip_comments(text)
 
-    names = []
-    module_stack = []  # Stack of module names for qualification
-    section_names = set()  # Track section names to distinguish from modules on End
+    names: list[str] = []
+    module_stack: list[str] = []  # current Module nesting, used for name qualification
+    section_names: set[str] = set()  # track Section names so End can distinguish them
 
     for line in text.split("\n"):
-        # Track module boundaries
-        m = MODULE_START_RE.match(line)
-        if m and not re.match(r"^\s*Module\s+Type\b", line):
-            module_stack.append(m.group(1))
+        # Track Module open (but not Module Type, which is a signature)
+        if m := _MODULE_START_RE.match(line):
+            if not _MODULE_TYPE_RE.match(line):
+                module_stack.append(m.group(1))
             continue
 
-        # Track section names
-        m = SECTION_START_RE.match(line)
-        if m:
+        # Track Section open (for disambiguation on End)
+        if m := _SECTION_START_RE.match(line):
             section_names.add(m.group(1))
             continue
 
-        # Handle End
-        m = MODULE_END_RE.match(line)
-        if m:
-            end_name = m.group(1)
-            if end_name in section_names:
-                section_names.discard(end_name)
-            elif module_stack and module_stack[-1] == end_name:
+        # Handle End: pop Section or Module depending on which name matches
+        if m := _END_RE.match(line):
+            name = m.group(1)
+            if name in section_names:
+                section_names.discard(name)
+            elif module_stack and module_stack[-1] == name:
                 module_stack.pop()
             continue
 
-        # Skip non-definition lines
-        if SKIP_LINE_RE.match(line):
+        # Skip non-definition vernacular (tactics, notations, imports, etc.)
+        if _SKIP_RE.match(line):
             continue
 
-        # Match definitions
-        m = DEF_RE.match(line)
-        if m:
-            _kind = m.group(1)
-            name = m.group(2)
-            # Qualify with module prefix
-            if module_stack:
-                qualified = ".".join(module_stack) + "." + name
-            else:
-                qualified = name
+        # Extract definition name and qualify with Module prefix
+        if m := _DEF_RE.match(line):
+            ident = m.group(1)
+            qualified = ".".join([*module_stack, ident]) if module_stack else ident
             names.append(qualified)
 
     return names
@@ -159,282 +202,214 @@ def parse_rocq_file(text: str) -> list[str]:
 # Iris-Rocq Download and Cache
 # ============================================================================
 
-def resolve_commit(ref: str) -> str:
-    """Resolve a Git ref (branch name, tag, or SHA) to a full commit SHA."""
-    url = (
-        f"{GITLAB_API_BASE}/projects/{GITLAB_PROJECT_ID}"
-        f"/repository/commits/{ref}"
-    )
+def _resolve_commit(ref: str) -> str:
+    """Resolve a Git ref (branch, tag, or SHA) to a full commit SHA via GitLab API."""
+    url = f"{GITLAB_API_BASE}/projects/{GITLAB_PROJECT_ID}/repository/commits/{ref}"
     try:
         with urllib.request.urlopen(url, timeout=30) as resp:
-            data = json.loads(resp.read())
-            return data["id"]
+            return json.loads(resp.read())["id"]
     except Exception as e:
-        print(f"Warning: could not resolve ref '{ref}': {e}", file=sys.stderr)
+        log(f"Warning: could not resolve ref '{ref}': {e}")
         return ref
 
 
-def download_iris_rocq(
-    commit: str, cache_dir: Path
-) -> tuple[dict[str, list[str]], str]:
-    """Download Iris-Rocq at the given commit, parse definitions, cache as JSON,
-    and delete the source tree.
+def download_iris_rocq(commit: str, cache_dir: Path) -> tuple[dict[str, list[str]], str]:
+    """Download and parse Iris-Rocq definitions, caching the result as JSON.
 
-    Returns: (definitions dict, resolved commit SHA).
+    The tarball is downloaded from the GitLab archive API, parsed for all .v
+    files under iris/, and the extracted definitions are cached as JSON keyed
+    by the resolved commit SHA. Subsequent calls with the same SHA hit the cache.
+
+    Returns (file_path -> definition_names, resolved_commit_sha).
     """
-    # Resolve branch/tag names to a concrete SHA
-    resolved = resolve_commit(commit)
+    # Always resolve to a concrete SHA so branch names get pinned in the cache.
+    resolved = _resolve_commit(commit)
     if resolved != commit:
-        print(f"Resolved '{commit}' -> {resolved}", file=sys.stderr)
+        log(f"Resolved '{commit}' -> {resolved}")
 
     cache_file = cache_dir / resolved / "rocq_definitions.json"
-
     if cache_file.exists():
-        print(f"Using cached Rocq definitions from {cache_file}", file=sys.stderr)
+        log(f"Using cached Rocq definitions from {cache_file}")
         with open(cache_file) as f:
             return json.load(f), resolved
 
-    print(f"Downloading Iris-Rocq at {resolved}...", file=sys.stderr)
+    # Download the tarball from GitLab.
+    log(f"Downloading Iris-Rocq at {resolved}...")
     url = (
         f"{GITLAB_API_BASE}/projects/{GITLAB_PROJECT_ID}"
         f"/repository/archive.tar.gz?sha={resolved}"
     )
-
-    req = urllib.request.Request(url)
-    with urllib.request.urlopen(req, timeout=120) as resp:
+    with urllib.request.urlopen(url, timeout=120) as resp:
         tarball_data = resp.read()
+    log(f"Downloaded {len(tarball_data) / 1024:.0f} KB, parsing...")
 
-    print(f"Downloaded {len(tarball_data) / 1024:.0f} KB, parsing...", file=sys.stderr)
-
+    # Parse every .v file under the iris/ source directory.
     definitions: dict[str, list[str]] = {}
-
     with tarfile.open(fileobj=io.BytesIO(tarball_data), mode="r:gz") as tf:
         for member in tf.getmembers():
             if not member.isfile() or not member.name.endswith(".v"):
                 continue
-
-            # Strip the top-level archive directory (e.g., "iris-master-SHA/")
+            # The archive has a top-level directory (e.g., "iris-master-SHA/").
             parts = member.name.split("/", 1)
             if len(parts) < 2:
                 continue
             rel_path = parts[1]
-
-            # Only process files under iris/ (the source directory)
             if not rel_path.startswith(ROCQ_SRC_PREFIX):
                 continue
-
-            f = tf.extractfile(member)
-            if f is None:
+            fobj = tf.extractfile(member)
+            if fobj is None:
                 continue
-
-            text = f.read().decode("utf-8", errors="replace")
-            defs = parse_rocq_file(text)
-
+            defs = parse_rocq_file(fobj.read().decode("utf-8", errors="replace"))
             if defs:
                 definitions[rel_path] = defs
 
-    # Cache the definitions
+    # Cache the parsed definitions so we don't re-download next time.
     cache_file.parent.mkdir(parents=True, exist_ok=True)
     with open(cache_file, "w") as f:
         json.dump(definitions, f, indent=2)
-    print(
-        f"Parsed {sum(len(v) for v in definitions.values())} definitions "
-        f"from {len(definitions)} files",
-        file=sys.stderr,
-    )
 
+    total_defs = sum(len(v) for v in definitions.values())
+    log(f"Parsed {total_defs} definitions from {len(definitions)} files")
     return definitions, resolved
 
 
 # ============================================================================
-# Lean Data Loading
+# Lean Data
 # ============================================================================
 
 def run_lake_dump(output_path: str = ".lake/rocq_aliases.json") -> None:
-    """Run lake exe dumpRocqAliases to generate the JSON dump."""
-    print("Running lake exe dumpRocqAliases...", file=sys.stderr)
+    """Run `lake exe dumpRocqAliases` to dump all Rocq.* aliases to JSON.
+
+    The Lean executable scans the compiled environment for declarations in the
+    Rocq namespace (created by @[rocq_alias]) and #rocq_ignore entries.
+    """
+    log("Running lake exe dumpRocqAliases...")
     result = subprocess.run(
         ["lake", "exe", "dumpRocqAliases", output_path],
-        capture_output=True,
-        text=True,
+        capture_output=True, text=True,
     )
     if result.returncode != 0:
-        print(f"Error running lake exe dumpRocqAliases:", file=sys.stderr)
-        print(result.stderr, file=sys.stderr)
+        log(f"Error running lake exe dumpRocqAliases:\n{result.stderr}")
         sys.exit(1)
-    print(result.stdout.strip(), file=sys.stderr)
+    log(result.stdout.strip())
 
 
-def load_lean_data(
-    json_path: str = ".lake/rocq_aliases.json",
-) -> tuple[dict[str, str], dict[str, str]]:
-    """Load the Lean alias and ignore data.
+def load_lean_data(json_path: str) -> tuple[dict[str, str], dict[str, str]]:
+    """Load Lean alias/ignore data from the JSON dump.
 
-    Returns:
-        aliases: dict mapping rocq_name -> lean_name
-        ignores: dict mapping rocq_name -> reason
+    Returns (rocq_name -> lean_name, rocq_name -> reason).
     """
     with open(json_path) as f:
         data = json.load(f)
-
     aliases = {a["rocq"]: a["lean"] for a in data["aliases"]}
     ignores = {i["rocq"]: i["reason"] for i in data["ignores"]}
     return aliases, ignores
 
 
-def load_config(
-    path: str = "rocq_ignore.toml",
-) -> tuple[str, set[str], set[str]]:
-    """Load the TOML configuration.
-
-    Returns:
-        rocq_commit: the Rocq commit/ref to track (or "" to use default)
-        ignored_paths: set of file paths and directory prefixes to skip
-        ignored_names: set of individual definition names to skip
-    """
-    ignored_paths: set[str] = set()
-    ignored_names: set[str] = set()
-    rocq_commit = ""
-
-    if not os.path.exists(path):
-        return rocq_commit, ignored_paths, ignored_names
-
-    with open(path, "rb") as f:
-        data = tomllib.load(f)
-
-    rocq_commit = data.get("rocq", {}).get("commit", "")
-    for p in data.get("files", {}).get("ignore", []):
-        ignored_paths.add(p)
-    for p in data.get("directories", {}).get("ignore", []):
-        ignored_paths.add(p)
-    for n in data.get("names", {}).get("ignore", []):
-        ignored_names.add(n)
-
-    return rocq_commit, ignored_paths, ignored_names
-
-
 # ============================================================================
-# Report Computation
+# Report
 # ============================================================================
 
+@dataclass
 class ReportEntry:
-    __slots__ = ("rocq_file", "rocq_name", "status", "lean_name", "reason")
-
-    def __init__(self, rocq_file, rocq_name, status, lean_name="", reason=""):
-        self.rocq_file = rocq_file
-        self.rocq_name = rocq_name
-        self.status = status
-        self.lean_name = lean_name
-        self.reason = reason
+    rocq_file: str
+    rocq_name: str
+    status: str  # "ported" | "ignored" | "missing" | "stale_alias" | "stale_ignore"
+    lean_name: str = ""
+    reason: str = ""
 
 
+@dataclass
 class Report:
-    def __init__(self):
-        self.entries: list[ReportEntry] = []
-        self.rocq_commit: str = ""
-        self.total_rocq: int = 0
+    entries: list[ReportEntry] = field(default_factory=list)
+    rocq_commit: str = ""
+    total_rocq: int = 0
 
-    @property
-    def ported(self):
-        return [e for e in self.entries if e.status == "ported"]
+    def count(self, status: str) -> int:
+        return sum(1 for e in self.entries if e.status == status)
 
-    @property
-    def ignored(self):
-        return [e for e in self.entries if e.status == "ignored"]
-
-    @property
-    def missing(self):
-        return [e for e in self.entries if e.status == "missing"]
-
-    @property
-    def stale_alias(self):
-        return [e for e in self.entries if e.status == "stale_alias"]
-
-    @property
-    def stale_ignore(self):
-        return [e for e in self.entries if e.status == "stale_ignore"]
+    def by_status(self, status: str) -> list[ReportEntry]:
+        return [e for e in self.entries if e.status == status]
 
 
 def compute_report(
     rocq_defs: dict[str, list[str]],
     aliases: dict[str, str],
     ignores: dict[str, str],
-    ignored_paths: set[str],
-    ignored_names: set[str],
+    cfg: Config,
     rocq_commit: str,
 ) -> Report:
-    """Compare Rocq definitions against Lean aliases and ignores."""
-    report = Report()
-    report.rocq_commit = rocq_commit
+    """Classify each Rocq definition and produce a report.
 
-    # Build flat set of all Rocq definition names -> file
-    rocq_name_to_file: dict[str, str] = {}
+    Each Rocq definition is classified as:
+      - "ported":  has a matching @[rocq_alias] in Lean
+      - "ignored": listed in #rocq_ignore or rocq_ignore.toml
+      - "missing": exists in Rocq but has no alias or ignore entry
+
+    Additionally, aliases/ignores that reference names not found in Rocq
+    are flagged as "stale_alias" or "stale_ignore".
+    """
+    report = Report(rocq_commit=rocq_commit)
+
+    # Flatten Rocq definitions: name -> source file path
+    name_to_file: dict[str, str] = {}
     for filepath, names in rocq_defs.items():
         for name in names:
-            rocq_name_to_file[name] = filepath
+            name_to_file[name] = filepath
+    report.total_rocq = len(name_to_file)
 
-    report.total_rocq = len(rocq_name_to_file)
-
-    # Classify each Rocq definition
-    for name, filepath in sorted(rocq_name_to_file.items()):
-        # Check file-level ignores (from rocq_ignore.txt)
-        file_ignored = any(filepath.startswith(p) for p in ignored_paths)
+    # Classify each Rocq definition against Lean aliases and ignore lists
+    for name, filepath in sorted(name_to_file.items()):
         if name in aliases:
-            report.entries.append(
-                ReportEntry(filepath, name, "ported", lean_name=aliases[name])
-            )
-        elif name in ignores or name in ignored_names or file_ignored:
+            report.entries.append(ReportEntry(filepath, name, "ported", lean_name=aliases[name]))
+        elif name in ignores or name in cfg.ignored_names or any(
+            filepath.startswith(p) for p in cfg.ignored_paths
+        ):
             reason = ignores.get(name, "")
-            if not reason and file_ignored:
-                reason = f"file ignored ({filepath})"
-            elif not reason:
-                reason = "ignored via rocq_ignore.txt"
-            report.entries.append(
-                ReportEntry(filepath, name, "ignored", reason=reason)
-            )
+            if not reason:
+                reason = f"file ignored ({filepath})" if any(
+                    filepath.startswith(p) for p in cfg.ignored_paths
+                ) else "ignored via rocq_ignore.toml"
+            report.entries.append(ReportEntry(filepath, name, "ignored", reason=reason))
         else:
             report.entries.append(ReportEntry(filepath, name, "missing"))
 
-    # Find stale aliases (in Lean but not in Rocq)
-    rocq_names = set(rocq_name_to_file.keys())
+    # Detect stale entries: aliases or ignores pointing to names that
+    # no longer exist in Rocq (possibly renamed or removed upstream).
+    all_rocq = set(name_to_file)
     for name, lean_name in sorted(aliases.items()):
-        if name not in rocq_names:
-            report.entries.append(
-                ReportEntry("", name, "stale_alias", lean_name=lean_name)
-            )
-
-    # Find stale ignores
+        if name not in all_rocq:
+            report.entries.append(ReportEntry("", name, "stale_alias", lean_name=lean_name))
     for name, reason in sorted(ignores.items()):
-        if name not in rocq_names:
-            report.entries.append(
-                ReportEntry("", name, "stale_ignore", reason=reason)
-            )
+        if name not in all_rocq:
+            report.entries.append(ReportEntry("", name, "stale_ignore", reason=reason))
 
     return report
 
 
 # ============================================================================
-# Output Formatters
+# Output: Summary
 # ============================================================================
 
 def output_summary(report: Report, out=sys.stdout) -> None:
-    """Print a human-readable summary."""
-    print("=" * 60, file=out)
-    print("Iris Porting Completeness Report", file=out)
-    print("=" * 60, file=out)
-    print(f"Rocq commit: {report.rocq_commit}", file=out)
-    print(f"Total Rocq definitions: {report.total_rocq}", file=out)
-    print(f"Ported (with rocq_alias): {len(report.ported)}", file=out)
-    print(f"Ignored: {len(report.ignored)}", file=out)
-    print(f"Missing: {len(report.missing)}", file=out)
-    if report.stale_alias:
-        print(f"Stale aliases: {len(report.stale_alias)}", file=out)
-    if report.stale_ignore:
-        print(f"Stale ignores: {len(report.stale_ignore)}", file=out)
+    """Print a human-readable summary to the given stream."""
+    p = lambda *a, **kw: print(*a, file=out, **kw)
 
-    if report.total_rocq > 0:
-        pct = len(report.ported) / report.total_rocq * 100
-        print(f"\nProgress: {pct:.1f}%", file=out)
+    pct = report.count("ported") / report.total_rocq * 100 if report.total_rocq else 0
+
+    p("=" * 60)
+    p("Iris Porting Completeness Report")
+    p("=" * 60)
+    p(f"Rocq commit: {report.rocq_commit}")
+    p(f"Total Rocq definitions: {report.total_rocq}")
+    p(f"Ported (with rocq_alias): {report.count('ported')}")
+    p(f"Ignored: {report.count('ignored')}")
+    p(f"Missing: {report.count('missing')}")
+    if n := report.count("stale_alias"):
+        p(f"Stale aliases: {n}")
+    if n := report.count("stale_ignore"):
+        p(f"Stale ignores: {n}")
+    p(f"\nProgress: {pct:.1f}%")
 
     # Per-file breakdown
     files: dict[str, dict[str, int]] = defaultdict(lambda: defaultdict(int))
@@ -442,45 +417,141 @@ def output_summary(report: Report, out=sys.stdout) -> None:
         if e.rocq_file:
             files[e.rocq_file][e.status] += 1
 
-    print(f"\nPer-file breakdown:", file=out)
-    print("-" * 60, file=out)
-
-    for filepath in sorted(files.keys()):
+    p(f"\nPer-file breakdown:")
+    p("-" * 60)
+    for filepath in sorted(files):
         counts = files[filepath]
         total = sum(counts.values())
-        ported = counts.get("ported", 0)
-        ignored = counts.get("ignored", 0)
-        missing = counts.get("missing", 0)
-        done = ported + ignored
-        pct = done / total * 100 if total > 0 else 0
-        status_parts = []
-        if ported:
-            status_parts.append(f"{ported} ported")
-        if ignored:
-            status_parts.append(f"{ignored} ignored")
-        if missing:
-            status_parts.append(f"{missing} missing")
-        status_str = ", ".join(status_parts)
-        # Shorten path for display
+        done = counts.get("ported", 0) + counts.get("ignored", 0)
+        file_pct = done / total * 100 if total else 0
+        parts = [f"{counts[s]} {s}" for s in ("ported", "ignored", "missing") if counts.get(s)]
         display = filepath.removeprefix(ROCQ_SRC_PREFIX)
-        print(f"  {display:40s} {done:3d}/{total:<3d} ({pct:5.1f}%) [{status_str}]", file=out)
+        p(f"  {display:40s} {done:3d}/{total:<3d} ({file_pct:5.1f}%) [{', '.join(parts)}]")
 
+
+# ============================================================================
+# Output: CSV
+# ============================================================================
 
 def output_csv(report: Report, path: str) -> None:
-    """Write a CSV report."""
-    f = open(path, "w", newline="") if path != "-" else sys.stdout
-    writer = csv.writer(f)
+    """Write report as CSV."""
+    fh = open(path, "w", newline="") if path != "-" else sys.stdout
+    writer = csv.writer(fh)
     writer.writerow(["rocq_file", "rocq_name", "status", "lean_name", "reason"])
     for e in report.entries:
         writer.writerow([e.rocq_file, e.rocq_name, e.status, e.lean_name, e.reason])
     if path != "-":
-        f.close()
-        print(f"Wrote CSV to {path}", file=sys.stderr)
+        fh.close()
+        log(f"Wrote CSV to {path}")
+
+
+# ============================================================================
+# Output: HTML
+# ============================================================================
+
+# Fixed column widths for definition tables (name 40%, status 10%, detail 50%).
+_COLGROUP = (
+    '<colgroup><col class="col-name"><col class="col-status">'
+    '<col class="col-detail"></colgroup>'
+)
+
+# CSS class for each status badge (rendered via ::before pseudo-elements in the template).
+_BADGE_CLS = {
+    "ported": "badge-ported",
+    "ignored": "badge-ignored",
+    "missing": "badge-missing",
+    "stale_alias": "badge-stale",
+    "stale_ignore": "badge-stale",
+}
+
+
+def _render_entry_row(e: ReportEntry) -> str:
+    """Render a single definition as an HTML table row."""
+    badge = _BADGE_CLS.get(e.status, "")
+    detail = e.lean_name if e.status == "ported" else e.reason
+    return (
+        f'<tr class="entry {e.status}" data-name="{e.rocq_name}">'
+        f"<td>{e.rocq_name}</td>"
+        f'<td><span class="badge {badge}"></span></td>'
+        f"<td>{detail}</td></tr>"
+    )
+
+
+def _render_file_section(
+    filepath: str, entries: list[ReportEntry], rocq_commit: str
+) -> str:
+    """Render a collapsible section for one Rocq .v file."""
+    display = filepath.removeprefix(ROCQ_SRC_PREFIX)
+    folder = display.split("/")[0]
+    n_done = sum(1 for e in entries if e.status in ("ported", "ignored"))
+    n_total = len(entries)
+    pct = n_done / n_total * 100 if n_total else 0
+    link = f"{GITLAB_WEB_BASE}/-/blob/{rocq_commit}/{filepath}"
+
+    rows = "".join(
+        _render_entry_row(e)
+        for e in sorted(entries, key=lambda x: (x.status != "missing", x.rocq_name))
+    )
+
+    return (
+        f'<div class="file-section" data-file="{display}" data-folder="{folder}">'
+        f'<div class="file-header" onclick="this.parentElement.classList.toggle(\'open\')">'
+        f'<span class="arrow">&#9654;</span>'
+        f'<code class="file-name">{display}</code>'
+        f'<a class="file-link" href="{link}" target="_blank"'
+        f' onclick="event.stopPropagation()">[src]</a>'
+        f'<span class="file-stats">{n_done}/{n_total} ({pct:.0f}%)</span>'
+        f'<span class="mini-bar"><span class="mini-bar-fill"'
+        f' style="width:{pct:.1f}%"></span></span>'
+        f"</div>"
+        f'<table class="file-table">{_COLGROUP}'
+        f"<thead><tr><th>Rocq Name</th><th>Status</th><th>Details</th></tr></thead>"
+        f"<tbody>{rows}</tbody></table></div>"
+    )
+
+
+def _render_stale_section(entries: list[ReportEntry]) -> str:
+    """Render the collapsible section for stale alias/ignore entries."""
+    if not entries:
+        return ""
+    rows = "".join(_render_entry_row(e) for e in entries)
+    return (
+        f'<div class="file-section open" data-file="stale" data-folder="_stale">'
+        f'<div class="file-header" onclick="this.parentElement.classList.toggle(\'open\')">'
+        f'<span class="arrow">&#9654;</span>'
+        f'<code class="file-name">Stale Entries</code>'
+        f'<span class="file-stats">{len(entries)} entries</span></div>'
+        f'<table class="file-table">{_COLGROUP}'
+        f"<thead><tr><th>Name</th><th>Status</th><th>Details</th></tr></thead>"
+        f"<tbody>{rows}</tbody></table></div>"
+    )
+
+
+def _render_folder_buttons(
+    files_data: dict[str, list[ReportEntry]],
+) -> str:
+    """Render filter buttons for top-level Rocq folders (algebra/, bi/, etc.)."""
+    stats: dict[str, dict[str, int]] = defaultdict(lambda: defaultdict(int))
+    for filepath, entries in files_data.items():
+        folder = filepath.removeprefix(ROCQ_SRC_PREFIX).split("/")[0]
+        for e in entries:
+            stats[folder][e.status] += 1
+            stats[folder]["total"] += 1
+
+    buttons = []
+    for folder in sorted(stats):
+        s = stats[folder]
+        done = s.get("ported", 0) + s.get("ignored", 0)
+        buttons.append(
+            f'<button class="folder-btn" onclick="setFolder(\'{folder}\')">'
+            f"{folder}/ <small>{done}/{s['total']}</small></button>"
+        )
+    return "\n".join(buttons)
 
 
 def output_html(report: Report, path: str) -> None:
     """Generate a self-contained HTML report from the template."""
-    # Per-file data
+    # Partition entries into per-file and stale
     files_data: dict[str, list[ReportEntry]] = defaultdict(list)
     stale_entries: list[ReportEntry] = []
     for e in report.entries:
@@ -490,216 +561,89 @@ def output_html(report: Report, path: str) -> None:
             files_data[e.rocq_file].append(e)
 
     total = report.total_rocq
-    ported = len(report.ported)
-    ignored = len(report.ignored)
-    missing = len(report.missing)
-    pct = ported / total * 100 if total > 0 else 0
+    ported = report.count("ported")
+    pct = ported / total * 100 if total else 0
 
-    # Collect top-level folders
-    folders: set[str] = set()
-    for filepath in files_data:
-        folders.add(filepath.removeprefix(ROCQ_SRC_PREFIX).split("/")[0])
-
-    # Per-folder summary
-    folder_stats: dict[str, dict[str, int]] = defaultdict(lambda: defaultdict(int))
-    for filepath, entries in files_data.items():
-        folder = filepath.removeprefix(ROCQ_SRC_PREFIX).split("/")[0]
-        for e in entries:
-            folder_stats[folder][e.status] += 1
-            folder_stats[folder]["total"] += 1
-
-    folder_buttons = ""
-    for folder in sorted(folders):
-        fs = folder_stats[folder]
-        f_total = fs["total"]
-        f_done = fs.get("ported", 0) + fs.get("ignored", 0)
-        folder_buttons += (
-            f'<button class="folder-btn" onclick="setFolder(\'{folder}\')">'
-            f'{folder}/ <small>{f_done}/{f_total}</small></button>\n'
-        )
-
-    # Build file sections
-    COLGROUP = (
-        '<colgroup><col class="col-name"><col class="col-status">'
-        '<col class="col-detail"></colgroup>'
+    # Build HTML fragments
+    file_sections = "\n".join(
+        _render_file_section(fp, entries, report.rocq_commit)
+        for fp, entries in sorted(files_data.items())
     )
-    BADGE_CLS = {
-        "ported": "badge-ported",
-        "ignored": "badge-ignored",
-        "missing": "badge-missing",
+
+    # Fill template
+    template = TEMPLATE_PATH.read_text()
+    replacements = {
+        "gitlab_web_base": GITLAB_WEB_BASE,
+        "rocq_commit": report.rocq_commit,
+        "rocq_commit_short": report.rocq_commit[:12],
+        "total": str(total),
+        "ported": str(ported),
+        "ignored": str(report.count("ignored")),
+        "missing": str(report.count("missing")),
+        "stale": str(report.count("stale_alias")),
+        "pct": f"{pct:.1f}",
+        "folder_buttons": _render_folder_buttons(files_data),
+        "file_sections": file_sections,
+        "stale_section": _render_stale_section(stale_entries),
     }
-
-    file_sections = []
-    for filepath in sorted(files_data.keys()):
-        entries = files_data[filepath]
-        display = filepath.removeprefix(ROCQ_SRC_PREFIX)
-        folder = display.split("/")[0]
-        n_ported = sum(1 for e in entries if e.status == "ported")
-        n_ignored = sum(1 for e in entries if e.status == "ignored")
-        n_total = len(entries)
-        n_done = n_ported + n_ignored
-        file_pct = n_done / n_total * 100 if n_total > 0 else 0
-        rocq_link = f"{GITLAB_WEB_BASE}/-/blob/{report.rocq_commit}/{filepath}"
-
-        rows = []
-        for e in sorted(entries, key=lambda x: (x.status != "missing", x.rocq_name)):
-            badge = BADGE_CLS.get(e.status, "")
-            detail = e.lean_name if e.status == "ported" else e.reason
-            rows.append(
-                f'<tr class="entry {e.status}" data-name="{e.rocq_name}">'
-                f"<td>{e.rocq_name}</td>"
-                f'<td><span class="badge {badge}"></span></td>'
-                f"<td>{detail}</td></tr>"
-            )
-
-        file_sections.append(
-            f'<div class="file-section" data-file="{display}" data-folder="{folder}">'
-            f'<div class="file-header" onclick="this.parentElement.classList.toggle(\'open\')">'
-            f'<span class="arrow">&#9654;</span>'
-            f'<code class="file-name">{display}</code>'
-            f'<a class="file-link" href="{rocq_link}" target="_blank"'
-            f' onclick="event.stopPropagation()">[src]</a>'
-            f'<span class="file-stats">{n_done}/{n_total} ({file_pct:.0f}%)</span>'
-            f'<span class="mini-bar"><span class="mini-bar-fill"'
-            f' style="width:{file_pct:.1f}%"></span></span>'
-            f"</div>"
-            f'<table class="file-table">{COLGROUP}'
-            f"<thead><tr><th>Rocq Name</th><th>Status</th><th>Details</th></tr></thead>"
-            f'<tbody>{"".join(rows)}</tbody></table></div>'
-        )
-
-    # Stale section
-    stale_section = ""
-    if stale_entries:
-        stale_rows = []
-        for e in stale_entries:
-            detail = e.lean_name if e.status == "stale_alias" else e.reason
-            stale_rows.append(
-                f'<tr class="entry stale_alias" data-name="{e.rocq_name}">'
-                f"<td>{e.rocq_name}</td>"
-                f'<td><span class="badge badge-stale"></span></td>'
-                f"<td>{detail}</td></tr>"
-            )
-        stale_section = (
-            f'<div class="file-section open" data-file="stale" data-folder="_stale">'
-            f'<div class="file-header" onclick="this.parentElement.classList.toggle(\'open\')">'
-            f'<span class="arrow">&#9654;</span>'
-            f'<code class="file-name">Stale Entries</code>'
-            f'<span class="file-stats">{len(stale_entries)} entries</span></div>'
-            f'<table class="file-table">{COLGROUP}'
-            f"<thead><tr><th>Name</th><th>Status</th><th>Details</th></tr></thead>"
-            f'<tbody>{"".join(stale_rows)}</tbody></table></div>'
-        )
-
-    # Load template and fill placeholders
-    template_path = Path(__file__).parent / "report_template.html"
-    template = template_path.read_text()
-
-    html = (
-        template
-        .replace("{{gitlab_web_base}}", GITLAB_WEB_BASE)
-        .replace("{{rocq_commit}}", report.rocq_commit)
-        .replace("{{rocq_commit_short}}", report.rocq_commit[:12])
-        .replace("{{total}}", str(total))
-        .replace("{{ported}}", str(ported))
-        .replace("{{ignored}}", str(ignored))
-        .replace("{{missing}}", str(missing))
-        .replace("{{stale}}", str(len(report.stale_alias)))
-        .replace("{{pct}}", f"{pct:.1f}")
-        .replace("{{folder_buttons}}", folder_buttons)
-        .replace("{{file_sections}}", "\n".join(file_sections))
-        .replace("{{stale_section}}", stale_section)
-    )
+    html = template
+    for key, value in replacements.items():
+        html = html.replace("{{" + key + "}}", value)
 
     with open(path, "w") as f:
         f.write(html)
-    print(f"Wrote HTML report to {path}", file=sys.stderr)
+    log(f"Wrote HTML report to {path}")
 
 
 # ============================================================================
 # Main
 # ============================================================================
 
-def main():
-    parser = argparse.ArgumentParser(
-        description="Iris-Lean porting completeness checker"
-    )
-    parser.add_argument(
-        "--format",
-        choices=["summary", "csv", "html"],
-        default="summary",
-        help="Output format (default: summary)",
-    )
-    parser.add_argument("--output", "-o", help="Output file path")
-    parser.add_argument(
-        "--rocq-commit",
-        default=DEFAULT_ROCQ_COMMIT,
-        help=f"Iris-Rocq commit SHA or branch (default: {DEFAULT_ROCQ_COMMIT})",
-    )
-    parser.add_argument(
-        "--no-build",
-        action="store_true",
-        help="Skip running lake exe dumpRocqAliases",
-    )
-    parser.add_argument(
-        "--cache-dir",
-        default=".lake/iris-rocq-cache",
-        help="Cache directory for downloaded Rocq sources",
-    )
-    parser.add_argument(
-        "--lean-json",
-        default=".lake/rocq_aliases.json",
-        help="Path to the Lean alias JSON dump",
-    )
+# Maps --format values to their output functions.
+FORMATTERS = {
+    "summary": lambda report, args: output_summary(
+        report, out=open(args.output, "w") if args.output else sys.stdout
+    ),
+    "csv": lambda report, args: output_csv(report, args.output or "-"),
+    "html": lambda report, args: output_html(report, args.output or "report.html"),
+}
 
+
+def main():
+    parser = argparse.ArgumentParser(description="Iris-Lean porting completeness checker")
+    parser.add_argument("--format", choices=FORMATTERS, default="summary")
+    parser.add_argument("--output", "-o", help="Output file path")
+    parser.add_argument("--rocq-commit", default=DEFAULT_ROCQ_REVISION,
+                        help="Iris-Rocq commit SHA or branch")
+    parser.add_argument("--no-build", action="store_true",
+                        help="Skip running lake exe dumpRocqAliases")
+    parser.add_argument("--cache-dir", default=".lake/iris-rocq-cache")
+    parser.add_argument("--lean-json", default=".lake/rocq_aliases.json")
     args = parser.parse_args()
 
-    # Step 0: Load config
-    config_commit, ignored_paths, ignored_names = load_config()
-    if ignored_paths or ignored_names:
-        print(
-            f"Loaded {len(ignored_paths)} ignored paths and "
-            f"{len(ignored_names)} ignored names from rocq_ignore.toml",
-            file=sys.stderr,
-        )
+    # Load TOML config (rocq commit SHA, ignore lists).
+    cfg = load_config()
 
-    # CLI --rocq-commit overrides the TOML config
+    # CLI --rocq-commit overrides the TOML-configured commit.
     rocq_ref = args.rocq_commit
-    if rocq_ref == DEFAULT_ROCQ_COMMIT and config_commit:
-        rocq_ref = config_commit
+    if rocq_ref == DEFAULT_ROCQ_REVISION and cfg.rocq_commit:
+        rocq_ref = cfg.rocq_commit
 
-    # Step 1: Get Lean data
+    # Step 1: Collect Lean-side data (rocq_alias + #rocq_ignore entries).
     if not args.no_build:
         run_lake_dump(args.lean_json)
     elif not os.path.exists(args.lean_json):
-        print(
-            f"Error: {args.lean_json} not found. Run without --no-build first.",
-            file=sys.stderr,
-        )
+        log(f"Error: {args.lean_json} not found. Run without --no-build first.")
         sys.exit(1)
-
     aliases, ignores = load_lean_data(args.lean_json)
-    print(
-        f"Loaded {len(aliases)} aliases and {len(ignores)} ignores from Lean",
-        file=sys.stderr,
-    )
+    log(f"Loaded {len(aliases)} aliases and {len(ignores)} ignores from Lean")
 
-    # Step 2: Get Rocq definitions
-    cache_dir = Path(args.cache_dir)
-    rocq_defs, rocq_commit = download_iris_rocq(rocq_ref, cache_dir)
+    # Step 2: Collect Rocq-side data (download, parse, cache).
+    rocq_defs, rocq_commit = download_iris_rocq(rocq_ref, Path(args.cache_dir))
 
-    # Step 3: Compute report
-    report = compute_report(
-        rocq_defs, aliases, ignores, ignored_paths, ignored_names, rocq_commit
-    )
-
-    # Step 4: Output
-    if args.format == "summary":
-        output_summary(report, out=open(args.output, "w") if args.output else sys.stdout)
-    elif args.format == "csv":
-        output_csv(report, args.output or "-")
-    elif args.format == "html":
-        output_html(report, args.output or "report.html")
+    # Step 3: Diff and output.
+    report = compute_report(rocq_defs, aliases, ignores, cfg, rocq_commit)
+    FORMATTERS[args.format](report, args)
 
 
 if __name__ == "__main__":
