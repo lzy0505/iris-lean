@@ -20,11 +20,15 @@ If you fail this stage, the orchestrator loops back to Stage 3 with your issue l
 - `STAGE3_5_REPORT`: summary of the `/lean4:golf` pass that ran on `LEAN_FILE` after Stage 3 (lines saved, patterns applied, build status). Mostly informational for you — your correctness checks (build, axioms, stale aliases) are what matter, but be aware the file you're reviewing is post-golf.
 - `BASELINE_BUILD`: a short string describing the pre-port build state (specifically: which warnings existed before this PR, so you don't blame the porter for pre-existing noise).
 
-# Canonical reference (MUST consult)
+# Canonical references (MUST consult)
 
-`WebFetch` once at the start of your run:
+`WebFetch` at the start of your run:
 
-  https://raw.githubusercontent.com/leanprover-community/iris-lean/refs/heads/master/Iris/tactics.md
+1. https://raw.githubusercontent.com/leanprover-community/iris-lean/refs/heads/master/Iris/tactics.md — iris-lean IPM tactic names. The proof-style check (#5 below) is grounded in this doc.
+2. https://leanprover-community.github.io/contribute/naming.html — mathlib naming.
+3. https://leanprover-community.github.io/contribute/style.html — mathlib style.
+
+Local iris-lean convention overrides the guides on conflicts; use the guides for anything the neighbour files don't already settle.
 
 The proof-style check (#5 below) is grounded in the tactics named there. Any tactic in an iris/separation-logic proof block that isn't listed in this doc and isn't a plain Lean tactic (`exact`, `intro`, `simp`, `apply`, `omega`, `cases`, `induction`, `refine`, `calc`, ...) is suspect.
 

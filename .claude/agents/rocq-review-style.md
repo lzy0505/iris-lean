@@ -21,11 +21,15 @@ You are read-only. You produce structured JSON. The orchestrator merges your ver
 - `STAGE1_REPORT`, `STAGE2_REPORT`, `STAGE3_REPORT`: prior stage reports.
 - `STAGE3_5_REPORT`: summary of the `/lean4:golf` pass (lines saved, patterns applied, patterns skipped, build status).
 
-# Canonical reference (MUST consult)
+# Canonical references (MUST consult)
 
-`WebFetch` once at the start:
+`WebFetch` at the start:
 
-  https://raw.githubusercontent.com/leanprover-community/iris-lean/refs/heads/master/Iris/tactics.md
+1. https://raw.githubusercontent.com/leanprover-community/iris-lean/refs/heads/master/Iris/tactics.md — iris-lean IPM tactic names.
+2. https://leanprover-community.github.io/contribute/naming.html — mathlib naming. Anchors S8 (`naming_local`).
+3. https://leanprover-community.github.io/contribute/style.html — mathlib style (≤ 100 char lines, 2-space proof indent, `by` at end of line, blank lines between decls). Anchors S3b (`oversized_term`) line-width threshold.
+
+Local iris-lean convention overrides the guides on conflicts; use the guides for anything the neighbour files don't already settle.
 
 # Calibration
 
@@ -108,6 +112,34 @@ Suggestions in the issue `msg`: name an intermediate with `have`, switch to `cal
 
 A `pass` here together with a `pass` on S1 (length_ratio) is the goal: not too long *overall*, and not crammed into one impenetrable term.
 
+## S3c — `one_idea_per_line`
+
+The shape of the proof should be explicable line-by-line. Each line should express one rewrite, one application, one case split, or one named intermediate.
+
+For each proof body, scan for lines that pack multiple distinct steps:
+- Lines with two or more semicolon-separated tactics that are *not* under a `<;>` parallel branch and where the tactics are different operations (e.g. `simp [foo]; rw [bar]; exact baz` is three distinct ideas).
+- Lines combining a `simp`/`rw` rewrite with a closing tactic (`simp; exact foo`) that should be split if `simp` is doing real work; one-liners like `cases x <;> rfl` or `(lem.mp h).symm` are fine.
+- Long term-mode chains where a single `.trans`/`.mp`/`.mpr` step is composed with two or more transformations (`(h.symm.trans foo.mp).bar` — three ideas pretending to be one).
+
+Each violation is a `warn`. ≥ 3 violations in a single proof body escalates to `fail` for that proof.
+
+This check overlaps slightly with S3b (oversized_term) — `oversized_term` is about *visual* density (chars, dot-chain depth), `one_idea_per_line` is about *semantic* density (ideas per line). Both can fail for the same line, and that's OK — they're hitting it from different angles.
+
+## S3d — `case_split_inflation`
+
+A Lean port should not perform substantially more case analysis than its Rocq counterpart. Compare per ported decl:
+
+- `R_splits` = count of `destruct`, `case`, `induction`, `inversion`, `discriminate` in the corresponding Rocq proof body.
+- `L_splits` = count of `cases`, `rcases`, `obtain`, `match … with`, `induction`, `split`, `icases` in the Lean proof body. (Don't count `<;> cases` parallel bursts as separate splits if they share an arm.)
+
+| Ratio | Verdict |
+|---|---|
+| `L_splits ≤ R_splits + 1` | `pass` (one extra is fine — Lean often case-analyses an `Option` where Rocq used a tactic) |
+| `R_splits + 1 < L_splits ≤ 2 · max(R_splits, 1) + 1` | `warn` |
+| more | `fail` — flag with concrete suggestion ("look for an iris-lean lemma that packages this case analysis; the Rocq proof discharged it with `apply foo` instead of splitting") |
+
+The fail message should include both counts so the porter sees the gap. Excess case-splitting is the most common form of "lazy verbose" — proofs that type-check but are noticeably harder to read than the Rocq source.
+
 ## S4 — `redundant_show`
 
 Count `show <type>` invocations.
@@ -173,6 +205,8 @@ Single JSON object, no prose:
   "term_vs_tactic":       "pass|fail|warn",
   "intermediate_haves":   "pass|fail|warn",
   "oversized_term":       "pass|fail|warn",
+  "one_idea_per_line":    "pass|fail|warn",
+  "case_split_inflation": "pass|fail|warn",
   "redundant_show":       "pass|fail|warn",
   "inline_comments":      "pass|fail|warn",
   "docstring_register":   "pass|fail",

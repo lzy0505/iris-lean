@@ -17,11 +17,15 @@ Stage 3 of the iris-lean Rocq→Lean porting pipeline. The Stage-1 file has been
 - `STAGE2_REPORT`: merged Stage-2 review report (so you know which `warn`s the reviewers raised).
 - (optional) `REVISION_FEEDBACK`: issues from a previous Stage-4 review that you must address. Treat as authoritative.
 
-# Canonical reference (MUST consult)
+# Canonical references (MUST consult)
 
-`WebFetch` once at the start of your run:
+`WebFetch` these three docs at the start of your run:
 
-  https://raw.githubusercontent.com/leanprover-community/iris-lean/refs/heads/master/Iris/tactics.md
+1. https://raw.githubusercontent.com/leanprover-community/iris-lean/refs/heads/master/Iris/tactics.md — iris-lean IPM tactic names.
+2. https://leanprover-community.github.io/contribute/naming.html — mathlib naming conventions (used for proof-local names like `have h_foo`, `let bar`).
+3. https://leanprover-community.github.io/contribute/style.html — mathlib style (≤ 100 char lines, 2-space proof indent, `by` at end of line, blank lines between decls).
+
+When the mathlib guides disagree with the local iris-lean convention, follow the local convention; use mathlib as the default for anything the neighbours don't already settle.
 
 This is the **single source of truth for iris-lean IPM tactic names**. They are lowercase-leading:
 
@@ -156,6 +160,27 @@ Rules of thumb:
 - Tactic blocks should have one tactic per line at the top level (semicolon-chaining is fine for genuinely parallel branches under `<;>`, not as a way to cram several distinct steps onto one line).
 
 This is **not** in tension with concision. The "Concision" section says don't pad a 1-line Rocq proof into a 5-line Lean proof; this section says don't shrink a 6-line Rocq proof into a single unreadable mega-term. The neighbour files (`InternalEq.lean`, `Updates.lean`, `Csum.lean`) all use `calc`, named `have`s, and short `refine` skeletons — match that.
+
+## One idea per line
+
+The shape of the proof should be explicable to a human reader at a glance. Aim to express **one idea per line** — one rewrite, one application, one case split, one named intermediate. When several primitive steps are forced into the same line by syntactic chaining (`.trans (h.mp).symm`, `simp; rw [foo]; exact bar`), the reader has to mentally re-decompose them. A line you'd describe with a single phrase ("rewrite by `foo`", "discharge with `bar`", "split on `x`") is a line that belongs alone.
+
+Exceptions where chaining on one line is fine:
+- A `<;>` parallel discharge where every branch is identical (`cases x <;> rfl`).
+- A `.trans` of two pieces where each piece is a short named lemma (`(siPure_mono blah).trans foo`) — still one idea, "compose lemma A into context B".
+- A `simp only [<short list>]` invocation — still one idea.
+
+Apply judgement: the test is whether you could narrate the proof line by line and have each line correspond to a single explanation. If you'd say "and then we... and then... and finally..." for one line, split it.
+
+## Don't outpace the Rocq proof's case-splitting
+
+A Lean port should not perform substantially more case analysis than its Rocq counterpart. If the Rocq proof did one `destruct x` and discharged the result with general lemmas, the Lean port should usually do one `cases x` (or none, via a named lemma that handles the splitting internally) — *not* a tower of `cases x <;> cases y <;> cases z` followed by branch-by-branch tactics.
+
+When you find yourself adding a case split that has no analog in the Rocq proof, stop and ask:
+- Is there a named iris-lean lemma that handles it without splitting? (Search: iris-loogle, then `Grep`.) Often the iris-lean side has packaged the case analysis into a `_ne_match`/`_dist_match` lemma or a typeclass instance.
+- Is the split needed because of a representation difference between Rocq and iris-lean? If yes, name and document the gap; if no, you're probably reaching past the existing API.
+
+Excess case-splitting is the most common form of "lazy verbose" — it always type-checks, but it produces proofs the maintainer has to wade through. Catching it requires comparing line-for-line against the Rocq source.
 
 ## Reach for `<;>` over case-by-case bashing
 

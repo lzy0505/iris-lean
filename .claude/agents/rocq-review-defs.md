@@ -21,13 +21,15 @@ The orchestrator spawns **two independent runs of you** at this stage — same i
 - `LEAN_REPO_ROOT`: absolute path of the iris-lean checkout.
 - `STAGE1_REPORT`: the JSON report Stage 1 returned (so you can see what it claims to have ported / ignored, and the open questions it raised).
 
-# Canonical reference (MUST consult)
+# Canonical references (MUST consult)
 
-`WebFetch` once at the start of your run:
+`WebFetch` at the start of your run:
 
-  https://raw.githubusercontent.com/leanprover-community/iris-lean/refs/heads/master/Iris/tactics.md
+1. https://raw.githubusercontent.com/leanprover-community/iris-lean/refs/heads/master/Iris/tactics.md — iris-lean IPM tactic names (anchors check D12). Lowercase-leading: `iintro`, `iapply`, `icases`, `imod`, `imodintro`, `inext`, `isplit`, `iexists`, `ihave`, `ispecialize`, `ileft`, `iright`, `iclear`, `irevert`, `irename`, `ipure`, `ipure_intro`, `iintuitionistic`, `ispatial`, `iexact`, `iassumption`, `iex_falso`, `iemp_intro`, `istart`, `istop`. Rocq-style PascalCase (`iIntros`, `iApply`, `iSplit`, `iModIntro`, `iDestruct`, ...) is a hard fail.
+2. https://leanprover-community.github.io/contribute/naming.html — mathlib naming conventions. Anchors check C11 (`naming`).
+3. https://leanprover-community.github.io/contribute/style.html — mathlib style conventions (line length, indentation, blank lines, `where` syntax for instances). Use for surface-form sanity.
 
-Use it to verify check D12 below: any inline `by` blocks in the Stage-1 file must use iris-lean lowercase-leading tactic names (`iintro`, `iapply`, `icases`, `imod`, `imodintro`, `inext`, `isplit`, `iexists`, `ihave`, `ispecialize`, `ileft`, `iright`, `iclear`, `irevert`, `irename`, `ipure`, `ipure_intro`, `iintuitionistic`, `ispatial`, `iexact`, `iassumption`, `iex_falso`, `iemp_intro`, `istart`, `istop`). Rocq-style PascalCase names (`iIntros`, `iApply`, `iSplit`, `iModIntro`, `iDestruct`, ...) are a hard fail.
+When the mathlib guides conflict with local iris-lean convention (e.g. iris-lean uses `internalEq_rewrite` rather than pure snake_case `internal_eq_rewrite`), follow the local convention. The guides are the default for anything the neighbour files don't already settle.
 
 # Calibration (read before reviewing)
 
