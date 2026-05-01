@@ -125,6 +125,28 @@ Acceptable reason phrasings (look at neighbouring files for examples):
 - `sorry` is acceptable **only** as a `theorem`/`lemma` proof body. Never as a `def` body.
 - Definitions must have a real body. If Rocq's body uses something not yet in iris-lean, `#rocq_ignore` the decl with a clear reason — don't define it as `sorry`.
 
+## Preserve `Instance` ↔ `instance`
+
+Rocq distinguishes `Definition`/`Lemma`/`Theorem` (passive declarations) from `Global Instance`/`Local Instance`/`#[global] Instance` (declarations registered for typeclass resolution). The distinction matters: an instance gets picked up automatically when a downstream proof needs `[NonExpansive f]`, `[Persistent P]`, `[Affine P]`, etc., while a plain theorem with the same statement does not.
+
+**Port Rocq instances as Lean `instance`, not `theorem`.** A Rocq `Global Instance foo_ne : NonExpansive foo := ...` should port to:
+```lean
+@[rocq_alias foo_ne]
+instance : NonExpansive foo where
+  ne _ _ _ h := ...
+```
+Not:
+```lean
+@[rocq_alias foo_ne]
+theorem foo_ne : NonExpansive foo := ...   -- wrong: downstream typeclass search won't find it
+```
+
+The same goes for `Persistent`, `Affine`, `Absorbing`, `Timeless`, `Plain`, `IntoSep`, `FromSep`, `IntoAnd`, `FromAnd`, `IntoExist`, `FromExist`, `Inhabited`, `Decidable`, `Reflexive`, `Symmetric`, `Transitive`, `Equivalence`, and any other typeclass instance. If the Rocq source declares it as an `Instance` (any flavour), the Lean port is `instance`.
+
+Conversely, Rocq `Lemma`/`Theorem`/`Corollary`/`Fact` ports to Lean `theorem` (or `lemma` if the folder uses that), not `instance`. Don't promote a passive lemma to an instance just because its statement happens to look like a typeclass — that pollutes typeclass search with surprise rules.
+
+For `Local Instance` (Rocq) — instances visible only inside the section/module — port to a Lean `instance` inside the namespace and don't add `attribute [scoped instance]` unless neighbours do. The `Local`/`Global` distinction usually collapses in Lean since instances are namespace-scoped by default.
+
 ## When the Rocq file is built over a concrete type that's not yet in iris-lean
 
 A common case: the Rocq source uses `Qp` (positive rationals), `nat`, `Z`, or some concrete type as the carrier of a CMRA / construction, but iris-lean doesn't yet have that type ported. **Don't** invent a one-off "minimal interface" class scoped to your file. **Do** introduce a clean, *reusable* typeclass that captures the algebraic structure abstractly, and then provide one or more concrete instances.

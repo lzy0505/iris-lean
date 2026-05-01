@@ -94,6 +94,28 @@ When in doubt, prefer `fail` and let the porter either upgrade the reason or rem
 
 For each ported decl, line-up the Rocq source and the Lean signature. Use `mcp__lean-lsp__lean_hover_info` on the Lean decl to get its full type as Lean sees it.
 
+### B5b — `instance_kind`
+
+For every Rocq decl ported into the file, the *kind* must match: a Rocq `Instance` (any flavour: `Global Instance`, `Local Instance`, `#[global] Instance`, `Existing Instance`, `Canonical Structure`, `#[export] Instance`) ports to a Lean `instance`; a Rocq `Lemma`/`Theorem`/`Corollary`/`Fact`/`Definition` ports to `theorem`/`lemma`/`def` respectively.
+
+**Hard fail** (with concrete fix) for either direction of mismatch:
+- A Rocq `Instance foo : Persistent ...` ported as `theorem foo : Persistent ...` — typeclass search won't find it; downstream proofs that rely on it will silently fail or require manual `letI`/`haveI` workarounds.
+- A Rocq `Lemma foo : Persistent ...` ported as `instance : Persistent ...` — pollutes typeclass search with a non-instance.
+
+To check: parse `ROCQ_FILE` for top-level decls and remember their kind (`Instance` / `Lemma`-family / `Definition` / `Inductive` / etc.). Then for each ported decl in `LEAN_FILE`, look at its Lean kind (`instance` / `theorem`/`lemma` / `def` / `inductive` / `structure` / `class`). They must agree:
+
+| Rocq kind | Lean kind |
+|---|---|
+| `Global Instance`, `Local Instance`, `Existing Instance`, `#[global/export] Instance` | `instance` |
+| `Canonical Structure` | usually `instance` (e.g. for OFE/COFE registration); occasionally `def` if neighbours do that |
+| `Lemma`, `Theorem`, `Corollary`, `Fact` | `theorem` (or `lemma`, per folder convention) |
+| `Definition` | `def` (or `abbrev`, per neighbours) |
+| `Inductive` | `inductive` |
+| `Record`, `Class` | `structure` or `class` |
+| `Fixpoint`, `CoFixpoint` | `def` (or `partial def`/`coinductive` analog where applicable) |
+
+This check is independent of, and run alongside, B6 (`stmt_equivalence`).
+
 ### B6 — `stmt_equivalence`
 The Lean theorem statement, modulo iris-lean conventions, must be denotationally equal to the Rocq lemma statement.
 
@@ -141,6 +163,7 @@ Produce a single JSON object as your final message. The orchestrator parses it.
   "alias_dupes":      "pass|fail",
   "stale":            "pass|fail",
   "ignore_justified": "pass|fail|warn",
+  "instance_kind":    "pass|fail",
   "stmt_equivalence": "pass|fail|warn",
   "binder_shape":     "pass|fail|warn",
   "instance_args":    "pass|fail|warn",
