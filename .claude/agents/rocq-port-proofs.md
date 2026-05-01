@@ -1,7 +1,7 @@
 ---
 name: rocq-port-proofs
 description: Stage 3 of the iris-lean Rocq porting pipeline. Replace each `sorry` in a Stage-2-approved file with a complete proof, preferring iris-lean IPM tactics for separation logic. Output must compile with no sorries, no new axioms.
-tools: Read, Edit, Grep, Glob, Bash, WebFetch, mcp__lean-lsp__lean_goal, mcp__lean-lsp__lean_diagnostic_messages, mcp__lean-lsp__lean_hover_info, mcp__lean-lsp__lean_local_search, mcp__lean-lsp__lean_leansearch, mcp__lean-lsp__lean_leanfinder, mcp__lean-lsp__lean_loogle, mcp__lean-lsp__lean_state_search, mcp__lean-lsp__lean_hammer_premise, mcp__lean-lsp__lean_multi_attempt, mcp__lean-lsp__lean_code_actions, mcp__lean-lsp__lean_completions
+tools: Read, Edit, Grep, Glob, Bash, WebFetch, mcp__lean-lsp__lean_goal, mcp__lean-lsp__lean_diagnostic_messages, mcp__lean-lsp__lean_hover_info, mcp__lean-lsp__lean_local_search, mcp__lean-lsp__lean_leansearch, mcp__lean-lsp__lean_leanfinder, mcp__lean-lsp__lean_state_search, mcp__lean-lsp__lean_hammer_premise, mcp__lean-lsp__lean_multi_attempt, mcp__lean-lsp__lean_code_actions, mcp__lean-lsp__lean_completions
 model: opus
 ---
 
@@ -97,18 +97,26 @@ For each theorem at `sorry`:
 6. **Check** with `mcp__lean-lsp__lean_diagnostic_messages "$LEAN_FILE"` that you didn't break anything else.
 7. After every few proofs, run `cd "$LEAN_REPO_ROOT/Iris" && lake build` to catch issues that the LSP missed (mostly cross-file problems).
 
-## Search tools to use freely
-- **Local Loogle (preferred)** — local instance at `http://localhost:8088/json` whose index is built with the `Iris` module loaded, so it covers Mathlib, Batteries, *and* iris-lean. Start the server with `uv run server.py` from `/Users/zongyuan/code/iris-loogle/` if it isn't already running. Query: `curl -sG 'http://localhost:8088/json' --data-urlencode 'q=<pattern>'`. Unrate-limited; use it as your default for type-pattern search and "is there already a lemma that does this?" questions.
-- `mcp__lean-lsp__lean_local_search` for "is there a lemma named X locally?"
-- `mcp__lean-lsp__lean_state_search` for "what closes this exact goal state?"
-- `mcp__lean-lsp__lean_hammer_premise` for "what should I feed `simp`?"
-- `mcp__lean-lsp__lean_leansearch` for natural-language → mathlib lookup (rate-limited).
+## Search tools (strict order)
+
+1. **iris-loogle (local server)** — covers iris-lean + Mathlib + Batteries in one type-pattern query, indexed with the `Iris` module loaded. Default tool for "what existing lemma matches this shape?" Start the server (if not already running) with `cd /Users/zongyuan/code/iris-loogle && uv run server.py` in the background. Query: `curl -sG 'http://localhost:8088/json' --data-urlencode 'q=<pattern>'`. Unrate-limited.
+2. **`Grep` over iris-lean source** — keyword and name lookups: `grep -rn "Foo\b" Iris/Iris/`. Often the right call when you already know what to look for.
+3. `mcp__lean-lsp__lean_local_search` — for verifying a name is unused or finding candidates in the open buffer's project context.
+4. `mcp__lean-lsp__lean_state_search` — "what closes this exact goal state?"
+5. `mcp__lean-lsp__lean_hammer_premise` — "what should I feed `simp`?"
+6. `mcp__lean-lsp__lean_leansearch` — natural-language → mathlib lookup (rate-limited; use sparingly).
+7. `mcp__lean-lsp__lean_leanfinder` — semantic/conceptual search (rate-limited; use sparingly).
+8. `mcp__lean-lsp__lean_hover_info` — inspect a signature.
+
+**Do not use `mcp__lean-lsp__lean_loogle`.** That tool's index is built without iris-lean's `Iris` module loaded, so it can't see local lemmas. iris-loogle (entry 1) strictly dominates it. The tool is intentionally not in your tools allowlist.
 
 ## Reusing Mathlib / Batteries lemmas
 
-If Loogle turns up a Mathlib or Batteries lemma that closes a step:
+**Avoid Mathlib when possible.** iris-lean is intentionally light on Mathlib dependencies. Reach for it only when there's no iris-lean equivalent and the lemma is genuinely necessary for the proof.
+
+When you do need it:
 - Prefer importing the relevant module if iris-lean already has the dependency.
-- Otherwise, if the lemma is **standalone and self-contained** (single decl, proof only relies on what iris-lean already has), it is acceptable to **copy the lemma into iris-lean** — typically into `Iris/Iris/Std/` or alongside the file using it. Leave a one-line comment giving credit (e.g. `-- copied from Mathlib.Data.Foo.Bar`).
+- Otherwise, if the lemma is **standalone and self-contained** (single decl, proof only relies on what iris-lean already has), it's acceptable to **copy the lemma into iris-lean** — typically into `Iris/Iris/Std/` or alongside the file using it. Leave a one-line credit comment.
 - Don't copy a lemma whose proof drags in further infrastructure iris-lean doesn't have. Prove it locally instead, or treat the surrounding decl as blocked (escape hatch flavour 2).
 
 # Style discipline

@@ -1,7 +1,7 @@
 ---
 name: rocq-port-defs
 description: Stage 1 of the iris-lean Rocq porting pipeline. Read a Rocq .v file and produce an iris-lean .lean file with all top-level definitions, lemma signatures (proofs as `sorry`), `@[rocq_alias]` annotations, and `#rocq_ignore` entries. Build must succeed; proofs are filled in Stage 3.
-tools: Read, Write, Edit, Grep, Glob, Bash, WebFetch, mcp__lean-lsp__lean_goal, mcp__lean-lsp__lean_diagnostic_messages, mcp__lean-lsp__lean_hover_info, mcp__lean-lsp__lean_local_search, mcp__lean-lsp__lean_leansearch, mcp__lean-lsp__lean_leanfinder, mcp__lean-lsp__lean_loogle, mcp__lean-lsp__lean_completions, mcp__lean-lsp__lean_file_outline
+tools: Read, Write, Edit, Grep, Glob, Bash, WebFetch, mcp__lean-lsp__lean_goal, mcp__lean-lsp__lean_diagnostic_messages, mcp__lean-lsp__lean_hover_info, mcp__lean-lsp__lean_local_search, mcp__lean-lsp__lean_leansearch, mcp__lean-lsp__lean_leanfinder, mcp__lean-lsp__lean_completions, mcp__lean-lsp__lean_file_outline
 model: opus
 ---
 
@@ -58,21 +58,28 @@ Before writing a single line of the new file, read the local conventions:
 
 # Discovery tools
 
-- **Local Loogle (preferred for type-pattern search)** — there's a local Loogle instance whose index is built with the `Iris` module loaded, so it covers Mathlib, Batteries, *and* iris-lean. Use it first for "is there a lemma of this shape?" queries. Start the server with `uv run server.py` from `/Users/zongyuan/code/iris-loogle/` if it isn't already running, then query: `curl -sG 'http://localhost:8088/json' --data-urlencode 'q=<pattern>'`. Patterns are the standard Loogle syntax (e.g. `?P → ?P`, `_ ⊢ _ -∗ _`, `Equivalence ?R`). Unrate-limited.
-- `mcp__lean-lsp__lean_local_search` to verify a name is unused / find an iris-lean-only candidate.
-- `mcp__lean-lsp__lean_leansearch` for "what does iris-lean / mathlib call this concept?" (natural language; rate-limited).
-- `mcp__lean-lsp__lean_hover_info` to inspect signatures of imports.
-- `mcp__lean-lsp__lean_file_outline` to skim a neighbour file efficiently.
-- `Grep` and `Glob` for repository-wide patterns (e.g. `grep -n "@\[rocq_alias" Iris/Iris/<folder>/*.lean`).
+The search hierarchy for "is there an existing lemma I should use?" is **strict**:
+
+1. **iris-loogle (local server)** — covers iris-lean + Mathlib + Batteries in one type-pattern query, indexed with the `Iris` module loaded. Use it as your default for type-pattern search. Start the server (if not already running) with `cd /Users/zongyuan/code/iris-loogle && uv run server.py` (run in background). Query: `curl -sG 'http://localhost:8088/json' --data-urlencode 'q=<pattern>'`. Patterns are the standard Loogle syntax — `?P → ?P`, `_ ⊢ _ -∗ _`, `Equivalence ?R`, etc. Unrate-limited.
+2. **`Grep` over the iris-lean source** — for keyword and name lookups not expressible as type patterns: `grep -rn "Foo\b" Iris/Iris/`. Combine with `Glob` to scope.
+3. `mcp__lean-lsp__lean_local_search` — to verify a name is unused or to find candidates inside the currently-open buffer's project context.
+4. `mcp__lean-lsp__lean_leansearch` — natural-language → mathlib lookup (rate-limited; use sparingly).
+5. `mcp__lean-lsp__lean_leanfinder` — semantic/conceptual search (rate-limited; use sparingly).
+6. `mcp__lean-lsp__lean_hover_info` — to inspect signatures of imports.
+7. `mcp__lean-lsp__lean_file_outline` — to skim a neighbour file efficiently.
+
+**Do not use `mcp__lean-lsp__lean_loogle`.** That tool's index is built without iris-lean's `Iris` module loaded, so it can't see local lemmas. iris-loogle (entry 1) strictly dominates it. The tool is intentionally not in your tools allowlist.
 
 Use these *before* introducing any new helper. iris-lean already has a deep API; duplicating a lemma is worse than reusing one with a slightly different name.
 
 ## Reusing Mathlib / Batteries
 
-The local Loogle search covers Mathlib and Batteries. If a lemma you need exists there:
-- Prefer to import the relevant Mathlib/Batteries module if iris-lean already has the dependency available (check `Iris/lakefile.toml` and existing `import` lines in neighbour files).
-- If pulling in the full module would be too heavy and the lemma is **standalone and self-contained** (a single decl with a self-contained proof, only relying on definitions iris-lean already has), it is acceptable to **copy the lemma into iris-lean** — typically into `Iris/Iris/Std/` or alongside the file using it. When you do, leave a one-line comment giving credit and the upstream name (e.g. `-- copied from Mathlib.Data.Foo.Bar (`Mathlib.foo_lemma`)`).
-- Do **not** copy a lemma whose proof drags in further Mathlib infrastructure that iris-lean doesn't have. In that case, prove it locally with whatever iris-lean does have, or — if it's genuinely missing — leave the dependent decl unmarked (per the "leave missing" rule above).
+**Avoid Mathlib results when possible.** iris-lean is intentionally light on Mathlib dependencies — the surrounding files mostly use only what's already available through iris-lean's own algebra/std layer (e.g. `Iris.Algebra.OFE`, `Iris.Std`). Reach for Mathlib only when there's no equivalent in iris-lean and the missing piece is genuinely necessary for the port.
+
+When you do need Mathlib (or Batteries):
+- If iris-lean already imports the relevant module (check `Iris/lakefile.toml` and existing `import` lines), use it directly.
+- If pulling in the full module would be too heavy and the lemma is **standalone and self-contained** (single decl, proof only relies on definitions iris-lean already has), it's acceptable to **copy the lemma into iris-lean** — typically into `Iris/Iris/Std/` — with a one-line comment giving credit (e.g. `-- copied from Mathlib.Data.Foo.Bar`).
+- Do **not** copy a lemma whose proof drags in further Mathlib infrastructure that iris-lean doesn't have. Prove it locally instead, or — if it's genuinely missing — leave the dependent decl unmarked.
 
 # Porting rules (hard constraints)
 

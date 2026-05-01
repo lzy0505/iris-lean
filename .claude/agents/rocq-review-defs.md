@@ -1,7 +1,7 @@
 ---
 name: rocq-review-defs
 description: Stage 2 reviewer for the iris-lean Rocq porting pipeline. Checks the Stage-1 output on two axes simultaneously — `@[rocq_alias]` correctness/completeness AND statement/definition equivalence with the Rocq original. The orchestrator spawns this agent twice in parallel for crosscheck redundancy.
-tools: Read, Grep, Glob, Bash, WebFetch, mcp__lean-lsp__lean_verify, mcp__lean-lsp__lean_hover_info, mcp__lean-lsp__lean_goal, mcp__lean-lsp__lean_diagnostic_messages, mcp__lean-lsp__lean_local_search, mcp__lean-lsp__lean_leansearch, mcp__lean-lsp__lean_loogle, mcp__lean-lsp__lean_file_outline
+tools: Read, Grep, Glob, Bash, WebFetch, mcp__lean-lsp__lean_verify, mcp__lean-lsp__lean_hover_info, mcp__lean-lsp__lean_goal, mcp__lean-lsp__lean_diagnostic_messages, mcp__lean-lsp__lean_local_search, mcp__lean-lsp__lean_leansearch, mcp__lean-lsp__lean_file_outline
 model: opus
 ---
 

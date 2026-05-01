@@ -93,7 +93,11 @@ If you want to re-run only Stage 3+4 (because Stage 2 already approved the signa
 
 ## Prerequisites
 
-- **Local Loogle**: agents query a local Loogle instance (faster than the rate-limited remote) whose index covers Mathlib, Batteries, and iris-lean. Start it once with `cd /Users/zongyuan/code/iris-loogle && uv run server.py`. The orchestrator checks for it at pre-flight and warns if it's down. Self-contained Mathlib/Batteries lemmas surfaced by Loogle may be copied into `Iris/Iris/Std/` when importing the upstream module would be too heavy.
+- **iris-loogle (local server)**: the agents' canonical type-pattern search. Index covers iris-lean + Mathlib + Batteries (built with the `Iris` module loaded), unrate-limited. Start it once with `cd /Users/zongyuan/code/iris-loogle && uv run server.py`. The orchestrator checks for it at pre-flight. If it's down, agents fall back to `Grep` over `Iris/Iris/`. Agents' tools allowlists deliberately exclude `mcp__lean-lsp__lean_loogle` (its index lacks iris-lean — wrong index for this workflow). `mcp__lean-lsp__lean_leansearch` and `mcp__lean-lsp__lean_leanfinder` remain available as rate-limited fallbacks for natural-language / semantic queries.
+
+## Mathlib policy
+
+iris-lean is intentionally light on Mathlib dependencies. Agents are told to **avoid Mathlib results when possible** and only reach for it when there's no iris-lean equivalent and the missing piece is genuinely necessary. When a self-contained Mathlib/Batteries lemma is necessary and importing the upstream module would be too heavy, it's acceptable to copy the lemma into `Iris/Iris/Std/` with a credit comment.
 
 ## See also
 

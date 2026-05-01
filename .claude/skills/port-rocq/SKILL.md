@@ -61,7 +61,7 @@ Both must `approve` for the pipeline to finish. Issues from either go into the m
 
 ### 0. Resolve paths and pre-flight
 
-**Local Loogle.** Several agents query a local Loogle instance whose index is built with the `Iris` module loaded (so it covers Mathlib + Batteries + iris-lean). Before Stage 1, check that the server is up:
+**iris-loogle (local server).** The agents' canonical type-pattern search is a local Loogle instance whose index is built with the `Iris` module loaded — covers iris-lean + Mathlib + Batteries in one query, unrate-limited. Before Stage 1, check that the server is up:
 ```
 curl -sf http://localhost:8088/json?q=true >/dev/null || echo "loogle down"
 ```
@@ -69,7 +69,7 @@ If it's down, start it (in the background) from `/Users/zongyuan/code/iris-loogl
 ```
 cd /Users/zongyuan/code/iris-loogle && uv run server.py
 ```
-Don't block on this — agents fall back to `mcp__lean-lsp__lean_loogle` (rate-limited) if local Loogle is unavailable. But warn the user, since the rate-limited fallback noticeably slows the pipeline.
+If you can't start it for some reason, fall back to `Grep` over `Iris/Iris/`. The agents' tools allowlists deliberately exclude `mcp__lean-lsp__lean_loogle` — its index is built without the `Iris` module loaded, so it can't see iris-lean lemmas; iris-loogle is the only Loogle they can reach.
 
 ```
 ROCQ_ROOT="/Users/zongyuan/code/iris-rocq"
