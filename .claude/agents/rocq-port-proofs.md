@@ -140,6 +140,23 @@ If the Rocq proof is one line, the iris-lean proof should be one line too. The o
 
 The neighbour files (`InternalEq.lean`, `Auth.lean`, `Csum.lean`, etc.) consistently use compact term-mode or short tactic-mode proofs. **Match that density.** A proof that's 3× longer than its Rocq counterpart is a code-smell — re-examine before shipping.
 
+## Readable proof terms — split, don't sprawl
+
+Concision and readability are different goals: a one-liner that's a 200-character chain of `.trans`/`.mp`/dot-access nests is *concise* but unreadable. When a proof term gets large enough that a reader has to mentally re-parse parentheses to follow the data flow, it's time to split.
+
+Break long proofs into **named pieces**:
+- Use `have <name> : <type> := <subterm>` (or `have <name> := <subterm>` when the type is obvious) to lift a subterm out and give it a name. Subsequent uses become `<name>` instead of inlining the subterm.
+- Use `calc` for multi-step entailment chains with ≥ 3 steps. Each `_ ⊢ _ := lemma` line names the intermediate proposition and the witness — vastly easier to scan than `(((lemma1.trans lemma2).trans lemma3).trans lemma4)`.
+- Use `refine` with explicit holes to expose the proof skeleton, then discharge each hole with a focused tactic block.
+- When a sub-proof is reused across two or more theorems in the file, hoist it into a `private theorem` and call it. (The same rule as for repeating shapes — see "Extract a private helper" below.)
+
+Rules of thumb:
+- A single proof term wider than ~80 characters is suspect. Either split with `have`/`calc` or break onto multiple lines following iris-lean's usual indentation.
+- A proof term with dot-chain depth > 2 (`a.foo.bar.baz`) is suspect. Name the intermediate.
+- Tactic blocks should have one tactic per line at the top level (semicolon-chaining is fine for genuinely parallel branches under `<;>`, not as a way to cram several distinct steps onto one line).
+
+This is **not** in tension with concision. The "Concision" section says don't pad a 1-line Rocq proof into a 5-line Lean proof; this section says don't shrink a 6-line Rocq proof into a single unreadable mega-term. The neighbour files (`InternalEq.lean`, `Updates.lean`, `Csum.lean`) all use `calc`, named `have`s, and short `refine` skeletons — match that.
+
 ## Reach for `<;>` over case-by-case bashing
 
 When several proofs share the same shape (typically: case-analyse one or more arguments, then discharge each branch with one of a small set of tactics), the iris-lean idiom is `cases x <;> cases y <;> first | t₁ | t₂ | t₃` — a single line, parallel branches, terse. *Not* `cases x with | A => ... | B => ... | C => ...` repeated for every theorem with the same shape. The case-by-case form belongs in the rare case where each branch needs genuinely different handling. When in doubt, write the `<;>`-form first; only break it apart if a branch resists.

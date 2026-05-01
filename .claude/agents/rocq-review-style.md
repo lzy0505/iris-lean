@@ -77,13 +77,36 @@ For each Rocq proof that's pure term-mode style (`Proof. apply foo, lem. Qed.`, 
 
 ## S3 — `intermediate_haves`
 
-Count `have <name> := ...` introductions inside each proof body. If a `have` is referenced exactly once in the same proof, it's a candidate for inlining.
+This check guards against *gratuitous* naming: a single-use `have` whose expression is short enough to inline trivially. Don't penalize legitimate uses of `have` for readability — they're a feature, not a smell.
 
-For each proof, scan for `have HXXX := EXPR; ...; HXXX` patterns. Each single-use `have` is a `warn` unless:
-- The expression is genuinely complex enough that naming aids readability (judgement call).
-- The neighbour files in the same folder do this consistently — check before flagging.
+For each proof, scan for `have HXXX := EXPR; ...; HXXX` patterns where:
+- `HXXX` is referenced exactly once, **and**
+- `EXPR` is short (≤ ~30 characters) **and** has no nested dot-chain or function application chain — i.e. it's a single name like `pcore_op_left` or a tiny tuple like `⟨a, b⟩`.
 
-If a single proof has ≥ 2 single-use `have`s, escalate to `fail` for that proof.
+Such trivially-inlineable single-use `have`s are a `warn`. Multiple in one proof escalates to `fail` for that proof.
+
+Single-use `have`s with longer or structurally non-trivial expressions are **fine** — they're naming an intermediate to keep the proof readable, which is exactly what S3b below requires when the term gets large. Don't flag them.
+
+## S3b — `oversized_term`
+
+The opposite failure of S3: a single proof term so large that a reader has to mentally re-parse it. Break long proofs into named pieces (`have`, `calc`, `refine` with holes) instead of one giant chain.
+
+For each proof body, compute:
+- **Maximum single-line term width** — the widest line of the proof body, in characters.
+- **Maximum dot-chain depth** — the longest `a.foo.bar.baz` (or `(...).trans (...).mp (...).symm`) chain anywhere in the body.
+
+| Metric | Threshold | Verdict |
+|---|---|---|
+| Single line ≤ 80 chars | | `pass` |
+| Single line 81–120 chars | | `warn` — flag with suggestion to break with `calc`/`have` |
+| Single line > 120 chars | | `fail` |
+| Dot-chain depth ≤ 2 | | `pass` |
+| Dot-chain depth = 3 | | `warn` |
+| Dot-chain depth ≥ 4 | | `fail` |
+
+Suggestions in the issue `msg`: name an intermediate with `have`, switch to `calc` for an entailment chain, or hoist a recurring sub-proof to a `private theorem`. Cite the specific line and column.
+
+A `pass` here together with a `pass` on S1 (length_ratio) is the goal: not too long *overall*, and not crammed into one impenetrable term.
 
 ## S4 — `redundant_show`
 
@@ -149,6 +172,7 @@ Single JSON object, no prose:
   "length_ratio":         "pass|fail|warn",
   "term_vs_tactic":       "pass|fail|warn",
   "intermediate_haves":   "pass|fail|warn",
+  "oversized_term":       "pass|fail|warn",
   "redundant_show":       "pass|fail|warn",
   "inline_comments":      "pass|fail|warn",
   "docstring_register":   "pass|fail",
