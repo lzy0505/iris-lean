@@ -93,34 +93,36 @@ When you do need Mathlib (or Batteries):
 - The argument to `@[rocq_alias ...]` is a Lean *identifier* — dots are accepted (Lean parses them as a hierarchical name).
 - No duplicate aliases. The build will reject duplicates anyway; check by grepping `Rocq.<your_alias>` first.
 
-## Ignores — only when the Rocq concept is NOT NEEDED in iris-lean
+## Ignores — use sparingly; the bar is high
 
-`#rocq_ignore` has **one** meaning: this Rocq concept is **not needed** in iris-lean — it doesn't apply, has been replaced architecturally, or is intrinsically Rocq-specific. It is **not** a "to-do" marker.
+`#rocq_ignore` makes a **permanent claim** that "iris-lean has consciously decided not to mirror this Rocq concept." Once written, the entry stays in the file until someone removes it; the tracking system treats the Rocq decl as resolved. So a wrongly-placed `#rocq_ignore` is worse than leaving the decl unmarked — it actively hides work that should be done.
 
-- **DO** use `#rocq_ignore <rocq.name> "<one-sentence reason>"` when:
-  - The Rocq decl is a Rocq-specific tactic / parsing helper / notation registration with no iris-lean counterpart by design.
-  - The Rocq decl is redundant with an iris-lean facility (e.g. covered by typeclass inference, subsumed by an existing iris-lean lemma).
-  - iris-lean dispatches the same concept differently (point at the iris-lean replacement in the reason).
-  - The decl is a Rocq internal lemma whose only role was to support a tactic that iris-lean handles differently.
+**The default is: don't ignore.** Only reach for `#rocq_ignore` when none of the alternatives applies:
 
-- **DO** use `#rocq_ignore_file <folder> "<file>" "<reason>"` for whole-file skips (rare at this stage).
+- Can the Rocq decl be ported, even with a `sorry` proof? → port it, with `@[rocq_alias]`. Stage 3 fills the proof.
+- Is the Rocq decl already covered by something you've ported under a different name (e.g. inlined into a Lean `instance` field)? → put `@[rocq_alias <rocq.name>]` on the Lean decl that subsumes it. Don't ignore — alias.
+- Is the Rocq decl blocked because some dependency isn't yet ported elsewhere? → **leave it unmarked.** The tracking system reports it as `missing`; a future pass picks it up.
+- Is the proof or the statement just hard? → port the signature with `sorry` and let Stage 3 handle it.
 
-- **DO NOT** use `#rocq_ignore` for:
-  - A decl you couldn't port because it depends on something else not yet ported in iris-lean. **Leave it unmarked.** The tracking system (`scripts/check_porting.py`) will report it as `missing` and pick it up later when its dependencies land.
-  - A decl whose proof you found difficult. Port the *signature* with `sorry` and let Stage 3 prove it.
-  - A decl you intend to come back to. There is no "later" — either it's not needed (ignore), it's needed and ported (alias), or it's needed and blocked (leave unmarked).
+**Only after** you've ruled out all of the above, ask: is this concept *intrinsically Rocq-specific* and *deliberately not part of iris-lean's design*? Concrete cases that qualify:
+- A Rocq tactic / parsing helper / `Hint Resolve` / notation registration with no iris-lean counterpart by design.
+- A Rocq `RAMixin` / `discreteR` / canonical-structure scaffolding decl, where iris-lean uses a direct typeclass instance instead.
+- A Rocq lemma whose only role is to feed a Rocq-only tactic (e.g. `solve_proper`'s lemma database) that iris-lean handles via a different mechanism.
 
-The distinction matters: `#rocq_ignore` makes a permanent claim that "iris-lean doesn't want this." Anything you mark today will *stay marked* until someone removes the entry. So use it only when you're confident the iris-lean side has consciously decided not to mirror that Rocq concept.
+If the answer to "is this concept intrinsically Rocq-specific?" is anything other than a confident yes, **leave it unmarked**.
 
-When in doubt: **leave it unmarked**. The tracking system will catch missing entries and surface them in the next pass.
+When you do ignore, the reason must name what iris-lean does instead — not just say "not needed". Compare:
+- ✗ "Not needed in iris-lean."
+- ✗ "Rocq-specific."
+- ✓ "Replaced by direct `OFE` instance on `Foo`; iris-lean doesn't use `leibnizO` canonical structures."
+- ✓ "Rocq tactic-database lemma; iris-lean discharges this goal via the `NonExpansive` instance directly."
+- ✓ "Subsumed by `Iris.BI.foo_lemma`." (and verify `Iris.BI.foo_lemma` actually exists, by `Grep` or iris-loogle).
 
-**Don't ignore something you also ported.** A Rocq decl is either ported (with `@[rocq_alias <rocq.name>]`) *or* ignored (with `#rocq_ignore <rocq.name> "..."`), never both. If you find yourself writing an ignore reason like "iris-lean uses `Foo.bar` instead", check: is `Foo.bar` in fact the iris-lean port of that exact decl? If yes, the right move is to put `@[rocq_alias <rocq.name>]` on `Foo.bar` and delete the `#rocq_ignore`. The tracking system treats those as the same outcome (the Rocq decl has a Lean home); duplicating both inflates the ignore count and creates dead `#rocq_ignore` entries that look like work to do but aren't.
+**Use `#rocq_ignore_file`** only for whole-file skips where every decl in the file falls into the same Rocq-specific category. Even rarer than per-decl ignores.
 
-Acceptable reason phrasings (look at neighbouring files for examples):
-  - "Rocq-specific tactic / parsing helper / notation registration."
-  - "Redundant with iris-lean's <X>; covered by typeclass inference."
-  - "Internal lemma; iris-lean dispatches this differently via <Y>."
-  - "Subsumed by <iris-lean lemma name>."
+**Never ignore something you also ported.** A Rocq name is either aliased (port lives somewhere) or ignored (no port intended), never both. If a decl you ignored as "redundant with X" *is* in fact the same decl as something you aliased to X, delete the `#rocq_ignore` and keep only the alias.
+
+When in doubt: **leave it unmarked**. The tracking system will catch missing entries and surface them in the next pass — that's the safe default. An unmarked entry is reversible (just port it next time); an `#rocq_ignore` entry has to be actively undone.
 
 ## Statements / definitions
 - Statements must be denotationally equivalent to the Rocq original — but expressed in iris-lean syntax: `⊢`/`⊣⊢` instead of `⊢@{PROP}` from a section variable when neighbours use that style; `iprop(...)` macro instead of Rocq's `(...)%I`; iris-lean BI notations (`∗`, `-∗`, `⌜⌝`, `▷`, `■`, `◇`).

@@ -78,19 +78,22 @@ python3 scripts/check_porting.py --format stale --no-build
 The output is a list of stale alias / ignore names. Filter for entries whose name lives in `ROCQ_FILE` (i.e. whose Rocq qualifier matches this file). Any such entry is a fail. Pre-existing stale entries in *other* files are reported but do not block this gate (note them as warns).
 
 ### A5 — `ignore_justified`
-For each `#rocq_ignore <name> "<reason>"`, the reason string must establish that the Rocq concept is **not needed** in iris-lean — not that it's deferred or blocked.
 
-**Hard fail** if the reason indicates blockage rather than deliberate non-port:
-- "depends on <X>", "blocked on <Y>", "requires <Z> first", "to be ported", "TODO", "later", "skip", "not yet", `""`, single-word non-explanations.
-- Anything that implies the porter intends to come back to this. Decls in that category should be left unmarked, not ignored.
+`#rocq_ignore` is a permanent claim that iris-lean has consciously decided not to mirror the Rocq concept. The bar is high — be strict.
 
-**Pass** if the reason establishes one of:
-- Rocq-specific tactic / parsing helper / notation registration with no iris-lean counterpart by design.
-- Redundant with iris-lean's `<X>`; covered by typeclass inference / by an existing iris-lean lemma.
-- Internal lemma; iris-lean dispatches the same concept differently via `<Y>`.
-- Subsumed by `<iris-lean lemma name>`.
+**Hard fail** in any of these cases:
 
-When in doubt, prefer `fail` and let the porter either upgrade the reason or remove the `#rocq_ignore` (turning it into a left-unmarked entry).
+1. *Reason implies deferral or blockage.* Strings like "depends on <X>", "blocked on <Y>", "requires <Z> first", "to be ported", "TODO", "later", "skip", "not yet", `""`, single-word non-explanations. Decls in that category should be left unmarked, not ignored.
+
+2. *Reason is generic / non-naming.* Strings like "not needed in iris-lean", "Rocq-specific", "use CMRA instance", "use Csum type with typeclass inference", "iris-lean handles this differently" without naming what iris-lean uses instead. A valid ignore reason **points at the iris-lean replacement by name** (a typeclass, a lemma, an instance) — vague phrasing means the porter didn't fully think through where the concept lives in iris-lean.
+
+3. *The Rocq decl could plausibly have been ported.* Specifically: if there's a Lean decl in the file (or in a neighbour file) whose statement matches the Rocq decl's, the right move is to put `@[rocq_alias <rocq.name>]` on that Lean decl, not `#rocq_ignore`. Verify by reading the Rocq decl's statement and `Grep`-ing the file for matches. If the porter ignored a decl whose port already exists under another name, the `#rocq_ignore` is wrong and should be replaced by an alias.
+
+4. *Redundant with an aliased Lean decl.* If a `#rocq_ignore <X>` entry says "redundant with `<Y>`" and `<Y>` is the name of a Lean decl in the file, check: does that Lean decl carry an `@[rocq_alias <X>]` already? If yes, the ignore is double-counting and should be deleted. If no, but `<Y>`'s statement is the same as `<X>`'s, the porter should add `@[rocq_alias <X>]` to `<Y>` and remove the ignore.
+
+**Pass** only if the reason names the iris-lean replacement concretely AND the Rocq decl is genuinely outside the iris-lean design (Rocq-specific tactic database, canonical-structure scaffolding subsumed by direct typeclass instances, parsing helpers, etc.).
+
+When in doubt, prefer `fail` — it's cheap to upgrade an ignore reason or convert to alias / leave-unmarked; it's expensive to undo a `#rocq_ignore` that hides real porting work.
 
 ## B. Statement / definition equivalence
 
