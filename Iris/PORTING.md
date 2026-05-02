@@ -140,10 +140,10 @@ Some porting tasks will require other tasks as dependencies, the GitHub issues p
   - [ ] Lemmas
   - [ ] Functors
 - [ ] `lib/mono_nat.v` (nb. generalize to `MonoNumbers.lean`)
-- [ ] `lib/ufrac_auth.v` 
-  - [ ] Lemmas
-  - [ ] Updates
-  - [ ] Functors
+- [x] `lib/ufrac_auth.v` 
+  - [x] Lemmas
+  - [x] Updates
+  - [x] Functors
 
 ## Base Logic 
 - [x] `base_logic.v`

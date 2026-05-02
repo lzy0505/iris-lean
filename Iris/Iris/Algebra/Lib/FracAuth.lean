@@ -6,6 +6,7 @@ Authors: Markus de Medeiros
 module
 
 public import Iris.Algebra.Auth
+public import Iris.Algebra.Lib.UFracAuth
 import Iris.Algebra.LocalUpdates
 meta import Iris.Std.RocqPorting
 
@@ -24,7 +25,7 @@ open Iris OFE CMRA UCMRA Auth Option
 /-! ## Definitions -/
 
 @[rocq_alias frac_authR]
-public abbrev FracAuth [UFraction F] [CMRA A] := Auth F (Option (Frac F × A))
+public abbrev FracAuth [UFraction F] [CMRA A] := UFracAuth F F A
 
 namespace FracAuth
 
@@ -56,7 +57,7 @@ instance auth_ne {dq : DFrac F} : NonExpansive (auth dq : A → FracAuth) where
 
 @[rocq_alias frac_auth_frag_ne]
 instance frag_ne {q : Frac F} : NonExpansive (frag q : A → FracAuth) where
-  ne _ _ _ h := Auth.frag_ne.ne ⟨.rfl, h⟩
+  ne _ _ _ h := UFracAuth.frag_ne.ne h
 
 /-! ## Discrete instances -/
 
@@ -66,7 +67,7 @@ theorem auth_discrete {dq : DFrac F} {a : A} (ha : DiscreteE a) : DiscreteE (●
 
 @[rocq_alias frac_auth_frag_discrete]
 theorem frag_discrete {q : Frac F} {a : A} (ha : DiscreteE a) : DiscreteE (◯F{q} a : FracAuth) :=
-  Auth.frag_discrete (some_is_discrete (prod.is_discrete ⟨discrete_0⟩ ha))
+  UFracAuth.frag_discrete (ha := ha)
 
 /-! ## Validity -/
 
@@ -159,15 +160,12 @@ theorem auth_valid {a : A} : (✓ (●F a : FracAuth (F := F))) ↔ ✓ a := by
 /-! ## Fragment-only validity -/
 
 @[rocq_alias frac_auth_frag_validN]
-theorem frag_validN {q : Frac F} {a : A} : (✓{n} ◯F{q} a) ↔ Fraction.Proper q.car ∧ ✓{n} a := by
-  rw [Auth.frag_validN]; rfl
+theorem frag_validN {q : Frac F} {a : A} : (✓{n} ◯F{q} a) ↔ Fraction.Proper q.car ∧ ✓{n} a :=
+  UFracAuth.frag_validN
 
 @[rocq_alias frac_auth_frag_valid]
-theorem frag_valid {q : Frac F} {a : A} : (✓ ◯F{q} a) ↔ Fraction.Proper q.car ∧ ✓ a := by
-  refine ⟨fun h => ⟨?_, ?_⟩, fun ⟨hq, ha⟩ => ?_⟩
-  · exact (frag_validN.mp (valid_iff_validN.mp h 0)).1
-  · exact valid_iff_validN.mpr fun n => (frag_validN.mp (valid_iff_validN.mp h n)).2
-  · exact valid_iff_validN.mpr fun n => frag_validN.mpr ⟨hq, valid_iff_validN.mp ha n⟩
+theorem frag_valid {q : Frac F} {a : A} : (✓ ◯F{q} a) ↔ Fraction.Proper q.car ∧ ✓ a :=
+  UFracAuth.frag_valid
 
 /-! ## Operations -/
 
@@ -177,7 +175,7 @@ theorem auth_dfrac_op {dq1 dq2 : DFrac F} {a : A} : (●F{dq1 • dq2} a) ≡ (�
 
 @[rocq_alias frac_auth_frag_op]
 theorem frag_op {q1 q2 : Frac F} {a1 a2 : A} : (◯F{q1 + q2} (a1 • a2)) ≡ (◯F{q1} a1) • ◯F{q2} a2 :=
-  .rfl
+  UFracAuth.frag_op
 
 /-! ## Auth-auth op validity -/
 
@@ -205,22 +203,20 @@ theorem auth_op_valid {a b : A} (h : ✓ (●F a : FracAuth (F := F)) • ●F b
 
 @[rocq_alias frac_auth_frag_op_validN]
 theorem frag_op_validN {q1 q2 : Frac F} {a b : A} :
-    (✓{n} (◯F{q1} a) • ◯F{q2} b) ↔ Fraction.Proper (q1 + q2).car ∧ ✓{n} (a • b) := by
-  show ✓{n} (◯F{q1 + q2} (a • b)) ↔ _
-  exact frag_validN
+    (✓{n} (◯F{q1} a) • ◯F{q2} b) ↔ Fraction.Proper (q1 + q2).car ∧ ✓{n} (a • b) :=
+  UFracAuth.frag_op_validN
 
 @[rocq_alias frac_auth_frag_op_valid]
 theorem frag_op_valid {q1 q2 : Frac F} {a b : A} :
-    (✓ (◯F{q1} a) • ◯F{q2} b) ↔ Fraction.Proper (q1 + q2).car ∧ ✓ (a • b) := by
-  show ✓ (◯F{q1 + q2} (a • b)) ↔ _
-  exact frag_valid
+    (✓ (◯F{q1} a) • ◯F{q2} b) ↔ Fraction.Proper (q1 + q2).car ∧ ✓ (a • b) :=
+  UFracAuth.frag_op_valid
 
 /-! ## Updates -/
 
 @[rocq_alias frac_auth_update]
 theorem update {q : Frac F} {a b a' b' : A} (h : (a, b) ~l~> (a', b')) :
     ((●F a : FracAuth (F := F)) • ◯F{q} b) ~~> (●F a') • ◯F{q} b' :=
-  auth_update (.option (.prod_2 _ q h))
+  UFracAuth.update h
 
 @[rocq_alias frac_auth_update_1]
 theorem update_full {a b a' : A} (ha' : ✓ a') :
@@ -245,10 +241,10 @@ theorem updateP_both_unpersist [IsSplitFraction F] {q : Frac F} {a b : A} :
 
 @[rocq_alias frac_authURF]
 abbrev FracAuthURF (T : COFE.OFunctorPre) [RFunctor T] : COFE.OFunctorPre :=
-  AuthURF (F := F) (OptionOF (ProdOF (constOF (Frac F)) T))
+  UFracAuth.UFracAuthURF (F := F) F T
 
 @[rocq_alias frac_authRF]
 abbrev FracAuthF (T : COFE.OFunctorPre) [RFunctor T] : COFE.OFunctorPre :=
-  AuthRF (F := F) (OptionOF (ProdOF (constOF (Frac F)) T))
+  UFracAuth.UFracAuthRF (F := F) F T
 
 end FracAuth
