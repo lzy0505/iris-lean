@@ -8,6 +8,7 @@ module
 public import Iris.Algebra.CMRA
 public import Iris.Algebra.OFE
 public import Iris.Algebra.LocalUpdates
+meta import Iris.Std.RocqPorting
 
 /-! ## Numbers CMRA
 Simple CMRA's for commutative monoids.
@@ -187,3 +188,188 @@ scoped instance [IdentityFree α] {a : α} : CMRA.IdFree a where
   id_free0_r _ _ h := IdentityFree.id_free (α := α) <| leibniz.mp (discrete h)
 
 end PosCommMonoidLike
+
+/-! ## `MaxNat` -/
+
+namespace Iris
+
+@[rocq_alias max_nat]
+structure MaxNat where
+  car : Nat
+
+namespace MaxNat
+
+@[reducible] instance : Add MaxNat := ⟨fun x y => ⟨x.car.max y.car⟩⟩
+@[reducible] instance : Zero MaxNat := ⟨⟨0⟩⟩
+
+scoped instance : Associative (Add.add (α := MaxNat)) where
+  assoc := fun {x y z} => by
+    simp only [Add.add]
+    exact congrArg MaxNat.mk (Nat.max_assoc ..)
+scoped instance : Commutative (Add.add (α := MaxNat)) where
+  comm := fun {x y} => by
+    simp only [Add.add]
+    exact congrArg MaxNat.mk (Nat.max_comm ..)
+scoped instance : IdempotentOp (Add.add (α := MaxNat)) where
+  idempotent x := by
+    simp only [Add.add]
+    cases x
+    exact congrArg MaxNat.mk (Nat.max_self _)
+scoped instance : @LeftIdentity MaxNat MaxNat Add.add (Zero.zero : MaxNat) where
+scoped instance : @LawfulLeftIdentity MaxNat MaxNat Add.add (Zero.zero : MaxNat) where
+  left_id := fun {x} => by
+    simp only [Add.add]
+    cases x
+    exact congrArg MaxNat.mk (Nat.zero_max _)
+
+scoped instance : Iris.COFE MaxNat := Iris.COFE.ofDiscrete _ Iris.Eq_Equivalence
+scoped instance : Iris.OFE.Discrete MaxNat := ⟨id⟩
+scoped instance : Iris.OFE.Leibniz MaxNat := ⟨id⟩
+
+open scoped OrdCommMonoidLike
+
+scoped instance : Iris.UCMRA MaxNat := inferInstance
+scoped instance : Iris.CMRA.Discrete MaxNat := inferInstance
+scoped instance (a : MaxNat) : Iris.CMRA.CoreId a := inferInstance
+
+@[rocq_alias max_nat_op]
+theorem op (x y : Nat) : (MaxNat.mk x) • (MaxNat.mk y) = MaxNat.mk (x.max y) := rfl
+
+@[rocq_alias max_nat_included]
+theorem included {x y : MaxNat} : x ≼ y ↔ x.car ≤ y.car := by
+  refine ⟨?_, ?_⟩
+  · rintro ⟨⟨z⟩, h⟩
+    rw [op] at h
+    cases h
+    exact Nat.le_max_left _ _
+  · intro h
+    refine ⟨y, ?_⟩
+    cases x; cases y
+    rw [op]
+    exact congrArg MaxNat.mk (Nat.max_eq_right h).symm
+
+@[rocq_alias max_nat_local_update]
+theorem local_update {x y x' : MaxNat} (h : x.car ≤ x'.car) :
+    (x, y) ~l~> (x', x') := by
+  refine (local_update_unital_discrete x y x' x').mpr fun ⟨z⟩ _ he => ?_
+  refine ⟨trivial, ?_⟩
+  rcases x with ⟨xc⟩; rcases x' with ⟨xc'⟩; cases y
+  simp only [op] at he
+  cases he
+  refine .of_eq (congrArg MaxNat.mk ?_)
+  show xc' = xc'.max z
+  simp only at h
+  exact (Nat.max_eq_left (Nat.le_trans (Nat.le_max_right _ _) h)).symm
+
+#rocq_ignore max_natO "Use the MaxNat type and inferred OFE/COFE instances"
+#rocq_ignore max_natR "Use the MaxNat type and OrdCommMonoidLike CMRA instance"
+#rocq_ignore max_natUR "Use the MaxNat type and OrdCommMonoidLike UCMRA instance"
+
+#rocq_ignore max_nat_unit_instance "Provided by OrdCommMonoidLike.instUCMRA"
+#rocq_ignore max_nat_valid_instance "Provided by OrdCommMonoidLike.instCMRA"
+#rocq_ignore max_nat_validN_instance "Provided by OrdCommMonoidLike.instCMRA"
+#rocq_ignore max_nat_pcore_instance "Provided by OrdCommMonoidLike.instCMRA"
+#rocq_ignore max_nat_op_instance "Use the Add instance and OrdCommMonoidLike.instCMRA"
+
+#rocq_ignore max_nat_ra_mixin "Subsumed by OrdCommMonoidLike.instCMRA"
+#rocq_ignore max_nat_cmra_discrete "Provided by OrdCommMonoidLike.instDiscrete"
+#rocq_ignore max_nat_ucmra_mixin "Subsumed by OrdCommMonoidLike.instUCMRA"
+#rocq_ignore max_nat_core_id "Provided by OrdCommMonoidLike.instCoreId"
+
+end MaxNat
+
+/-! ## `MaxZ` -/
+
+@[rocq_alias max_Z]
+structure MaxZ where
+  car : Int
+
+namespace MaxZ
+
+@[reducible] instance : Add MaxZ := ⟨fun x y => ⟨max x.car y.car⟩⟩
+/-- Required by the `OrdCommMonoidLike` CMRA scaffold. `MaxZ` is **not** a UCMRA — `0`
+is not the bottom element under `Int.max` — so no `LawfulLeftIdentity` instance is
+provided. `MonoZ` therefore wraps `MaxZ` in `Option` to obtain a unit. -/
+@[reducible] instance : Zero MaxZ := ⟨⟨0⟩⟩
+
+scoped instance : Associative (Add.add (α := MaxZ)) where
+  assoc := fun {x _ _} => by
+    simp only [Add.add]
+    exact congrArg MaxZ.mk (Int.max_assoc ..)
+scoped instance : Commutative (Add.add (α := MaxZ)) where
+  comm := fun {x y} => by
+    simp only [Add.add]
+    exact congrArg MaxZ.mk (Int.max_comm x.car y.car)
+scoped instance : IdempotentOp (Add.add (α := MaxZ)) where
+  idempotent x := by
+    simp only [Add.add]
+    cases x
+    exact congrArg MaxZ.mk (Int.max_self _)
+
+scoped instance : Iris.COFE MaxZ := Iris.COFE.ofDiscrete _ Iris.Eq_Equivalence
+scoped instance : Iris.OFE.Discrete MaxZ := ⟨id⟩
+scoped instance : Iris.OFE.Leibniz MaxZ := ⟨id⟩
+
+open scoped OrdCommMonoidLike
+
+scoped instance : Iris.CMRA MaxZ := inferInstance
+scoped instance : Iris.CMRA.Discrete MaxZ := inferInstance
+scoped instance (a : MaxZ) : Iris.CMRA.CoreId a := inferInstance
+
+scoped instance : Iris.CMRA.IsTotal MaxZ where
+  total x := ⟨x, rfl⟩
+
+/-- Every `some (MaxZ.mk n)` is `CoreId` because `MaxZ` is a universal-core CMRA.
+Useful when wrapping `MaxZ` in `Option` to obtain a UCMRA (e.g. for `MonoZ`). -/
+scoped instance some_core_id (n : Int) : Iris.CMRA.CoreId (some (MaxZ.mk n)) where
+  core_id := show some (some (MaxZ.mk n)) ≡ some (some (MaxZ.mk n)) from .rfl
+
+@[rocq_alias max_Z_op]
+theorem op (x y : Int) : (MaxZ.mk x) • (MaxZ.mk y) = MaxZ.mk (max x y) := rfl
+
+@[rocq_alias max_Z_included]
+theorem included {x y : MaxZ} : x ≼ y ↔ x.car ≤ y.car := by
+  refine ⟨?_, ?_⟩
+  · rintro ⟨⟨z⟩, h⟩
+    rw [op] at h
+    cases h
+    exact Int.le_max_left _ _
+  · intro h
+    refine ⟨y, ?_⟩
+    cases x; cases y
+    rw [op]
+    exact congrArg MaxZ.mk (Int.max_eq_right h).symm
+
+@[rocq_alias max_Z_local_update]
+theorem local_update {x y x' : MaxZ} (h : x.car ≤ x'.car) :
+    (x, y) ~l~> (x', x') := by
+  refine (LocalUpdate.discrete x y x' x').mpr ?_
+  rintro mz _ he
+  refine ⟨trivial, ?_⟩
+  rcases x with ⟨xc⟩; rcases x' with ⟨xc'⟩; cases y
+  match mz, he with
+  | none, _ => exact .rfl
+  | some ⟨z⟩, he =>
+    simp only [CMRA.op?, op] at he
+    cases (OFE.eq_of_eqv he : _ = _)
+    refine .of_eq (congrArg MaxZ.mk ?_)
+    show xc' = max xc' z
+    exact (Int.max_eq_left (Int.le_trans (Int.le_max_right _ _) h)).symm
+
+#rocq_ignore max_ZO "Use the MaxZ type and inferred OFE/COFE instances"
+#rocq_ignore max_ZR "Use the MaxZ type and OrdCommMonoidLike CMRA instance"
+
+#rocq_ignore max_Z_unit_instance "Carrier is not a UCMRA; MonoZ wraps it in Option"
+#rocq_ignore max_Z_valid_instance "Provided by OrdCommMonoidLike.instCMRA"
+#rocq_ignore max_Z_validN_instance "Provided by OrdCommMonoidLike.instCMRA"
+#rocq_ignore max_Z_pcore_instance "Provided by OrdCommMonoidLike.instCMRA"
+#rocq_ignore max_Z_op_instance "Use the Add instance and OrdCommMonoidLike.instCMRA"
+
+#rocq_ignore max_Z_ra_mixin "Subsumed by OrdCommMonoidLike.instCMRA"
+#rocq_ignore max_Z_cmra_total "Provided by OrdCommMonoidLike (CMRA has total core)"
+#rocq_ignore max_Z_cmra_discrete "Provided by OrdCommMonoidLike.instDiscrete"
+#rocq_ignore max_Z_core_id "Provided by OrdCommMonoidLike.instCoreId"
+
+end MaxZ
+
+end Iris
