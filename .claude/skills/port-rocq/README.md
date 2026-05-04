@@ -93,7 +93,9 @@ If you want to re-run only Stage 3+4 (because Stage 2 already approved the signa
 
 ## Prerequisites
 
-- **iris-loogle (local server)**: the agents' canonical type-pattern search. Index covers iris-lean + Mathlib + Batteries (built with the `Iris` module loaded), unrate-limited. Start it once with `cd /Users/zongyuan/code/iris-loogle && uv run server.py`. The orchestrator checks for it at pre-flight. If it's down, agents fall back to `Grep` over `Iris/Iris/`. Agents' tools allowlists deliberately exclude `mcp__lean-lsp__lean_loogle` (its index lacks iris-lean — wrong index for this workflow). `mcp__lean-lsp__lean_leansearch` and `mcp__lean-lsp__lean_leanfinder` remain available as rate-limited fallbacks for natural-language / semantic queries.
+- **iris-loogle (accessed via the Lean MCP)**: agents query `mcp__lean-lsp__lean_loogle`. The MCP is configured (`LOOGLE_URL=http://localhost:8088`) to route to the local iris-loogle instance — index built with the `Iris` module loaded, so it covers iris-lean + Mathlib + Batteries, unrate-limited. Start the iris-loogle server once with `cd /Users/zongyuan/code/iris-loogle && uv run server.py`. The orchestrator checks for it at pre-flight.
+
+- **Lean-side search**: agents are told to use `mcp__lean-lsp__lean_local_search` in place of `Grep` for any Lean-side name/keyword lookup. `Grep` is reserved for non-Lean files (Rocq `.v`, configs). `lean_leansearch`, `lean_leanfinder`, `lean_state_search`, `lean_hammer_premise` are disabled at the MCP server level (`LEAN_MCP_DISABLED_TOOLS`) and not callable.
 
 ## Mathlib policy
 

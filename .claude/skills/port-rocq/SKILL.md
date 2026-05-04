@@ -61,7 +61,7 @@ Both must `approve` for the pipeline to finish. Issues from either go into the m
 
 ### 0. Resolve paths and pre-flight
 
-**iris-loogle (local server).** The agents' canonical type-pattern search is a local Loogle instance whose index is built with the `Iris` module loaded — covers iris-lean + Mathlib + Batteries in one query, unrate-limited. Before Stage 1, check that the server is up:
+**iris-loogle (local server, accessed via the Lean MCP).** Agents query Loogle through `mcp__lean-lsp__lean_loogle`. The MCP server is configured (via `LOOGLE_URL=http://localhost:8088` in the user's MCP config) to route Loogle queries to the local iris-loogle instance, whose index is built with the `Iris` module loaded — so the MCP transparently covers iris-lean + Mathlib + Batteries, unrate-limited. Before Stage 1, check that the server is up:
 ```
 curl -sf http://localhost:8088/json?q=true >/dev/null || echo "loogle down"
 ```
@@ -69,7 +69,7 @@ If it's down, start it (in the background) from `/Users/zongyuan/code/iris-loogl
 ```
 cd /Users/zongyuan/code/iris-loogle && uv run server.py
 ```
-If you can't start it for some reason, fall back to `Grep` over `Iris/Iris/`. The agents' tools allowlists deliberately exclude `mcp__lean-lsp__lean_loogle` — its index is built without the `Iris` module loaded, so it can't see iris-lean lemmas; iris-loogle is the only Loogle they can reach.
+Agents are told to **always go through the MCP** (`mcp__lean-lsp__lean_loogle`), never via raw `curl`. They are also told that **`mcp__lean-lsp__lean_local_search` replaces `Grep` for any Lean-side lookup** — `Grep` is reserved for non-Lean files (Rocq `.v`, configs, scripts).
 
 ```
 ROCQ_ROOT="/Users/zongyuan/code/iris-rocq"

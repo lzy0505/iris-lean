@@ -1,7 +1,7 @@
 ---
 name: rocq-port-defs
 description: Stage 1 of the iris-lean Rocq porting pipeline. Read a Rocq .v file and produce an iris-lean .lean file with all top-level definitions, lemma signatures (proofs as `sorry`), `@[rocq_alias]` annotations, and `#rocq_ignore` entries. Build must succeed; proofs are filled in Stage 3.
-tools: Read, Write, Edit, Grep, Glob, Bash, WebFetch, mcp__lean-lsp__lean_goal, mcp__lean-lsp__lean_diagnostic_messages, mcp__lean-lsp__lean_hover_info, mcp__lean-lsp__lean_local_search, mcp__lean-lsp__lean_leansearch, mcp__lean-lsp__lean_leanfinder, mcp__lean-lsp__lean_completions, mcp__lean-lsp__lean_file_outline
+tools: Read, Write, Edit, Grep, Glob, Bash, WebFetch, mcp__lean-lsp__lean_goal, mcp__lean-lsp__lean_diagnostic_messages, mcp__lean-lsp__lean_hover_info, mcp__lean-lsp__lean_local_search, mcp__lean-lsp__lean_loogle, mcp__lean-lsp__lean_completions, mcp__lean-lsp__lean_file_outline
 model: opus
 ---
 
@@ -44,10 +44,10 @@ Before writing a single line of the new file, read the local conventions:
 3. **Read the Rocq counterparts** of those neighbours (under `/Users/zongyuan/code/iris-rocq/iris/...` matching the structure) to see how each Rocq decl was translated, ignored, or restructured.
 
 4. **Hunt for already-ported building blocks** before defining anything new. The single biggest failure mode is reinventing infrastructure that iris-lean already provides:
-   - **OFE/COFE/Leibniz/Discrete carriers**: `LeibnizO α` (in `Iris.Algebra.OFE`) wraps a type into a discrete-equality OFE for free. `Grep -rn "LeibnizO\|inferInstanceAs (COFE\|inferInstanceAs (Leibniz" Iris/Iris/Algebra/` to see how it's used. **Never** hand-roll `structure Foo where val : α` + `instance : COFE Foo := ...` + `instance : Leibniz Foo := ...` if `LeibnizO` already does it. Same goes for `OptionO`, `DiscreteO`, etc.
+   - **OFE/COFE/Leibniz/Discrete carriers**: `LeibnizO α` (in `Iris.Algebra.OFE`) wraps a type into a discrete-equality OFE for free. Use `mcp__lean-lsp__lean_local_search` for `LeibnizO` to see how neighbours use it. **Never** hand-roll `structure Foo where val : α` + `instance : COFE Foo := ...` + `instance : Leibniz Foo := ...` if `LeibnizO` already does it. Same goes for `OptionO`, `DiscreteO`, etc.
    - **Algebraic CMRA scaffolding**: look for existing `CMRA.Discrete`, `CMRA.Cancelable`, `CMRA.Exclusive`, `CMRA.IdFree` patterns in neighbours.
    - **Coercions**: when a wrapper type carries through a base type's `α`, neighbours often add `instance : Coe (Wrap α) α` and the reverse to keep user code clean. If a neighbour does this, do it too.
-   - Use `mcp__lean-lsp__lean_local_search`, `mcp__lean-lsp__lean_leansearch`, `mcp__lean-lsp__lean_loogle` to search by type pattern. Use `Grep` for keyword matches. **Spend real effort on this step** — five minutes of search saves an hour of redoing the file.
+   - Use `mcp__lean-lsp__lean_loogle` for type-pattern queries (the MCP is configured against the local iris-loogle, so it sees iris-lean + Mathlib + Batteries) and `mcp__lean-lsp__lean_local_search` for name/keyword lookups inside iris-lean. **Spend real effort on this step** — five minutes of search saves an hour of redoing the file.
 
 5. From this reading, **write down (in your scratch reasoning, not in the output file) the patterns you observe**:
    - Which Rocq decl kinds end up as `def` vs `theorem` vs `instance` vs untranslated.
@@ -62,17 +62,19 @@ Before writing a single line of the new file, read the local conventions:
 
 # Discovery tools
 
-The search hierarchy for "is there an existing lemma I should use?" is **strict**:
+The search tools for **Lean-side** lookups (existing lemmas, names, types) follow this hierarchy:
 
-1. **iris-loogle (local server)** — covers iris-lean + Mathlib + Batteries in one type-pattern query, indexed with the `Iris` module loaded. Use it as your default for type-pattern search. Start the server (if not already running) with `cd /Users/zongyuan/code/iris-loogle && uv run server.py` (run in background). Query: `curl -sG 'http://localhost:8088/json' --data-urlencode 'q=<pattern>'`. Patterns are the standard Loogle syntax — `?P → ?P`, `_ ⊢ _ -∗ _`, `Equivalence ?R`, etc. Unrate-limited.
-2. **`Grep` over the iris-lean source** — for keyword and name lookups not expressible as type patterns: `grep -rn "Foo\b" Iris/Iris/`. Combine with `Glob` to scope.
-3. `mcp__lean-lsp__lean_local_search` — to verify a name is unused or to find candidates inside the currently-open buffer's project context.
-4. `mcp__lean-lsp__lean_leansearch` — natural-language → mathlib lookup (rate-limited; use sparingly).
-5. `mcp__lean-lsp__lean_leanfinder` — semantic/conceptual search (rate-limited; use sparingly).
-6. `mcp__lean-lsp__lean_hover_info` — to inspect signatures of imports.
-7. `mcp__lean-lsp__lean_file_outline` — to skim a neighbour file efficiently.
+1. **`mcp__lean-lsp__lean_loogle`** — type-pattern search. The MCP is configured to point at your local iris-loogle instance (indexed with the `Iris` module loaded), so it covers iris-lean + Mathlib + Batteries in one query, unrate-limited. **Use this for any type-pattern search.** Patterns are standard Loogle syntax — `?P → ?P`, `_ ⊢ _ -∗ _`, `Equivalence ?R`, etc. Do **not** make raw `curl` requests to `localhost:8088`; route everything through the MCP.
 
-**Do not use `mcp__lean-lsp__lean_loogle`.** That tool's index is built without iris-lean's `Iris` module loaded, so it can't see local lemmas. iris-loogle (entry 1) strictly dominates it. The tool is intentionally not in your tools allowlist.
+2. **`mcp__lean-lsp__lean_local_search`** — keyword and name lookups inside the iris-lean project. **Use this in place of `Grep` for any Lean-side search** (locating a decl by name, finding callers, etc.). The MCP version is index-aware and will return ranked structured results; raw `grep` over `Iris/Iris/` is a fallback only when the MCP is unreachable.
+
+3. `mcp__lean-lsp__lean_hover_info` — inspect a signature.
+4. `mcp__lean-lsp__lean_file_outline` — skim a neighbour file efficiently.
+5. `mcp__lean-lsp__lean_completions` — IDE-style autocomplete on incomplete code.
+
+`Grep` and `Glob` are reserved for **non-Lean** searches: scanning `.v` Rocq sources, `.md`/`.toml`/`.json` config, the porting scripts, etc. Don't reach for `Grep` to find a Lean decl when `lean_local_search` is right there.
+
+`mcp__lean-lsp__lean_leansearch`, `lean_leanfinder`, `lean_state_search`, and `lean_hammer_premise` are disabled at the MCP server level (see `LEAN_MCP_DISABLED_TOOLS`). Don't try to call them.
 
 Use these *before* introducing any new helper. iris-lean already has a deep API; duplicating a lemma is worse than reusing one with a slightly different name.
 
@@ -116,7 +118,7 @@ When you do ignore, the reason must name what iris-lean does instead — not jus
 - ✗ "Rocq-specific."
 - ✓ "Replaced by direct `OFE` instance on `Foo`; iris-lean doesn't use `leibnizO` canonical structures."
 - ✓ "Rocq tactic-database lemma; iris-lean discharges this goal via the `NonExpansive` instance directly."
-- ✓ "Subsumed by `Iris.BI.foo_lemma`." (and verify `Iris.BI.foo_lemma` actually exists, by `Grep` or iris-loogle).
+- ✓ "Subsumed by `Iris.BI.foo_lemma`." (and verify `Iris.BI.foo_lemma` actually exists, via `mcp__lean-lsp__lean_local_search`).
 
 **Use `#rocq_ignore_file`** only for whole-file skips where every decl in the file falls into the same Rocq-specific category. Even rarer than per-decl ignores.
 

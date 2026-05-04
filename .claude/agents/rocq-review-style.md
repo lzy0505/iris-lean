@@ -176,7 +176,7 @@ The module `/-! ... -/` docstring should describe the *concept* the file formali
 This is a soft check — emit `warn`s, not `fail`s. Compare the file's typeclass / definition shape to its neighbours:
 
 - Did the file introduce a typeclass named after itself (e.g. `Frac2.Param`) when neighbours use abstraction-named typeclasses (e.g. `Fraction`)? `warn`: "consider renaming the abstraction class to reflect the concept, not the file".
-- Did the file hand-roll a wrapper `structure` + `instance : COFE ...` when `LeibnizO` (or another existing primitive) would have done it? Check `Grep -rn "LeibnizO" Iris/Iris/Algebra/`. If used elsewhere and applicable here, `warn`: "consider replacing the custom carrier with `LeibnizO α`".
+- Did the file hand-roll a wrapper `structure` + `instance : COFE ...` when `LeibnizO` (or another existing primitive) would have done it? Check via `mcp__lean-lsp__lean_local_search` for `LeibnizO`. If used elsewhere and applicable here, `warn`: "consider replacing the custom carrier with `LeibnizO α`".
 - Did the file ship an abstract typeclass with no concrete instance? `warn`: "consider providing at least one concrete instance (e.g. `PNat`) to demonstrate inhabitation".
 
 These are *judgement* warnings — don't block on them, but surface them so the user can re-evaluate.

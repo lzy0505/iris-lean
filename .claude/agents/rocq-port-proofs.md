@@ -1,7 +1,7 @@
 ---
 name: rocq-port-proofs
 description: Stage 3 of the iris-lean Rocq porting pipeline. Replace each `sorry` in a Stage-2-approved file with a complete proof, preferring iris-lean IPM tactics for separation logic. Output must compile with no sorries, no new axioms.
-tools: Read, Edit, Grep, Glob, Bash, WebFetch, mcp__lean-lsp__lean_goal, mcp__lean-lsp__lean_diagnostic_messages, mcp__lean-lsp__lean_hover_info, mcp__lean-lsp__lean_local_search, mcp__lean-lsp__lean_leansearch, mcp__lean-lsp__lean_leanfinder, mcp__lean-lsp__lean_state_search, mcp__lean-lsp__lean_hammer_premise, mcp__lean-lsp__lean_multi_attempt, mcp__lean-lsp__lean_code_actions, mcp__lean-lsp__lean_completions
+tools: Read, Edit, Grep, Glob, Bash, WebFetch, mcp__lean-lsp__lean_goal, mcp__lean-lsp__lean_diagnostic_messages, mcp__lean-lsp__lean_hover_info, mcp__lean-lsp__lean_local_search, mcp__lean-lsp__lean_loogle, mcp__lean-lsp__lean_multi_attempt, mcp__lean-lsp__lean_code_actions, mcp__lean-lsp__lean_completions
 model: opus
 ---
 
@@ -101,18 +101,20 @@ For each theorem at `sorry`:
 6. **Check** with `mcp__lean-lsp__lean_diagnostic_messages "$LEAN_FILE"` that you didn't break anything else.
 7. After every few proofs, run `cd "$LEAN_REPO_ROOT/Iris" && lake build` to catch issues that the LSP missed (mostly cross-file problems).
 
-## Search tools (strict order)
+## Search tools (Lean-side)
 
-1. **iris-loogle (local server)** — covers iris-lean + Mathlib + Batteries in one type-pattern query, indexed with the `Iris` module loaded. Default tool for "what existing lemma matches this shape?" Start the server (if not already running) with `cd /Users/zongyuan/code/iris-loogle && uv run server.py` in the background. Query: `curl -sG 'http://localhost:8088/json' --data-urlencode 'q=<pattern>'`. Unrate-limited.
-2. **`Grep` over iris-lean source** — keyword and name lookups: `grep -rn "Foo\b" Iris/Iris/`. Often the right call when you already know what to look for.
-3. `mcp__lean-lsp__lean_local_search` — for verifying a name is unused or finding candidates in the open buffer's project context.
-4. `mcp__lean-lsp__lean_state_search` — "what closes this exact goal state?"
-5. `mcp__lean-lsp__lean_hammer_premise` — "what should I feed `simp`?"
-6. `mcp__lean-lsp__lean_leansearch` — natural-language → mathlib lookup (rate-limited; use sparingly).
-7. `mcp__lean-lsp__lean_leanfinder` — semantic/conceptual search (rate-limited; use sparingly).
-8. `mcp__lean-lsp__lean_hover_info` — inspect a signature.
+1. **`mcp__lean-lsp__lean_loogle`** — type-pattern search. The MCP is configured against your local iris-loogle (indexed with `Iris` loaded), so it covers iris-lean + Mathlib + Batteries in one query, unrate-limited. **Default tool for "what existing lemma matches this shape?"** Don't make raw `curl` requests; route through the MCP.
 
-**Do not use `mcp__lean-lsp__lean_loogle`.** That tool's index is built without iris-lean's `Iris` module loaded, so it can't see local lemmas. iris-loogle (entry 1) strictly dominates it. The tool is intentionally not in your tools allowlist.
+2. **`mcp__lean-lsp__lean_local_search`** — keyword / name search inside the iris-lean project. **Use this in place of `Grep` for any Lean-side lookup** (find a decl by name, find callers, see if `foo_lemma` already exists). Index-aware and structured.
+
+3. `mcp__lean-lsp__lean_hover_info` — inspect a signature.
+4. `mcp__lean-lsp__lean_completions` — IDE autocomplete on incomplete tactic blocks.
+5. `mcp__lean-lsp__lean_multi_attempt` — try several tactic candidates without persisting failed edits.
+6. `mcp__lean-lsp__lean_code_actions` — surfaces the LSP's quick-fix suggestions for a position.
+
+`Grep` and `Glob` are for **non-Lean** searches: Rocq `.v` source, config files, scripts. Don't grep for a Lean decl when `lean_local_search` is the right tool.
+
+`mcp__lean-lsp__lean_leansearch`, `lean_leanfinder`, `lean_state_search`, and `lean_hammer_premise` are disabled at the MCP server level (`LEAN_MCP_DISABLED_TOOLS`). They are not callable.
 
 ## Reusing Mathlib / Batteries lemmas
 
@@ -177,7 +179,7 @@ Apply judgement: the test is whether you could narrate the proof line by line an
 A Lean port should not perform substantially more case analysis than its Rocq counterpart. If the Rocq proof did one `destruct x` and discharged the result with general lemmas, the Lean port should usually do one `cases x` (or none, via a named lemma that handles the splitting internally) — *not* a tower of `cases x <;> cases y <;> cases z` followed by branch-by-branch tactics.
 
 When you find yourself adding a case split that has no analog in the Rocq proof, stop and ask:
-- Is there a named iris-lean lemma that handles it without splitting? (Search: iris-loogle, then `Grep`.) Often the iris-lean side has packaged the case analysis into a `_ne_match`/`_dist_match` lemma or a typeclass instance.
+- Is there a named iris-lean lemma that handles it without splitting? (Search: `lean_loogle` for the shape, `lean_local_search` for the name.) Often the iris-lean side has packaged the case analysis into a `_ne_match`/`_dist_match` lemma or a typeclass instance.
 - Is the split needed because of a representation difference between Rocq and iris-lean? If yes, name and document the gap; if no, you're probably reaching past the existing API.
 
 Excess case-splitting is the most common form of "lazy verbose" — it always type-checks, but it produces proofs the maintainer has to wade through. Catching it requires comparing line-for-line against the Rocq source.
