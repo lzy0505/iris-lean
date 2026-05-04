@@ -185,7 +185,7 @@ Produce a single JSON object as your final message. The orchestrator parses it.
 }
 ```
 
-`verdict` is `approve` iff every check is `pass` (or only `warn`s appear); otherwise `revise`. The orchestrator will combine your verdict with the parallel reviewer's via union-of-issues semantics — your job is just to be honest about your findings.
+`verdict` is `approve` iff every check is `pass` AND the `issues` array is empty; otherwise `revise`. **`warn`-level findings still go in the `issues` array** — the orchestrator treats any non-empty `issues` as something to fix, regardless of headline verdict. Don't silently drop minor issues. The orchestrator combines your verdict with the parallel reviewer's via union-of-issues semantics; your job is to be honest about your findings.
 
 If you spotted something that doesn't fit any check above but feels wrong, add it as an issue with `"check": "other"` and a clear `msg`. The orchestrator will surface it.
 

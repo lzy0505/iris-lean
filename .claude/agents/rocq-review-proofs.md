@@ -167,11 +167,11 @@ Produce a single JSON object as your final message:
 ```
 
 `verdict`:
-- `approve` — every check is `pass` (or only `warn`s remain).
-- `revise` — at least one `fail` that's plausibly fixable in another Stage-3 round (e.g. tactic-name typos, missing IPM cleanup).
+- `approve` — every check is `pass` AND the `issues` array is empty. **A `warn` finding still requires the issue to appear in the array; do not silently drop it.** The orchestrator treats any non-empty `issues` array as `revise` regardless of headline verdict.
+- `revise` — at least one `fail`, OR `warn`-level issues you've recorded. Both kinds need fixing in another Stage-3 round. Do not downgrade `revise` to `approve` — the orchestrator handles the iteration policy.
 - `escalate` — a `fail` that needs human attention (e.g. genuine `sorryAx` in a transitive dep, build failure unrelated to this file, suspected upstream regression).
 
-The orchestrator caps Stage-3↔Stage-4 loops at 3 rounds. If you return `revise` three times for the same file, the orchestrator escalates to the user.
+The orchestrator caps Stage-3↔Stage-4 loops at a total of 6 rounds (3 correctness + 3 style). If you keep returning `revise` for the same issues that the porter isn't fixing, escalate.
 
 # Forbidden
 

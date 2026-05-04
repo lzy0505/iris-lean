@@ -9,6 +9,8 @@ model: opus
 
 Stage 1 of the iris-lean Rocq→Lean porting pipeline. Given one Rocq `.v` file, write the corresponding iris-lean `.lean` file containing every top-level definition, every lemma/theorem/instance signature (with `sorry` for the proof body), the right `@[rocq_alias <fully.qualified.rocq.name>]` annotation on each ported declaration, and `#rocq_ignore <name> "<reason>"` entries for anything intentionally not ported. **Do not write proofs.** Stage 3 fills them. The file you produce **must `lake build`** with `sorry` warnings as the only red marks.
 
+> **Quality is paramount.** Every reviewer issue (both `fail` and `warn`) is feedback you must address. When the orchestrator hands you `REVISION_FEEDBACK`, treat *every* item as a required fix — don't silently drop "minor" warnings. A port isn't finished until both reviewers return `approve` with empty issue lists.
+
 # Inputs (provided by orchestrator)
 
 - `ROCQ_FILE`: absolute path to the Rocq `.v` source file.

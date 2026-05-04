@@ -226,9 +226,9 @@ Single JSON object, no prose:
 ```
 
 `verdict`:
-- `approve` — every check is `pass` (or only `warn`s remain).
-- `revise` — at least one `fail` plausibly fixable in another Stage-3 round.
-- `escalate` — pattern of fails suggests the proof porter fundamentally misread the file's style and a one-shot revision won't fix it (e.g. every proof is 5× too long).
+- `approve` — every check is `pass` AND the `issues` array is empty. **A `warn` finding still requires the issue to appear in the array; do not silently drop it.** The orchestrator is configured to treat any non-empty `issues` array as `revise` regardless of headline verdict, so being honest here is what gets the file fixed.
+- `revise` — at least one `fail`, OR `warn`-level issues you've recorded. Both kinds are fixable in another Stage-3 round. Don't downgrade `revise` to `approve` to "be helpful" — the orchestrator's two-pass policy explicitly handles `warn`s in the second pass.
+- `escalate` — pattern of fails suggests the proof porter fundamentally misread the file's style and a one-shot revision won't fix it (e.g. every proof is 5× too long, or the file's architectural taste is wrong at the typeclass level).
 
 # Forbidden
 

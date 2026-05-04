@@ -5,6 +5,14 @@ description: Port one Iris-Rocq .v file to iris-lean using a four-stage agent pi
 
 # Port one Iris-Rocq file to iris-lean
 
+> **Code quality is paramount.** A port is not "done" when it compiles — it is done when both correctness and style reviewers approve. **Every suggestion from the proof and def reviewers must be addressed.** None are advisory; none are skipped. A `warn` and a `fail` are both feedback the porter has to handle.
+>
+> Address feedback in two passes when natural:
+> 1. **Correctness first.** Loop until the def-reviewer (Stage 2) and proof-reviewer's correctness checks (Stage 4a — build, axioms, ignores, stale aliases, tactic-name correctness) all pass.
+> 2. **Style second.** Then loop until *every* style-reviewer suggestion (Stage 4b — length ratio, term-vs-tactic, intermediate `have`s, oversized terms, one idea per line, case-split inflation, redundant `show`, inline comments, docstring register, architectural taste, naming, header authors) is also addressed.
+>
+> Do not declare the pipeline successful until both rounds reach `approve`. The final reviewer's verdict on a `warn`-laden output is `revise`, not `approve` — `warn`s have to be cleaned up just like `fail`s, even if the orchestrator's loop budget would otherwise let them slide.
+
 This skill orchestrates a four-stage agent pipeline to port a single Rocq `.v` file from `iris-rocq` to `iris-lean`. It enforces the user's invariants:
 
 1. The project always builds (`lake build` is a hard gate at every stage that allows it).
@@ -243,13 +251,19 @@ The two reviewers cover **orthogonal axes**:
 **Merging the two reports:**
 
 - For each headline check field, take the per-reviewer verdict as-is (the two reviewers' fields don't overlap).
-- For `issues`, take the **union**.
+- For `issues`, take the **union**. Both `fail` and `warn` issues count — both must be addressed.
 - Compute the merged `verdict`:
-  - **`approve`** — both reviewers return `approve`.
-  - **`revise`** — either returns `revise` and neither returns `escalate`. Loop back to Stage 3 with the merged issue list as `REVISION_FEEDBACK`. Cap at 3 rounds.
+  - **`approve`** — both reviewers return `approve` AND the union of `issues` is empty. A reviewer that returns `approve` with non-empty issues is reporting `warn`-level findings; those still need to be addressed before the pipeline finishes.
+  - **`revise`** — either returns `revise`, OR either returns `approve` with non-empty `issues` (warn-only), and neither returns `escalate`. Loop back to Stage 3 with the merged issue list as `REVISION_FEEDBACK`. The first revise round should focus on **correctness** issues (any from `rocq-review-proofs`); subsequent rounds clean up the **style** issues (from `rocq-review-style`). The Stage-3 porter should prioritize accordingly.
   - **`escalate`** — either returns `escalate`. Hand to the user with both reports. Do not retry.
 
-Stage 4 caps at 3 Stage-3↔Stage-4 loops total, regardless of which reviewer triggered the loop. After the third failure, escalate to the user.
+**Two-pass loop policy:**
+- **Pass 1 (correctness):** Loop until `rocq-review-proofs` returns `approve` with empty issues. Cap at 3 rounds. Style issues from `rocq-review-style` are *carried forward* — not lost — but not the primary target of this pass.
+- **Pass 2 (style):** Once correctness is settled, loop until `rocq-review-style` returns `approve` with empty issues. Cap at 3 rounds. Each Stage-3 invocation in this pass focuses purely on the style feedback; the porter must not regress any correctness check.
+- If pass 2's revisions break a correctness check (regression), drop back to pass 1 once, then resume pass 2.
+- If after 6 total rounds (3 + 3) any reviewer still has open issues, escalate to the user with both reports and the full revision history.
+
+This is non-negotiable: a port with unaddressed `warn` findings is not finished. The user's quality bar is "address every reviewer suggestion" — the orchestrator enforces it, not the agents on their own.
 
 ### 7. Finalize
 

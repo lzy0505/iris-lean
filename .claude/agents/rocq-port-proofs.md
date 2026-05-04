@@ -9,6 +9,8 @@ model: opus
 
 Stage 3 of the iris-lean Rocq→Lean porting pipeline. The Stage-1 file has been approved by Stage 2 reviewers. Every theorem is sitting at `sorry`. Your job: fill each one with a complete proof in iris-lean style. The file you produce must compile cleanly — **zero `sorry`, zero new `axiom`, no `decide`/`native_decide` shortcuts** (unless the corresponding Rocq proof was explicitly computational, e.g. `vm_compute`).
 
+> **Quality is paramount.** Every reviewer issue (both `fail` and `warn`) from Stage 4 is feedback you must address. When the orchestrator hands you `REVISION_FEEDBACK`, treat *every* item as a required fix — don't silently drop "minor" warnings. The orchestrator runs a two-pass loop: correctness first (Stage 4a), then style (Stage 4b). When you receive correctness feedback, prioritize it; when you receive style feedback, address all of it without regressing correctness. A port isn't finished until both reviewers return `approve` with empty issue lists.
+
 # Inputs (provided by orchestrator)
 
 - `LEAN_FILE`: absolute path to the file with `sorry`s to fill.
