@@ -44,7 +44,8 @@ The path is relative to the iris-rocq root (`/Users/zongyuan/code/iris-rocq/`). 
        Stage 2: rocq-review-defs ‖ rocq-review-defs   (PARALLEL — same prompt, twice)
                 │
                 ▼ orchestrator merges reports (union of issues)
-                │ pass → continue;  fail → loop to Stage 1 (cap 3 rounds)
+                │ STRICT: both `approve` AND both issues arrays empty → continue
+                ▼ ANY issue from EITHER reviewer → loop back to Stage 1 (cap 3 rounds)
        Stage 3: rocq-port-proofs
                 │
                 ▼ build must succeed; no sorry; no new axiom
@@ -163,7 +164,7 @@ Follow your full instructions. Return the structured JSON report.
 
 Both reports come back. **Merge them**:
 
-- For each headline field (`alias_coverage`, `alias_qualified`, `alias_dupes`, `stale`, `ignore_justified`, `stmt_equivalence`, `binder_shape`, `instance_args`, `notation`, `def_extensional`, `naming`, `tactic_names`):
+- For each headline field (`alias_coverage`, `alias_qualified`, `alias_dupes`, `stale`, `ignore_justified`, `instance_kind`, `stmt_equivalence`, `binder_shape`, `instance_args`, `notation`, `def_extensional`, `naming`, `tactic_names`):
   - If both report `pass` → merged is `pass`.
   - If either reports `fail` → merged is `fail`.
   - If one reports `pass` and the other `warn` → merged is `warn`.
@@ -171,9 +172,16 @@ Both reports come back. **Merge them**:
 - For `issues`: take the **union**. If both reviewers flagged the same `decl + check`, deduplicate by keeping the more specific message.
 - **Surface disagreements**: if the two reviewers disagree on whether a particular check passes, include both verdicts in the consolidated feedback so the Stage-1 porter sees both perspectives. Add a synthetic issue: `{"decl": "<scope>", "check": "<check>", "msg": "DISAGREEMENT: reviewer A says <X>, reviewer B says <Y>. Treating as fail. Apply the stricter interpretation."}`.
 
-If the merged headline contains any `fail`, **loop back to Stage 1** with the merged issue list as `REVISION_FEEDBACK`. Cap at 3 revision rounds. After the third failure, escalate to the user with the merged report.
+**Gate to Stage 3 — strict.** Proceed to Stage 3 **only if both reviewers returned `approve` AND the merged `issues` array is empty**. There is no "good enough" state at this gate:
 
-If the merged report is all `pass` (and at most a handful of `warn`s), proceed to Stage 3.
+- Either reviewer reports `revise` → loop back to Stage 1 with the merged issues as `REVISION_FEEDBACK`.
+- Either reviewer reports `approve` but with non-empty `issues` (i.e. `warn`-level findings) → loop back to Stage 1 with those issues as `REVISION_FEEDBACK`. A `warn` is still a suggestion the porter must address.
+- Any merged headline is `fail` or `warn` → loop back to Stage 1.
+- Any disagreement between the two reviewers (one says OK, the other flags) → loop back to Stage 1 (apply the stricter interpretation).
+
+Only when **both reviewers' verdicts are `approve` AND both reviewers' `issues` arrays are empty AND every merged headline is `pass`** does the orchestrator proceed to Stage 3.
+
+Cap at 3 revision rounds at this gate. After the third failure, escalate to the user with the merged report and the full revision history. The bar is intentionally high: definitions and lemma statements are the leverage point — a wrong statement at this stage cascades into wasted Stage-3 effort and a likely re-port. Better to spend the rounds here.
 
 ### 5. Stage 3 — Spawn `rocq-port-proofs`
 
@@ -302,7 +310,7 @@ On a clean `approve`:
 | 0 | `LEAN_FILE` exists | Ask user whether to overwrite |
 | 0 | baseline `lake build` fails | Abort, tell user the tree is broken pre-port |
 | 1 | agent returns `"build": "fail"` after 1 attempt | Escalate to user with the error |
-| 2 | merged report has `fail` after 3 revision rounds | Escalate to user with the consolidated issue list |
+| 2 | gate not met after 3 revision rounds (any issue from either reviewer, not just `fail`) | Escalate to user with the consolidated issue list |
 | 3 | agent returns `"verdict": "blocked"` | Escalate to user with `blocked_proofs` |
 | 3.5 | `/lean4:golf` breaks the build (internal golf bug, not Stage 3's fault) | Abort pipeline with the golf log; user investigates |
 | 4 | either reviewer returns `"revise"` after 3 rounds | Escalate to user |
