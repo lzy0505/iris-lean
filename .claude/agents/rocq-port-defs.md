@@ -44,7 +44,7 @@ Before writing a single line of the new file, read the local conventions:
    - **OFE/COFE/Leibniz/Discrete carriers**: `LeibnizO α` (in `Iris.Algebra.OFE`) wraps a type into a discrete-equality OFE for free. Use `mcp__lean-lsp__lean_local_search` for `LeibnizO` to see how neighbours use it. **Never** hand-roll `structure Foo where val : α` + `instance : COFE Foo := ...` + `instance : Leibniz Foo := ...` if `LeibnizO` already does it. Same goes for `OptionO`, `DiscreteO`, etc.
    - **Algebraic CMRA scaffolding**: look for existing `CMRA.Discrete`, `CMRA.Cancelable`, `CMRA.Exclusive`, `CMRA.IdFree` patterns in neighbours.
    - **Coercions**: when a wrapper type carries through a base type's `α`, neighbours often add `instance : Coe (Wrap α) α` and the reverse to keep user code clean. If a neighbour does this, do it too.
-   - Use `mcp__lean-lsp__lean_loogle` for type-pattern queries (the MCP is configured against the local iris-loogle, so it sees iris-lean + Mathlib + Batteries) and `mcp__lean-lsp__lean_local_search` for name/keyword lookups inside iris-lean. **Spend real effort on this step** — five minutes of search saves an hour of redoing the file.
+   - Use `mcp__lean-lsp__lean_loogle` for type-pattern queries (covers iris-lean + Mathlib + Batteries) and `mcp__lean-lsp__lean_local_search` for name/keyword lookups inside iris-lean. **Spend real effort on this step** — five minutes of search saves an hour of redoing the file.
 
 5. From this reading, **write down (in your scratch reasoning, not in the output file) the patterns you observe**:
    - Which Rocq decl kinds end up as `def` vs `theorem` vs `instance` vs untranslated.
@@ -61,7 +61,7 @@ Before writing a single line of the new file, read the local conventions:
 
 The search tools for **Lean-side** lookups (existing lemmas, names, types) follow this hierarchy:
 
-1. **`mcp__lean-lsp__lean_loogle`** — type-pattern search. The MCP is configured to point at your local iris-loogle instance (indexed with the `Iris` module loaded), so it covers iris-lean + Mathlib + Batteries in one query, unrate-limited. **Use this for any type-pattern search.** Patterns are standard Loogle syntax — `?P → ?P`, `_ ⊢ _ -∗ _`, `Equivalence ?R`, etc. Do **not** make raw `curl` requests to `localhost:8088`; route everything through the MCP.
+1. **`mcp__lean-lsp__lean_loogle`** — type-pattern search. Covers iris-lean + Mathlib + Batteries in one query, unrate-limited. **Use this for any type-pattern search.** Patterns are standard Loogle syntax — `?P → ?P`, `_ ⊢ _ -∗ _`, `Equivalence ?R`, etc.
 
 2. **`mcp__lean-lsp__lean_local_search`** — keyword and name lookups inside the iris-lean project. **Use this in place of `Grep` for any Lean-side search** (locating a decl by name, finding callers, etc.). The MCP version is index-aware and will return ranked structured results; raw `grep` over `Iris/Iris/` is a fallback only when the MCP is unreachable.
 

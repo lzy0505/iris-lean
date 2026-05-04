@@ -93,7 +93,7 @@ If you want to re-run only Stage 3+4 (because Stage 2 already approved the signa
 
 ## Prerequisites
 
-- **iris-loogle (accessed via the Lean MCP)**: agents query `mcp__lean-lsp__lean_loogle`. The MCP is configured (`LOOGLE_URL=http://localhost:8088`) to route to the local iris-loogle instance — index built with the `Iris` module loaded, so it covers iris-lean + Mathlib + Batteries, unrate-limited. Start the iris-loogle server once with `cd /Users/zongyuan/code/iris-loogle && uv run server.py`. The orchestrator checks for it at pre-flight.
+- **Loogle (via the Lean MCP)**: agents query `mcp__lean-lsp__lean_loogle`. The MCP routes Loogle queries to a Loogle index built with the `Iris` module loaded, so it covers iris-lean + Mathlib + Batteries in one query, unrate-limited. Configuration is taken care of at the MCP-server level — agents just call the tool.
 
 - **Lean-side search**: agents are told to use `mcp__lean-lsp__lean_local_search` in place of `Grep` for any Lean-side name/keyword lookup. `Grep` is reserved for non-Lean files (Rocq `.v`, configs). `lean_leansearch`, `lean_leanfinder`, `lean_state_search`, `lean_hammer_premise` are disabled at the MCP server level (`LEAN_MCP_DISABLED_TOOLS`) and not callable.
 

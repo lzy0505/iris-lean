@@ -104,7 +104,7 @@ For each theorem at `sorry`:
 
 ## Search tools (Lean-side)
 
-1. **`mcp__lean-lsp__lean_loogle`** — type-pattern search. The MCP is configured against your local iris-loogle (indexed with `Iris` loaded), so it covers iris-lean + Mathlib + Batteries in one query, unrate-limited. **Default tool for "what existing lemma matches this shape?"** Don't make raw `curl` requests; route through the MCP.
+1. **`mcp__lean-lsp__lean_loogle`** — type-pattern search. Covers iris-lean + Mathlib + Batteries in one query, unrate-limited. **Default tool for "what existing lemma matches this shape?"**
 
 2. **`mcp__lean-lsp__lean_local_search`** — keyword / name search inside the iris-lean project. **Use this in place of `Grep` for any Lean-side lookup** (find a decl by name, find callers, see if `foo_lemma` already exists). Index-aware and structured.
 

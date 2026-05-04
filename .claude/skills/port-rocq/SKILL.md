@@ -70,15 +70,7 @@ Both must `approve` for the pipeline to finish. Issues from either go into the m
 
 ### 0. Resolve paths and pre-flight
 
-**iris-loogle (local server, accessed via the Lean MCP).** Agents query Loogle through `mcp__lean-lsp__lean_loogle`. The MCP server is configured (via `LOOGLE_URL=http://localhost:8088` in the user's MCP config) to route Loogle queries to the local iris-loogle instance, whose index is built with the `Iris` module loaded — so the MCP transparently covers iris-lean + Mathlib + Batteries, unrate-limited. Before Stage 1, check that the server is up:
-```
-curl -sf http://localhost:8088/json?q=true >/dev/null || echo "loogle down"
-```
-If it's down, start it (in the background) from `/Users/zongyuan/code/iris-loogle/`:
-```
-cd /Users/zongyuan/code/iris-loogle && uv run server.py
-```
-Agents are told to **always go through the MCP** (`mcp__lean-lsp__lean_loogle`), never via raw `curl`. They are also told that **`mcp__lean-lsp__lean_local_search` replaces `Grep` for any Lean-side lookup** — `Grep` is reserved for non-Lean files (Rocq `.v`, configs, scripts).
+**Search tools.** Agents use `mcp__lean-lsp__lean_loogle` for type-pattern queries (covers iris-lean + Mathlib + Batteries, unrate-limited) and `mcp__lean-lsp__lean_local_search` in place of `Grep` for any Lean-side lookup. `Grep` is reserved for non-Lean files (Rocq `.v`, configs, scripts). If `mcp__lean-lsp__lean_loogle` returns an error indicating the underlying Loogle service is unreachable, surface that to the user — the orchestrator does not own that infrastructure.
 
 ```
 ROCQ_ROOT="/Users/zongyuan/code/iris-rocq"
