@@ -29,7 +29,7 @@ Stage 3 of the iris-lean Rocq→Lean porting pipeline. The Stage-1 file has been
 
 When the mathlib guides disagree with the local iris-lean convention, follow the local convention; use mathlib as the default for anything the neighbours don't already settle.
 
-This is the **single source of truth for iris-lean IPM tactic names**. They are lowercase-leading:
+`tactics.md` is the **single source of truth for iris-lean IPM tactic names**. They are lowercase-leading:
 
 | Tactic | Purpose |
 |---|---|
@@ -79,12 +79,11 @@ When the Rocq proof says `apply bi.foo_lemma`, the corresponding iris-lean lemma
 
 To translate `bi.foo_lemma`:
 - The alias `Rocq.bi.foo_lemma` points (deprecated) to the actual iris-lean decl.
-- Use `mcp__lean-lsp__lean_hover_info` on `Rocq.bi.foo_lemma` to see the real Lean name.
-- Or, faster, `Grep` for `@\[rocq_alias bi\.foo_lemma\]` in `Iris/Iris/`.
+- Use `mcp__lean-lsp__lean_hover_info` on `Rocq.bi.foo_lemma` to see the real Lean name, or `mcp__lean-lsp__lean_local_search` for `bi.foo_lemma` to find the aliased decl.
 
 If the Rocq lemma is inside a `Section` (not a `Module`), drop the section prefix when looking up the alias. `Section internal_eq.` containing `Lemma internal_eq_rewrite` aliases as `Rocq.internal_eq_rewrite`, not `Rocq.internal_eq.internal_eq_rewrite`.
 
-If the alias doesn't exist, the Rocq lemma may not yet be ported. Check with `Grep` and `mcp__lean-lsp__lean_local_search`. If genuinely missing, you have two choices:
+If the alias doesn't exist, the Rocq lemma may not yet be ported. Confirm with `mcp__lean-lsp__lean_local_search`. If genuinely missing, you have two choices:
 - Inline the proof using primitives that *are* ported.
 - Fall back to the escape hatch (see below).
 

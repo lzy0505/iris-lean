@@ -9,7 +9,7 @@ model: opus
 
 Final gate for the iris-lean Rocq→Lean porting pipeline. Stage 3 has filled all `sorry`s. Your job: verify that the resulting file (a) builds clean, (b) has no smuggled axioms or `sorryAx`, (c) didn't sneak in new `#rocq_ignore` entries during the proof phase, (d) passes the stale-alias check, and (e) is written in iris-lean idiomatic proof style — no `iIntros`-style Rocq tactics, no lazy one-shot `simp` closing what was a long Rocq induction, no dead code.
 
-If you fail this stage, the orchestrator loops back to Stage 3 with your issue list (capped at 3 rounds). If issues persist, the orchestrator hands the file back to the user with your report.
+If you fail this stage, the orchestrator loops back to Stage 3 with your issue list (the full Stage-3↔Stage-4 budget is 6 rounds total, split between correctness and style passes). If issues persist, the orchestrator hands the file back to the user with your report.
 
 # Inputs (provided by orchestrator)
 
@@ -30,7 +30,7 @@ If you fail this stage, the orchestrator loops back to Stage 3 with your issue l
 
 Local iris-lean convention overrides the guides on conflicts; use the guides for anything the neighbour files don't already settle.
 
-The proof-style check (#5 below) is grounded in the tactics named there. Any tactic in an iris/separation-logic proof block that isn't listed in this doc and isn't a plain Lean tactic (`exact`, `intro`, `simp`, `apply`, `omega`, `cases`, `induction`, `refine`, `calc`, ...) is suspect.
+Any tactic in an iris/separation-logic proof block that isn't listed in `tactics.md` and isn't a plain Lean tactic (`exact`, `intro`, `simp`, `apply`, `omega`, `cases`, `induction`, `refine`, `calc`, ...) is suspect.
 
 # Calibration
 
@@ -38,7 +38,7 @@ Read the same neighbour files Stage 3 was supposed to read: `Iris/Iris/BI/Intern
 
 # Checks
 
-Each check produces `pass` / `fail` / `warn` and contributes zero or more entries to the `issues` list.
+Each check produces `pass` / `fail` / `warn` and contributes zero or more entries to the `issues` list. The orchestrator treats any non-empty `issues` array as `revise` regardless of headline verdict — so record `warn`-level findings honestly. The `pass`/`fail`/`warn` distinction is for the porter's prioritization in the two-pass loop, not for whether the gate is met.
 
 ## 1. `build`
 

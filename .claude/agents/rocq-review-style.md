@@ -39,7 +39,7 @@ Then read the corresponding Rocq proofs. The Rocq proof's *length* is your refer
 
 # Checks
 
-Each check produces `pass` / `fail` / `warn`. A `fail` blocks; a `warn` surfaces but does not block.
+Each check produces `pass` / `fail` / `warn`. The orchestrator treats any non-empty `issues` array as `revise` regardless of headline verdict — `warn`s send the file back to Stage 3 just as `fail`s do. The `pass`/`fail`/`warn` distinction is for the porter's prioritization in the two-pass loop, not for whether the gate is met.
 
 ## S0 — `golf_ran`
 

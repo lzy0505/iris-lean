@@ -1,6 +1,6 @@
 ---
 name: rocq-port-defs
-description: Stage 1 of the iris-lean Rocq porting pipeline. Read a Rocq .v file and produce an iris-lean .lean file with all top-level definitions, lemma signatures (proofs as `sorry`), `@[rocq_alias]` annotations, and `#rocq_ignore` entries. Build must succeed; proofs are filled in Stage 3.
+description: Stage 1 of the iris-lean Rocq porting pipeline. Read a Rocq .v file and produce an iris-lean .lean file with all top-level definitions, lemma signatures (proofs as `sorry`), `@[rocq_alias]` annotations, and (rarely) `#rocq_ignore` entries. Build must succeed; proofs are filled in Stage 3.
 tools: Read, Write, Edit, Grep, Glob, Bash, WebFetch, mcp__lean-lsp__lean_goal, mcp__lean-lsp__lean_diagnostic_messages, mcp__lean-lsp__lean_hover_info, mcp__lean-lsp__lean_local_search, mcp__lean-lsp__lean_loogle, mcp__lean-lsp__lean_completions, mcp__lean-lsp__lean_file_outline
 model: opus
 ---
@@ -36,12 +36,7 @@ Before writing a single line of the new file, read the local conventions:
 
 1. **Read the porting infrastructure docstring**: `Iris/Iris/Std/RocqPorting.lean`. It is the source of truth for `@[rocq_alias]` and `#rocq_ignore` syntax. Pay special attention to: Module prefixes are *included* in the alias name; Section prefixes are *excluded*.
 
-2. **Read 2–3 nearest-neighbour ported files** in the same target folder as `LEAN_FILE`. If `LEAN_FILE` is in `Iris/Iris/Algebra/`, look at the existing files there; if in `Iris/Iris/BI/`, similarly. Always-good baselines (densest with `@[rocq_alias]` annotations):
-   - `Iris/Iris/BI/InternalEq.lean`
-   - `Iris/Iris/BI/Plainly.lean`  (74 occurrences)
-   - `Iris/Iris/BI/Updates.lean`
-   - `Iris/Iris/BI/Algebra.lean`
-   - For Algebra/: `Iris/Iris/Algebra/Auth.lean`, `Iris/Iris/Algebra/Csum.lean`, `Iris/Iris/Algebra/DFrac.lean`, `Iris/Iris/Algebra/Excl.lean`, `Iris/Iris/Algebra/Agree.lean`.
+2. **Read 2–3 nearest-neighbour ported files** in the same target folder as `LEAN_FILE` — those with the densest `@[rocq_alias]` annotations are the best calibration. List the candidates with `mcp__lean-lsp__lean_local_search` for `rocq_alias` and pick from the same folder.
 
 3. **Read the Rocq counterparts** of those neighbours (under `/Users/zongyuan/code/iris-rocq/iris/...` matching the structure) to see how each Rocq decl was translated, ignored, or restructured.
 
@@ -54,7 +49,7 @@ Before writing a single line of the new file, read the local conventions:
 5. From this reading, **write down (in your scratch reasoning, not in the output file) the patterns you observe**:
    - Which Rocq decl kinds end up as `def` vs `theorem` vs `instance` vs untranslated.
    - How Module-qualified vs Section-only Rocq names map to alias names.
-   - The namespace/section structure used in Lean for that folder (e.g. `namespace Iris.BI.internalEq`, `section internalEqLaws`).
+   - The namespace structure used in Lean for that folder (e.g. `namespace Iris.BI.internalEq`).
    - Which kinds of Rocq items are routinely `#rocq_ignore`'d, and the typical phrasing of the reason string.
    - Whether the folder uses `theorem` or `lemma`.
    - Capitalization rules in the actual files. iris-lean often uses **camelCase** for theorem names (e.g. `internalEq_rewrite`, `siPure_mono`), even though Rocq uses snake_case (`internal_eq_rewrite`, `si_pure_mono`). **Match the local file** — do not assume mathlib defaults.
@@ -78,7 +73,7 @@ The search tools for **Lean-side** lookups (existing lemmas, names, types) follo
 
 `mcp__lean-lsp__lean_leansearch`, `lean_leanfinder`, `lean_state_search`, and `lean_hammer_premise` are disabled at the MCP server level (see `LEAN_MCP_DISABLED_TOOLS`). Don't try to call them.
 
-Use these *before* introducing any new helper. iris-lean already has a deep API; duplicating a lemma is worse than reusing one with a slightly different name.
+Use the search tools *before* introducing any new helper. iris-lean already has a deep API; duplicating a lemma is worse than reusing one with a slightly different name.
 
 ## Reusing Mathlib / Batteries
 
@@ -234,7 +229,7 @@ Authors: <AUTHOR_PLACEHOLDER>
 
 # Workflow
 
-1. **Fetch** `tactics.md` once (`WebFetch`). Cache it mentally for the run.
+1. **Fetch the three canonical references** (`tactics.md`, mathlib naming, mathlib style) via `WebFetch`. Cache them mentally for the run.
 2. **Read** `Iris/Iris/Std/RocqPorting.lean` to recall the exact `@[rocq_alias]` / `#rocq_ignore` syntax.
 3. **Read** the Rocq source `ROCQ_FILE` end-to-end. Make a list (in your reasoning) of every top-level decl: `Definition`/`Lemma`/`Theorem`/`Corollary`/`Fact`/`Instance`/`Class`/`Record`/`Inductive`/`CoInductive`/`Fixpoint`/`CoFixpoint`/`Notation`/`Hint Resolve`/`Module`/`Section`. Classify each as one of:
    - **PORT** — port now (write the def/theorem with alias).
