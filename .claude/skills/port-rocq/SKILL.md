@@ -250,7 +250,9 @@ The two reviewers cover **orthogonal axes**:
 - `rocq-review-proofs` — correctness gates: build, axioms, ignore-set unchanged, stale aliases, tactic-name correctness, anti-laziness style.
 - `rocq-review-style` — concision/aesthetic gates: length ratio vs Rocq, term-vs-tactic mode, intermediate `have`s, redundant `show`s, inline-comment policy, docstring register, header authors, architectural taste.
 
-**Merging the two reports:**
+**Coverage pre-check (style reviewer only).** Before merging, validate that `rocq-review-style`'s report includes a `coverage` block with `rules_checked == rules_total` (i.e. it walked every HOUSE_STYLE.md rule, including `N/A` rows). If `rules_checked < rules_total`, **the report is incomplete** — re-run the style reviewer once with explicit feedback that under-coverage was detected. If the second run is also under-covered, escalate to the user (the agent prompt is broken or the model is short-circuiting; either way the orchestrator can't paper over it). Do not merge an incomplete report; doing so would let style violations slip through.
+
+**Merging the two reports** (after coverage validation passes):
 
 - For each headline check field, take the per-reviewer verdict as-is (the two reviewers' fields don't overlap).
 - For `issues`, take the **union**. Both `fail` and `warn` issues count — both must be addressed.

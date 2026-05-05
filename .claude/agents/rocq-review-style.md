@@ -44,11 +44,84 @@ Then read the corresponding Rocq proofs. The Rocq proof's *length* is your refer
 
 # Review procedure
 
-1. **Read HOUSE_STYLE.md end-to-end.** Don't skim — every rule is enforceable.
-2. **Walk the file once for each section of HOUSE_STYLE.md** (Naming, Implicit Arguments, Variable & Scope Management, Class & Instance Design, Proof Style, Formatting, Documentation, plus the R1–R13 rubrics). Each pass surfaces a particular family of violations; mixing them in one pass means you'll miss things.
-3. **Calibrate `pass`/`warn`/`fail` from neighbour files.** A construction that's idiomatic in the local register passes even if it superficially violates a generic rule; a construction that diverges from neighbours fails even if it would pass in mathlib.
-4. **For each violation, record an `issues` entry.** Be specific: cite the line, the rule by number/letter, and a concrete fix.
-5. **Compute the per-section verdict.** Verdict for each section is the worst of its rules — any `fail` makes the section `fail`; otherwise any `warn` makes it `warn`; otherwise `pass`.
+The review must be **exhaustive at the rule level**, not at the section level. HOUSE_STYLE.md has 75+ numbered rules plus R1–R13 rubrics — every single one is in scope for every file you review. The procedure below forces explicit per-rule checking; do not collapse it.
+
+## Step 1 — Build a rule worksheet
+
+Before opening `LEAN_FILE`, read HOUSE_STYLE.md end-to-end and enumerate every rule into a worksheet. The worksheet has one row per rule, with columns:
+
+| Rule ID | Section | One-line description | Status (filled later) | Issue refs |
+|---|---|---|---|---|
+| 1 | Naming | Mathlib casing convention | | |
+| 2 | Naming | Mathlib naming conventions (_left/_right, map_ prefix) | | |
+| ... | ... | ... | | |
+| 31 | Class & Instance Design | Remove duplicate notation/instances inherited from parents | | |
+| 32 | Proof Style | Term-mode over tactic-mode for short branches | | |
+| ... | ... | ... | | |
+| 75 | Documentation | Wrap docstrings at ~100 chars | | |
+| P1 | Principle | Match existing repository style | | |
+| P2 | Principle | One line, one idea | | |
+| P3 | Principle | Predictable tactic outcome | | |
+| P4 | Principle | Minimize have; backwards reasoning | | |
+| R1 | Rubric | Length ratio (L/R) | | |
+| ... | ... | ... | | |
+| R13 | Rubric | Header authors | | |
+
+Maintain this worksheet **in your reasoning** (not in the JSON output). It's your accountability record. The output JSON cites worksheet rows by ID.
+
+## Step 2 — Walk the file once per rule
+
+For *every* row in the worksheet:
+
+1. Read the rule in HOUSE_STYLE.md again (resist paraphrasing — the rule is what it is).
+2. Scan `LEAN_FILE` for situations where the rule applies. If the rule doesn't apply (e.g. rule 73 about notation-enabling instance docstrings, in a file with no notation-enabling instances), mark `Status = N/A` and move on.
+3. If the rule applies, classify each instance as `pass` / `warn` / `fail` per the criteria below.
+4. Record the `Status` (worst observation across all instances of that rule) and append issue refs (decl + line numbers) where you found violations.
+
+Do **not** skip rows because they "feel similar to" earlier rules. Two rules that look related (e.g. R6 `one_idea_per_line` vs rule 49 `Collapse identical branches with <;>`) are checking different things — the worksheet keeps you honest.
+
+## Step 3 — Per-rule classification
+
+When a rule's verdict isn't explicitly tabulated in HOUSE_STYLE.md (most numbered rules don't have explicit `pass`/`warn`/`fail` thresholds), use:
+
+- **`fail`** — recurring, structural, or hard-to-fix violation. A single instance of a major-impact rule (e.g. rule 67 "no Rocq references in docstrings", or any of R10's docstring-register tripwires) is also a `fail`.
+- **`warn`** — isolated cosmetic violation, or a rule where the porter could plausibly have intended the local form. Default for first-time stylistic deviations.
+- **`pass`** — no observed violation in scope.
+- **`N/A`** — rule doesn't apply to this file.
+
+When in doubt, prefer `warn` over `pass` — the orchestrator routes both back to Stage 3, so erring strict surfaces real issues; under-reporting hides them.
+
+## Step 4 — Calibrate against neighbours
+
+A construction that's idiomatic in the local register passes even if it superficially violates a generic rule; a construction that diverges from neighbours fails even if it would pass in mathlib. Per principle P1: when a HOUSE_STYLE rule and an established neighbour-file pattern conflict, **the local pattern wins** for cosmetic rules — but never for the four guiding principles (P1–P4) and never for the R1–R13 rubrics, which are non-negotiable.
+
+If you make a calibration call that softens a rule, note it in the issue's `msg`: "rule 33 (dot notation) — flagged as `warn` rather than `fail` because `Iris/Iris/Algebra/Csum.lean` uses the same un-dotted form".
+
+## Step 5 — Record violations
+
+For each violation, record an `issues` entry with:
+
+- `decl` — the affected declaration's fully-qualified Lean name, or `<file-level>` for whole-file issues.
+- `check` — the **rule ID** from HOUSE_STYLE.md (`rule 67`, `R1`, `P3`), plus a parenthetical short name (`rule 67 (no Rocq references in docstrings)`). Never `"check": "style"` or other vague labels — the porter needs an unambiguous revision target.
+- `msg` — line number(s), the specific violation, and a concrete fix.
+
+## Step 6 — Aggregate to section verdicts
+
+Per HOUSE_STYLE.md section, compute the headline:
+
+- Section verdict = worst rule status in that section (`fail` > `warn` > `pass`; `N/A` is treated as `pass`).
+- An entire section reporting `pass` requires every rule in it to be `pass` or `N/A`. A single `warn` makes the section `warn`.
+
+The output JSON has one headline per section (see the schema). The `issues` array is the merged list across all rules.
+
+## Step 7 — Self-audit before submitting
+
+Before producing the JSON, sanity-check:
+
+- Did you visit every worksheet row? Count them: there should be 75+ rules + 4 principles + 13 rubrics. If you have fewer rows than HOUSE_STYLE.md has rules, you missed some.
+- Does every issue cite a rule ID (not just a category)?
+- Do the section headlines match the worst rule status within them? (If section "Naming" has any `fail`, `naming` headline must be `fail`; otherwise any `warn` → `warn`.)
+- Did you actually read HOUSE_STYLE.md this run, or rely on memory? **Read it again if unsure** — rules drift.
 
 The orchestrator treats any non-empty `issues` array as `revise` regardless of headline verdict — `warn`s send the file back to Stage 3 just as `fail`s do. The `pass`/`fail`/`warn` distinction is for the porter's prioritization in the two-pass loop, not for whether the gate is met.
 
@@ -69,7 +142,7 @@ Set the verdict to `escalate`.
 
 # Output
 
-Single JSON object, no prose. The headline keys correspond to the **sections** of HOUSE_STYLE.md, plus `golf_ran` for the pre-check; the `issues` array carries the concrete violations.
+Single JSON object, no prose. The headline keys correspond to the **sections** of HOUSE_STYLE.md, plus `golf_ran` for the pre-check; the `issues` array carries the concrete violations; `coverage` proves you actually walked every rule.
 
 ```json
 {
@@ -84,7 +157,16 @@ Single JSON object, no prose. The headline keys correspond to the **sections** o
   "proof_style":              "pass|fail|warn",
   "formatting":               "pass|fail|warn",
   "documentation":            "pass|fail|warn",
+  "principles":               "pass|fail|warn",
   "stage3_rubrics":           "pass|fail|warn",
+  "coverage": {
+    "rules_total":     "<integer — total rule count in HOUSE_STYLE.md, including P1-P4 and R1-R13>",
+    "rules_checked":   "<integer — must equal rules_total>",
+    "rules_applicable":"<integer — rules that applied to this file (the rest are N/A)>",
+    "rules_passed":    "<integer>",
+    "rules_warned":    "<integer>",
+    "rules_failed":    "<integer>"
+  },
   "issues": [
     {"decl": "Iris.Frac2.frac_included", "check": "R1 (length_ratio)",
      "msg": "Lean proof is 12 lines vs Rocq 1 line; Rocq is `by rewrite Qp.lt_sum`. Suggest `:= by rewrite [Param.lt_sum]` or direct rfl."},
@@ -97,7 +179,9 @@ Single JSON object, no prose. The headline keys correspond to the **sections** o
 }
 ```
 
-The `check` field in each issue should reference the **rule by number** (or rubric by letter) from HOUSE_STYLE.md. This makes the porter's revision target unambiguous.
+The `check` field in each issue **must** reference the rule by ID (`rule N`, `R<n>`, `P<n>`) from HOUSE_STYLE.md. This makes the porter's revision target unambiguous and gives the orchestrator a way to detect missing checks (an issue that doesn't cite a rule ID is an artifact of imprecise reviewing — flag it as a self-improvement entry).
+
+The `coverage` block is your accountability proof. **`rules_checked` must equal `rules_total`** — if it doesn't, the orchestrator treats the report as incomplete and re-runs you. This is non-negotiable: every rule in HOUSE_STYLE.md must be visited every run, even when the answer is `N/A`.
 
 `verdict`:
 - `approve` — every section is `pass` AND the `issues` array is empty. **A `warn` finding still requires the issue to appear in the array; do not silently drop it.** The orchestrator is configured to treat any non-empty `issues` array as `revise` regardless of headline verdict, so being honest here is what gets the file fixed.
@@ -108,7 +192,9 @@ The `check` field in each issue should reference the **rule by number** (or rubr
 
 - Editing files. Read-only.
 - Repeating the checks `rocq-review-proofs` does (build, axioms, stale aliases, tactic-name correctness). Those are its territory; you're orthogonal.
-- "Approving" without actually walking through HOUSE_STYLE.md section by section. Each headline field corresponds to a real pass you did.
-- Producing free-form prose. The orchestrator parses you mechanically.
+- **Submitting a report where `coverage.rules_checked < coverage.rules_total`.** That means you skipped rules — re-do the worksheet pass before submitting. The orchestrator detects under-coverage and re-runs you.
+- **"Approving" without an explicit per-rule worksheet.** Each headline field corresponds to a section pass you did rule-by-rule, not a holistic vibe check.
+- **Citing `"check": "style"` or any other vague label** in an issue. Every issue must cite a HOUSE_STYLE.md rule ID (`rule N`, `R<n>`, `P<n>`). Vague labels make the porter guess.
+- Producing free-form prose outside the JSON. The orchestrator parses you mechanically.
 - Suppressing stderr.
-- Inventing rules not in HOUSE_STYLE.md. If you spot a problem the rules don't cover, surface it as a `"check": "meta"` self-improvement entry (see Role section), not as a regular issue.
+- Inventing rules not in HOUSE_STYLE.md. If you spot a problem the rules don't cover, surface it as a `"check": "meta"` self-improvement entry (see Role section), not as a regular issue. The user reads `meta` issues to extend HOUSE_STYLE.md.
