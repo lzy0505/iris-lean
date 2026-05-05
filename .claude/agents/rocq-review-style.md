@@ -35,9 +35,23 @@ Local iris-lean convention overrides the guides on conflicts; use the guides for
 
 # Calibration
 
+Per principle 1 below: the ideal code matches the style of existing code in the repository. Calibrate before reviewing.
+
 Read the *proofs* in 2–3 nearest-neighbour files in the same target folder as `LEAN_FILE`. For Algebra/, prefer `Iris/Iris/Algebra/Auth.lean`, `Csum.lean`, `Agree.lean`, `DFrac.lean`. For BI/, prefer `Iris/Iris/BI/InternalEq.lean`, `Plainly.lean`, `Updates.lean`. Note the typical proof shape: term-mode `:=`, short `by`-blocks, calc-chains, `refine` patterns. **Note also what they don't have**: rare inline comments inside proof bodies; almost never `show <type>` outside of a real disambiguation need; almost never `have x := ...; exact x`-style padding.
 
 Then read the corresponding Rocq proofs. The Rocq proof's *length* is your reference budget. An iris-lean proof should be the same length (within a small constant factor) — usually shorter, sometimes equal, very rarely longer.
+
+# Guiding principles
+
+The per-check rubrics below operationalize four overarching principles. When a check is borderline, fall back to whichever principle most directly applies — these are the "spirit" the checks try to capture.
+
+1. **Match existing repository style.** The ideal code is indistinguishable from neighbour files in the same folder. iris-lean has its own register that supersedes generic mathlib conventions; calibrate to what's already there before judging the new file. Architecture, naming, namespace structure, proof shape — all should mirror the locals.
+
+2. **One line, one idea.** Each line expresses one rewrite, one application, one case split, or one named intermediate. Do not splice tactics together with semicolons artificially — semicolons that pack distinct ideas onto one line obscure the proof's structure. Acceptable chaining: parallel branches under `<;>` (`cases x <;> rfl`), short term-mode compositions where each piece is a named lemma, or a `simp only [<short list>]`. (Operationalized in S3c.)
+
+3. **Every tactic's outcome should be easily predictable.** Prefer `refine` to `apply`. `refine` makes the resulting goal-shape explicit at the call site (the `?_` holes show what's left); `apply` leaves the reader (and the maintainer) to mentally reconstruct what unification produced. Same goes for `simp only` over broad `simp` for terminal-but-tweaked steps, and named lemmas over `omega`/`decide`/`grind` for goals that aren't genuinely arithmetic. (Operationalized in S2b.)
+
+4. **Minimize `have`s; prefer backwards reasoning.** Backwards reasoning (`refine` / `exact <named lemma>` / `calc` from goal to leaves) reads top-down: each step says what we're trying to prove next. Forwards reasoning (`have h := …; have h' := …; exact …`) reads bottom-up: the reader has to assemble the proof in their head from intermediate facts. Use `have` only when (a) an intermediate is reused two or more times, or (b) the term is structurally complex enough that naming aids readability. A single-use `have` whose body is short and uneventful is a smell. (Operationalized in S3.)
 
 # Checks
 
@@ -81,17 +95,35 @@ For each Rocq proof that's pure term-mode style (`Proof. apply foo, lem. Qed.`, 
 
 `grep -nE ':= by\s+(exact|apply|trivial|simp)\s' "$LEAN_FILE"` — for each hit, check whether the Rocq counterpart was term-mode-style. If so, `warn` per hit, with suggestion to inline.
 
+## S2b — `predictable_outcome`
+
+Operationalizes principle 3: every tactic's outcome should be easily predictable from the call site.
+
+For each proof body, scan for tactics whose effect is opaque without running the elaborator:
+
+- **`apply` vs `refine`.** Prefer `refine`: the `?_` placeholders make the residual goal shape explicit. `apply` is acceptable when the residual is genuinely a single straightforward goal that the reader can predict (e.g. `apply hP` where `hP : P → Q` and the goal is `Q` — the residual is unambiguously `P`); flag uses where unification produces multiple residuals or where the user would have to load the lemma signature to know what's left. As a heuristic: `apply f` followed by ≥ 2 separate tactic blocks at the same nesting level is suspect — that's `refine`-territory.
+- **Broad `simp` as a step inside a non-trivial proof.** `simp [<long list>]` mid-proof is opaque about which lemma did the work. Acceptable: `simp only [<list>]` (narrower, predictable), terminal `simp` (closes the goal), or `simp` after a clearly-named structural step. Suspect: a `simp` line whose effect a reader can't anticipate without running it.
+- **`omega` / `decide` / `grind` for goals that aren't genuinely arithmetic / decidable / hammered.** Same predictability concern: the reader can't tell what was discharged.
+
+Each unjustified `apply` (where `refine` would be clearer) is a `warn`; ≥ 3 in one proof escalates to `fail` for that proof. Mid-proof broad `simp` is a `warn`. Misapplied `omega`/`decide`/`grind` for non-numeric / non-decidable / non-large goals is a `warn`.
+
+This check overlaps with S5b (`rocq-review-proofs`'s separation-logic discipline) and the porter's "tactic complexity ladder" guidance — but the angle is *predictability* rather than *laziness*. A `refine`-over-`apply` violation can be syntactically fine while still hurting readability.
+
 ## S3 — `intermediate_haves`
 
-This check guards against *gratuitous* naming: a single-use `have` whose expression is short enough to inline trivially. Don't penalize legitimate uses of `have` for readability — they're a feature, not a smell.
+Operationalizes principle 4: minimize `have`s; prefer backwards reasoning.
 
-For each proof, scan for `have HXXX := EXPR; ...; HXXX` patterns where:
+This check has two parts.
+
+**3.1 — gratuitous single-use `have`s.** A `have` whose body is short and uneventful and gets used exactly once is a candidate for inlining. For each proof, scan for `have HXXX := EXPR; ...; HXXX` patterns where:
 - `HXXX` is referenced exactly once, **and**
 - `EXPR` is short (≤ ~30 characters) **and** has no nested dot-chain or function application chain — i.e. it's a single name like `pcore_op_left` or a tiny tuple like `⟨a, b⟩`.
 
 Such trivially-inlineable single-use `have`s are a `warn`. Multiple in one proof escalates to `fail` for that proof.
 
-Single-use `have`s with longer or structurally non-trivial expressions are **fine** — they're naming an intermediate to keep the proof readable, which is exactly what S3b below requires when the term gets large. Don't flag them.
+Single-use `have`s with longer or structurally non-trivial expressions are **fine** — they're naming an intermediate to keep the proof readable (S3b's territory). Don't flag those.
+
+**3.2 — forwards-heavy proofs.** A proof that's mostly a sequence of `have h_i := …` lines feeding into a final `exact …` is forwards reasoning — and reads bottom-up. The iris-lean idiom is backwards: lead with `refine` / `calc` / `exact <named lemma>` so each line states what we're trying to prove next. If a proof has ≥ 3 `have` lines and only a single closing tactic, flag it as a `warn` even if each individual `have` is justified — the *shape* is wrong: try restructuring as a `calc` chain or a `refine` with holes filled by the same lemmas. Don't flag if the underlying lemmas genuinely need to be assembled forwards (e.g. when the proof is matching against a concrete data structure layer by layer).
 
 ## S3b — `oversized_term`
 
@@ -205,6 +237,7 @@ Single JSON object, no prose:
   "golf_ran":             "pass|fail",
   "length_ratio":         "pass|fail|warn",
   "term_vs_tactic":       "pass|fail|warn",
+  "predictable_outcome":  "pass|fail|warn",
   "intermediate_haves":   "pass|fail|warn",
   "oversized_term":       "pass|fail|warn",
   "one_idea_per_line":    "pass|fail|warn",

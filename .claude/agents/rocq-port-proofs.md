@@ -130,6 +130,15 @@ When you do need it:
 
 # Style discipline
 
+The detailed rules below operationalize four overarching principles. When in doubt about a specific tactic choice, fall back to whichever principle most directly applies:
+
+1. **Match existing repository style.** The ideal proof is indistinguishable from neighbour files in the same folder. Calibrate to what's already there before writing — architecture, naming, proof shape, idiom choice.
+2. **One line, one idea.** Each line expresses one rewrite, one application, one case split, or one named intermediate. Don't splice tactics together with semicolons artificially. Acceptable chaining: parallel branches under `<;>`, short term-mode compositions where each piece is a named lemma, or a `simp only [<short list>]`.
+3. **Every tactic's outcome should be easily predictable.** Prefer `refine` to `apply` — the `?_` placeholders make residual goals explicit at the call site. Prefer `simp only [<list>]` to broad mid-proof `simp`. Prefer named lemmas to `omega`/`decide`/`grind` for goals that aren't genuinely arithmetic / decidable / large.
+4. **Minimize `have`s; prefer backwards reasoning.** Lead with `refine` / `calc` / `exact <named lemma>` so each line says what we're trying to prove next. Use `have` only when an intermediate is reused two or more times, or when its name aids readability of a structurally complex term. A long sequence of `have h_i := …` lines feeding into a final `exact …` is a red flag — restructure as `calc` or `refine` with holes.
+
+The detailed rules:
+
 - **Match the Rocq proof's structural shape.** If Rocq does `induction n; simpl; auto`, you should do an induction and discharge each case with appropriately small pieces — *not* close the whole thing with one `simp_all` or `aesop`.
 - **Prefer IPM** for separation-logic goals. Rocq's `iIntros "[H1 H2]"` becomes iris-lean's `iintro ⟨H1, H2⟩` or `icases H ...` depending on whether you're introducing or destructuring later.
 - **Use named entailment lemmas** with `.trans` / `refine`. The InternalEq.lean style is the gold standard: `(siPure_mono blah).trans foo`.
