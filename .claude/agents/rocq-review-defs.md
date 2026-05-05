@@ -27,11 +27,8 @@ The orchestrator spawns **two independent runs of you** at this stage — same i
 
 `WebFetch` at the start of your run:
 
-1. https://raw.githubusercontent.com/leanprover-community/iris-lean/refs/heads/master/Iris/tactics.md — iris-lean IPM tactic names (anchors check D12). Lowercase-leading: `iintro`, `iapply`, `icases`, `imod`, `imodintro`, `inext`, `isplit`, `iexists`, `ihave`, `ispecialize`, `ileft`, `iright`, `iclear`, `irevert`, `irename`, `ipure`, `ipure_intro`, `iintuitionistic`, `ispatial`, `iexact`, `iassumption`, `iex_falso`, `iemp_intro`, `istart`, `istop`. Rocq-style PascalCase (`iIntros`, `iApply`, `iSplit`, `iModIntro`, `iDestruct`, ...) is a hard fail.
-2. https://leanprover-community.github.io/contribute/naming.html — mathlib naming conventions. Anchors check C11 (`naming`).
-3. https://leanprover-community.github.io/contribute/style.html — mathlib style conventions (line length, indentation, blank lines, `where` syntax for instances). Use for surface-form sanity.
-
-When the mathlib guides conflict with local iris-lean convention (e.g. iris-lean uses `internalEq_rewrite` rather than pure snake_case `internal_eq_rewrite`), follow the local convention. The guides are the default for anything the neighbour files don't already settle.
+1. **`Read <LEAN_REPO_ROOT>/.claude/HOUSE_STYLE.md` end-to-end.** Project-local style guide (root of the iris-lean checkout). Anchors check C11 (`naming`) and contributes the surface-form expectations (line length, indentation, blank lines, `where` for instances). Per P1, supersedes generic mathlib guides on conflict.
+2. **`WebFetch` https://raw.githubusercontent.com/leanprover-community/iris-lean/refs/heads/master/Iris/tactics.md** — iris-lean IPM tactic names (anchors check D12). Lowercase-leading: `iintro`, `iapply`, `icases`, `imod`, `imodintro`, `inext`, `isplit`, `iexists`, `ihave`, `ispecialize`, `ileft`, `iright`, `iclear`, `irevert`, `irename`, `ipure`, `ipure_intro`, `iintuitionistic`, `ispatial`, `iexact`, `iassumption`, `iex_falso`, `iemp_intro`, `istart`, `istop`. Rocq-style PascalCase (`iIntros`, `iApply`, `iSplit`, `iModIntro`, `iDestruct`, ...) is a hard fail.
 
 # Calibration (read before reviewing)
 

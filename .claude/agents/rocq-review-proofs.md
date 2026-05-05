@@ -26,11 +26,8 @@ If you fail this stage, the orchestrator loops back to Stage 3 with your issue l
 
 `WebFetch` at the start of your run:
 
-1. https://raw.githubusercontent.com/leanprover-community/iris-lean/refs/heads/master/Iris/tactics.md — iris-lean IPM tactic names. The proof-style check (#5 below) is grounded in this doc.
-2. https://leanprover-community.github.io/contribute/naming.html — mathlib naming.
-3. https://leanprover-community.github.io/contribute/style.html — mathlib style.
-
-Local iris-lean convention overrides the guides on conflicts; use the guides for anything the neighbour files don't already settle.
+1. **`Read <LEAN_REPO_ROOT>/.claude/HOUSE_STYLE.md` end-to-end.** Project-local style guide (root of the iris-lean checkout). Style/naming aspects of your review (#5, #6) are grounded in it; per P1 it supersedes generic mathlib guides.
+2. **`WebFetch` https://raw.githubusercontent.com/leanprover-community/iris-lean/refs/heads/master/Iris/tactics.md** — iris-lean IPM tactic names. The proof-style check (#5 below) is grounded in this doc.
 
 Any tactic in an iris/separation-logic proof block that isn't listed in `tactics.md` and isn't a plain Lean tactic (`exact`, `intro`, `simp`, `apply`, `omega`, `cases`, `induction`, `refine`, `calc`, ...) is suspect.
 

@@ -22,15 +22,12 @@ Stage 1 of the iris-lean Rocq→Lean porting pipeline. Given one Rocq `.v` file,
 
 # Canonical references (MUST consult before producing output)
 
-`WebFetch` these three docs at the start of your run:
+Before producing output:
 
-1. https://raw.githubusercontent.com/leanprover-community/iris-lean/refs/heads/master/Iris/tactics.md — iris-lean IPM tactic names (canonical for any inline `by` block).
-2. https://leanprover-community.github.io/contribute/naming.html — mathlib naming conventions (snake_case for theorems, UpperCamelCase for types/classes/Props, lowerCamelCase for terms; `_iff`, `_of`, `_eq` patterns; American English).
-3. https://leanprover-community.github.io/contribute/style.html — mathlib style conventions (≤ 100 char lines, 2-space proof indent, `by` at end of line, `where` for instances, blank lines between decls).
+1. **`Read <LEAN_REPO_ROOT>/.claude/HOUSE_STYLE.md` end-to-end.** This is the project-local style guide (lives at the root of the iris-lean checkout, alongside `Iris/`, `IrisMath/`, `scripts/`). Single source of truth for naming, implicit arguments, scoping, class/instance design, proof style, formatting, and documentation. Every numbered rule applies; principle P1 establishes that the local convention supersedes generic mathlib guidance on conflict.
+2. **`WebFetch` https://raw.githubusercontent.com/leanprover-community/iris-lean/refs/heads/master/Iris/tactics.md** — iris-lean IPM tactic names (canonical for any inline `by` block).
 
 The iris-lean IPM tactic names are **lowercase-leading**: `istart`, `istop`, `iintro`, `iapply`, `iexact`, `iassumption`, `icases`, `imod`, `ihave`, `isplit`, `ileft`, `iright`, `iexists`, `ispecialize`, `irevert`, `irename`, `iclear`, `ipure`, `iintuitionistic`, `ispatial`, `ipure_intro`, `imodintro`, `inext`, `iex_falso`, `iemp_intro`. Even though Stage 1 mostly leaves proofs as `sorry`, any inline `by` block you do produce (instance fields, `def` bodies that need a tactic, notation-elaboration helpers) **must use these names**, never the Rocq-style PascalCase variants `iIntros`/`iApply`/`iSplit`/`iModIntro`/`iDestruct`/etc. Those will not parse.
-
-**Resolving conflicts.** When the mathlib naming guide and the local iris-lean convention disagree, **the local convention wins** — iris-lean has its own register (e.g. `internalEq_rewrite` rather than pure `internal_eq_rewrite`) and consistency with neighbour files matters more than literal mathlib compliance. Use the mathlib guides as a default for any decision the neighbour files don't already settle.
 
 # Required pre-work — calibrate to the local style
 
