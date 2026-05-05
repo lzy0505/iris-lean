@@ -108,14 +108,16 @@ For each theorem at `sorry`:
 
 1. **`mcp__lean-lsp__lean_loogle`** — type-pattern search. Covers iris-lean + Mathlib + Batteries in one query, unrate-limited. **Default tool for "what existing lemma matches this shape?"**
 
-2. **`mcp__lean-lsp__lean_local_search`** — keyword / name search inside the iris-lean project. **Use this in place of `Grep` for any Lean-side lookup** (find a decl by name, find callers, see if `foo_lemma` already exists). Index-aware and structured.
+2. **`mcp__lean-lsp__lean_local_search`** — every Lean-side lookup. Decl by name, callers, "does `foo_lemma` exist?", file containing a definition, location of a notation. Index-aware and structured.
 
 3. `mcp__lean-lsp__lean_hover_info` — inspect a signature.
 4. `mcp__lean-lsp__lean_completions` — IDE autocomplete on incomplete tactic blocks.
 5. `mcp__lean-lsp__lean_multi_attempt` — try several tactic candidates without persisting failed edits.
 6. `mcp__lean-lsp__lean_code_actions` — surfaces the LSP's quick-fix suggestions for a position.
 
-`Grep` and `Glob` are for **non-Lean** searches: Rocq `.v` source, config files, scripts. Don't grep for a Lean decl when `lean_local_search` is the right tool.
+**`Grep`, `Glob`, `find`, and `fd` are forbidden for finding Lean definitions or lemmas.** Anti-pattern: `find / -path "*lean*/lean/Init/Data/List*" -name "*.lean"` to locate a List lemma. Use `mcp__lean-lsp__lean_loogle` for type patterns and `mcp__lean-lsp__lean_local_search` for names.
+
+These tools remain fine for everything else: Rocq `.v` sources, config files, scripts, logs, textual scans within a known file, directory listings, etc. The forbidden case is specifically *discovering Lean decls by filesystem walk*.
 
 `mcp__lean-lsp__lean_leansearch`, `lean_leanfinder`, `lean_state_search`, and `lean_hammer_premise` are disabled at the MCP server level (`LEAN_MCP_DISABLED_TOOLS`). They are not callable.
 
@@ -209,6 +211,7 @@ If you find yourself writing `simp [pcore] at h; obtain ⟨a, ha, hcx⟩ := h; s
 - Modifying lemma statements. Those are locked by Stage 2.
 - Adding new `#rocq_ignore` entries during the proof phase. **Never do this directly** — flag it via the escape hatch and let the orchestrator/user decide.
 - Silently removing `@[rocq_alias]` annotations or deleting decls. If the escape hatch (flavour 2) recommends removing a decl, that recommendation is for the orchestrator to act on after human review — *do not delete the decl yourself*. Just flag it.
+- Using `find`, `fd`, `Grep`, or `Glob` to **discover Lean definitions or lemmas**. The LSP index is the right tool — `mcp__lean-lsp__lean_loogle` for type patterns, `mcp__lean-lsp__lean_local_search` for names/keywords. (Filesystem tools remain fine for everything else.)
 
 # Escape hatch — when a proof genuinely cannot be ported
 

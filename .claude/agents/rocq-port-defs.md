@@ -62,13 +62,15 @@ The search tools for **Lean-side** lookups (existing lemmas, names, types) follo
 
 1. **`mcp__lean-lsp__lean_loogle`** — type-pattern search. Covers iris-lean + Mathlib + Batteries in one query, unrate-limited. **Use this for any type-pattern search.** Patterns are standard Loogle syntax — `?P → ?P`, `_ ⊢ _ -∗ _`, `Equivalence ?R`, etc.
 
-2. **`mcp__lean-lsp__lean_local_search`** — keyword and name lookups inside the iris-lean project. **Use this in place of `Grep` for any Lean-side search** (locating a decl by name, finding callers, etc.). The MCP version is index-aware and will return ranked structured results; raw `grep` over `Iris/Iris/` is a fallback only when the MCP is unreachable.
+2. **`mcp__lean-lsp__lean_local_search`** — every Lean-side lookup. Decl by name, declaration of a typeclass, file containing a definition, location of a notation, callers of a function — all of it. The MCP version is index-aware and returns ranked structured results.
 
 3. `mcp__lean-lsp__lean_hover_info` — inspect a signature.
 4. `mcp__lean-lsp__lean_file_outline` — skim a neighbour file efficiently.
 5. `mcp__lean-lsp__lean_completions` — IDE-style autocomplete on incomplete code.
 
-`Grep` and `Glob` are reserved for **non-Lean** searches: scanning `.v` Rocq sources, `.md`/`.toml`/`.json` config, the porting scripts, etc. Don't reach for `Grep` to find a Lean decl when `lean_local_search` is right there.
+**`Grep`, `Glob`, `find`, and `fd` are forbidden for finding Lean definitions or lemmas.** Reflexively running `find / -path "*lean*/lean/Init/Data/List*" -name "*.lean"` to locate a List lemma — or `grep -rn "theorem foo_bar" Iris/Iris/` to discover whether a decl exists — defeats the point of having an LSP. Always use `mcp__lean-lsp__lean_loogle` (type pattern) or `mcp__lean-lsp__lean_local_search` (name/keyword) for those queries.
+
+`Grep`, `Glob`, `find`, and `fd` remain available for everything else: scanning Rocq `.v` sources, scanning configs / scripts / logs, listing directories, textual scans within a known file (e.g. counting `#rocq_ignore` lines in `LEAN_FILE`), checking for stray whitespace, etc. The forbidden case is specifically *discovering Lean decls by filesystem walk* when the LSP index is the right tool.
 
 `mcp__lean-lsp__lean_leansearch`, `lean_leanfinder`, `lean_state_search`, and `lean_hammer_premise` are disabled at the MCP server level (see `LEAN_MCP_DISABLED_TOOLS`). Don't try to call them.
 
@@ -299,3 +301,4 @@ If you cannot make the file build, return `"build": "fail"` with a `"build_error
 - Suppressing `lake build` stderr (e.g. `2>/dev/null`).
 - Touching files other than `LEAN_FILE` unless absolutely necessary. Allowed exceptions: registering the new file in a parent `.lean` that re-exports the folder; copying a self-contained Mathlib/Batteries lemma into `Iris/Iris/Std/` per the "Reusing Mathlib / Batteries" guidance above.
 - Any `#rocq_ignore` whose reason is "TODO", "skip", "later", or otherwise unjustified.
+- Using `find`, `fd`, `Grep`, or `Glob` to **discover Lean definitions or lemmas**. The LSP index is the right tool — `mcp__lean-lsp__lean_loogle` for type patterns, `mcp__lean-lsp__lean_local_search` for names/keywords. (Filesystem tools remain fine for non-discovery uses: textual scans of a known file, listing directories, walking Rocq sources, etc.)
