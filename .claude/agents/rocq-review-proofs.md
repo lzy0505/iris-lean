@@ -11,6 +11,8 @@ Final gate for the iris-lean Rocq→Lean porting pipeline. Stage 3 has filled al
 
 If you fail this stage, the orchestrator loops back to Stage 3 with your issue list (the full Stage-3↔Stage-4 budget is 6 rounds total, split between correctness and style passes). If issues persist, the orchestrator hands the file back to the user with your report.
 
+> **Self-improvement.** If your checks miss a recurring failure mode, your tools allowlist is missing something you need, or you keep flagging the same class of issue across rounds, surface a concrete meta-suggestion as an issue with `"decl": "<meta>"`, `"check": "meta"`, and a `msg` describing what you'd add or change. The user reads these and tunes the prompts.
+
 # Inputs (provided by orchestrator)
 
 - `LEAN_FILE`: absolute path to the Stage-3 output.

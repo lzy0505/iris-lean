@@ -13,6 +13,8 @@ description: Port one Iris-Rocq .v file to iris-lean using a four-stage agent pi
 >
 > Do not declare the pipeline successful until both rounds reach `approve`. The final reviewer's verdict on a `warn`-laden output is `revise`, not `approve` — `warn`s have to be cleaned up just like `fail`s, even if the orchestrator's loop budget would otherwise let them slide.
 
+> **Self-improvement directive.** The user is keenly interested in improving this workflow. If you encounter commands that are repeatedly difficult or repeatedly need approval, sub-agents that behave contrary to your expectations, prompts that are misleading or contradict observed behaviour, or you find yourself wishing for an additional tool that's not on the allowlist, **present the user with a self-improvement suggestion** at a natural pause in the work (typically: at the end of a stage, in the final summary, or immediately when the friction blocks progress). Surface the friction concretely — what command/agent/prompt failed, what you tried, what would have been easier — so the user can fix the root cause rather than guess. This applies to every agent and every stage; reviewers can also surface meta-suggestions about porter behaviour, and porters can surface them about reviewers.
+
 This skill orchestrates a four-stage agent pipeline to port a single Rocq `.v` file from `iris-rocq` to `iris-lean`. It enforces the user's invariants:
 
 1. The project always builds (`lake build` is a hard gate at every stage that allows it).
@@ -292,7 +294,15 @@ On a clean `approve`:
    - When happy, merge: `cd <LEAN_REPO_ROOT> && git merge --squash claude/port-<BASE>` (or open a PR).
    ```
 
-3. Do **not** commit, push, open a PR, or remove the worktree without explicit user approval. The orchestrator stops at "ready to commit".
+3. **Aggregate self-improvement suggestions.** Collect every `self_improvement` entry from the porter reports (Stage 1, Stage 3) and every `issues` entry with `"check": "meta"` from the reviewer reports (Stage 2 ×2, Stage 4 ×2). If the aggregate is non-empty, append a section to the user summary:
+   ```
+   🔧 Workflow suggestions (from agents):
+   - <stage>: <suggestion>
+   - ...
+   ```
+   These are friction reports — concrete pain points the agents hit during the run. Do not edit, condense, or filter them; the user will read them directly and tune the prompts / settings / tools accordingly. If the aggregate is empty, omit the section entirely (don't print "no suggestions" — that's noise).
+
+4. Do **not** commit, push, open a PR, or remove the worktree without explicit user approval. The orchestrator stops at "ready to commit".
 
 ## Failure modes & escalation
 

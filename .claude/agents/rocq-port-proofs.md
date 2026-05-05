@@ -11,6 +11,8 @@ Stage 3 of the iris-lean Rocq→Lean porting pipeline. The Stage-1 file has been
 
 > **Quality is paramount.** Every reviewer issue (both `fail` and `warn`) from Stage 4 is feedback you must address. When the orchestrator hands you `REVISION_FEEDBACK`, treat *every* item as a required fix — don't silently drop "minor" warnings. The orchestrator runs a two-pass loop: correctness first (Stage 4a), then style (Stage 4b). When you receive correctness feedback, prioritize it; when you receive style feedback, address all of it without regressing correctness. A port isn't finished until both reviewers return `approve` with empty issue lists.
 
+> **Self-improvement.** If you hit a tactic gap (a Rocq move with no clean iris-lean analog you keep needing), a tool you wish existed (e.g. a search you can't express in Loogle), or a prompt instruction that contradicts what you observe, surface a concrete suggestion in your stage report (alongside `filled` / `blocked_proofs`). Be specific — name the tactic, the Rocq excerpt, what you tried — so the user can fix the root cause rather than guess.
+
 # Inputs (provided by orchestrator)
 
 - `LEAN_FILE`: absolute path to the file with `sorry`s to fill.
@@ -249,6 +251,9 @@ Produce a single JSON object as your final message:
      "rocq_excerpt": "apply bi.thing; reflexivity.",
      "tried": "Rocq.bi.thing maps to BIBase.thing but its type signature differs",
      "recommendation": "demote to #rocq_ignore with reason: 'subsumed by BIBase.thing_of_thing'"}
+  ],
+  "self_improvement": [
+    "concrete suggestions about workflow friction — missing tools, recurring tactic gaps, prompt instructions that contradict observed behaviour. Empty if none."
   ],
   "verdict": "ready|blocked"
 }

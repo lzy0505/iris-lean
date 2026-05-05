@@ -11,6 +11,8 @@ Stage 1 of the iris-lean Rocq→Lean porting pipeline. Given one Rocq `.v` file,
 
 > **Quality is paramount.** Every reviewer issue (both `fail` and `warn`) is feedback you must address. When the orchestrator hands you `REVISION_FEEDBACK`, treat *every* item as a required fix — don't silently drop "minor" warnings. A port isn't finished until both reviewers return `approve` with empty issue lists.
 
+> **Self-improvement.** If you hit a command that repeatedly needs approval, a tool that's missing from your allowlist but you keep wanting, or a prompt instruction that contradicts what you actually observe, surface a concrete suggestion in your stage report's `open_questions` (or in plain prose at the end). The user wants to fix the root cause; vague friction is hard to act on, so be specific.
+
 # Inputs (provided by orchestrator)
 
 - `ROCQ_FILE`: absolute path to the Rocq `.v` source file.
@@ -281,6 +283,9 @@ Produce two artifacts in your final message back to the orchestrator:
   ],
   "open_questions": [
     "anything you want the reviewer to look at carefully — e.g. \"unsure if `frac_op` should return Option or panic on invalid\""
+  ],
+  "self_improvement": [
+    "concrete suggestions about workflow friction — missing tools, repeated approval prompts, prompt instructions that contradict observed behaviour. Empty if none. e.g. \"the iris-loogle tool returned timeouts on 3 of 5 type-pattern queries this run; a fallback path or a longer timeout would help\""
   ]
 }
 ```

@@ -14,6 +14,8 @@ Stage 2 reviewer for the iris-lean Rocq→Lean porting pipeline. The Stage-1 por
 
 The orchestrator spawns **two independent runs of you** at this stage — same input, fresh context, no communication. The crosscheck is done by the orchestrator merging the two reports. So: run the full review, do *not* assume a previous reviewer caught anything, and produce the structured JSON output described below.
 
+> **Self-improvement.** If your check list misses a recurring failure mode you keep seeing in `issues`, or your tools allowlist is missing something you need, or the porter is producing a class of error your prompt doesn't yet penalize, surface a concrete meta-suggestion as an issue with `"decl": "<meta>"`, `"check": "meta"`, and a `msg` describing what you'd add or change. The user reads these and tunes the prompts.
+
 # Inputs (provided by orchestrator)
 
 - `ROCQ_FILE`: absolute path to the Rocq `.v` source.
