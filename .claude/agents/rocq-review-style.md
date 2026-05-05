@@ -52,20 +52,30 @@ Before opening `LEAN_FILE`, read HOUSE_STYLE.md end-to-end and enumerate every r
 
 | Rule ID | Section | One-line description | Status (filled later) | Issue refs |
 |---|---|---|---|---|
-| Rule ID | Section | One-line description | Status (filled later) | Issue refs |
-|---|---|---|---|---|
-| P1 | Principles | Match existing repository style | | |
-| P2 | Principles | One line, one idea | | |
-| P3 | Principles | Predictable tactic outcome | | |
-| P4 | Principles | Minimize `have`; backwards reasoning | | |
-| 1 | Naming | Mathlib casing convention | | |
-| 2 | Naming | Mathlib morphism conventions | | |
-| ... | ... | (every numbered rule actually present) | | |
-| R1 | Rubrics | Length ratio (L/R) | | |
-| ... | ... | ... | | |
-| R13 | Rubrics | Header authors | | |
+HOUSE_STYLE.md is organized as four principles (P1–P4); each principle owns a body of sub-rules, addressed `P<n>.<m>` for prescriptive sub-rules and `R<n>` for review rubrics. Build the worksheet by walking HOUSE_STYLE.md top-to-bottom and recording **every** entry — every `P<n>` heading, every `P<n>.<m>` sub-rule, every `R<n>` rubric — as a row:
 
-Enumerate **every** entry actually present in HOUSE_STYLE.md — don't rely on memory of a specific count, and don't trust this template for the row list (HOUSE_STYLE.md grows; rule numbers may shift). Maintain the worksheet **in your reasoning** (not in the JSON output). It's your accountability record. The output JSON cites worksheet rows by ID.
+| Rule ID | Principle | One-line description | Status (filled later) | Issue refs |
+|---|---|---|---|---|
+| P1 | P1 (match repo style) | The principle itself | | |
+| P1.1 | P1 | Mathlib casing convention | | |
+| P1.2 | P1 | Mathlib morphism conventions | | |
+| ... | ... | (every P1.N entry) | | |
+| R12 | P1 | Local hypothesis naming | | |
+| R10 | P1 | Module docstring register | | |
+| R11 | P1 | Architectural taste | | |
+| R13 | P1 | Header authors | | |
+| P2 | P2 (one line, one idea) | The principle itself | | |
+| P2.1 | P2 | Multiple rewrites in single `rw` | | |
+| ... | ... | ... | | |
+| R6, R5 | P2 | One idea per line, oversized term | | |
+| P3 | P3 (predictable outcome) | The principle itself | | |
+| ... | ... | ... | | |
+| R3, R8, R9, R1, R2, R7 | P3 | (rubrics) | | |
+| P4 | P4 (minimize have; backwards) | The principle itself | | |
+| ... | ... | ... | | |
+| R4 | P4 | Intermediate `have`s | | |
+
+Each principle gets one row for itself (top-level "is the file's overall posture compatible with this principle?") plus one row per sub-rule and rubric beneath it. Enumerate **every** entry actually present in HOUSE_STYLE.md — don't rely on memory of a specific count, and don't trust this template's exact row list (HOUSE_STYLE.md grows). Maintain the worksheet **in your reasoning** (not in the JSON output). It's your accountability record. The output JSON cites worksheet rows by ID.
 
 ## Step 2 — Walk the file once per rule
 
@@ -103,14 +113,14 @@ For each violation, record an `issues` entry with:
 - `check` — the **rule ID** from HOUSE_STYLE.md (`rule 67`, `R1`, `P3`), plus a parenthetical short name (`rule 67 (no Rocq references in docstrings)`). Never `"check": "style"` or other vague labels — the porter needs an unambiguous revision target.
 - `msg` — line number(s), the specific violation, and a concrete fix.
 
-## Step 6 — Aggregate to section verdicts
+## Step 6 — Aggregate to principle headlines
 
-Per HOUSE_STYLE.md section, compute the headline:
+Per principle (P1–P4), compute the headline:
 
-- Section verdict = worst rule status in that section (`fail` > `warn` > `pass`; `N/A` is treated as `pass`).
-- An entire section reporting `pass` requires every rule in it to be `pass` or `N/A`. A single `warn` makes the section `warn`.
+- Principle headline = worst sub-rule status under that principle (`fail` > `warn` > `pass`; `N/A` is treated as `pass`).
+- A principle reporting `pass` requires every sub-rule (`P<n>.<m>`) and rubric (`R<n>`) under it to be `pass` or `N/A`. A single `warn` anywhere under it makes the principle `warn`.
 
-The output JSON has one headline per section (see the schema). The `issues` array is the merged list across all rules.
+The output JSON has one headline per principle (see the schema). The `issues` array is the merged list across all rules and rubrics.
 
 ## Step 7 — Self-audit before submitting
 
@@ -140,7 +150,7 @@ Set the verdict to `escalate`.
 
 # Output
 
-Single JSON object, no prose. The headline keys correspond to the **sections** of HOUSE_STYLE.md, plus `golf_ran` for the pre-check; the `issues` array carries the concrete violations; `coverage` proves you actually walked every rule.
+Single JSON object, no prose. The headline keys are the four principles plus `golf_ran` for the pre-check; the `issues` array carries the concrete violations; `coverage` proves you actually walked every rule.
 
 ```json
 {
@@ -148,17 +158,12 @@ Single JSON object, no prose. The headline keys correspond to the **sections** o
   "lean_file": "<absolute path>",
   "rocq_file": "<absolute path>",
   "golf_ran":                 "pass|fail",
-  "naming":                   "pass|fail|warn",
-  "implicit_arguments":       "pass|fail|warn",
-  "variable_scope":           "pass|fail|warn",
-  "class_instance_design":    "pass|fail|warn",
-  "proof_style":              "pass|fail|warn",
-  "formatting":               "pass|fail|warn",
-  "documentation":            "pass|fail|warn",
-  "principles":               "pass|fail|warn",
-  "stage3_rubrics":           "pass|fail|warn",
+  "P1_match_repo_style":      "pass|fail|warn",
+  "P2_one_idea_per_line":     "pass|fail|warn",
+  "P3_predictable_outcome":   "pass|fail|warn",
+  "P4_minimize_have":         "pass|fail|warn",
   "coverage": {
-    "rules_total":     "<integer — total rule count in HOUSE_STYLE.md, including P1-P4 and R1-R13>",
+    "rules_total":     "<integer — total entry count in HOUSE_STYLE.md (4 principles + every P<n>.<m> sub-rule + every R<n> rubric)>",
     "rules_checked":   "<integer — must equal rules_total>",
     "rules_applicable":"<integer — rules that applied to this file (the rest are N/A)>",
     "rules_passed":    "<integer>",
@@ -168,16 +173,18 @@ Single JSON object, no prose. The headline keys correspond to the **sections** o
   "issues": [
     {"decl": "Iris.Frac2.frac_included", "check": "R1 (length_ratio)",
      "msg": "Lean proof is 12 lines vs Rocq 1 line; Rocq is `by rewrite Qp.lt_sum`. Suggest `:= by rewrite [Param.lt_sum]` or direct rfl."},
-    {"decl": "<file-level>", "check": "rule 67 (no Rocq references in docstrings)",
+    {"decl": "<file-level>", "check": "P1.47 (no Rocq references in docstrings)",
      "msg": "Module docstring contains 'Corresponds to Rocq's frac.v' — describe behavior in Lean terms; the rocq_alias attribute records the Rocq mapping."},
-    {"decl": "Iris.BI.foo", "check": "rule 32 (term-mode over tactic-mode)",
+    {"decl": "Iris.BI.foo", "check": "P3.1 (term-mode over tactic-mode)",
      "msg": "Two-branch match should be term-mode `match l with | .nil => .rfl | .cons _ _ => ...`, not a `by cases` block."}
   ],
   "verdict": "approve|revise|escalate"
 }
 ```
 
-The `check` field in each issue **must** reference the rule by ID (`rule N`, `R<n>`, `P<n>`) from HOUSE_STYLE.md. This makes the porter's revision target unambiguous and gives the orchestrator a way to detect missing checks (an issue that doesn't cite a rule ID is an artifact of imprecise reviewing — flag it as a self-improvement entry).
+The `check` field in each issue **must** reference the rule by ID (`P<n>.<m>`, `R<n>`, or `P<n>` for a principle-level violation) from HOUSE_STYLE.md. This makes the porter's revision target unambiguous and gives the orchestrator a way to detect missing checks (an issue that doesn't cite a rule ID is an artifact of imprecise reviewing — flag it as a self-improvement entry).
+
+The principle headline is the worst sub-rule status under that principle (`fail` > `warn` > `pass`; `N/A` is treated as `pass`). A principle reporting `pass` requires every sub-rule and rubric under it to be `pass` or `N/A`.
 
 The `coverage` block is your accountability proof. **`rules_checked` must equal `rules_total`** — if it doesn't, the orchestrator treats the report as incomplete and re-runs you. This is non-negotiable: every rule in HOUSE_STYLE.md must be visited every run, even when the answer is `N/A`.
 
