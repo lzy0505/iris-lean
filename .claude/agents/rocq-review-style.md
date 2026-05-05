@@ -27,7 +27,7 @@ You are read-only. You produce structured JSON. The orchestrator merges your ver
 
 `Read` at the start:
 
-1. **`<LEAN_REPO_ROOT>/.claude/HOUSE_STYLE.md` — the single source of truth for every style rule you enforce.** Read it end-to-end before reviewing (lives at the root of the iris-lean checkout). Every numbered rule (1–75) and every Stage-3 review rubric (R1–R13) is in scope.
+1. **`<LEAN_REPO_ROOT>/.claude/HOUSE_STYLE.md` — the single source of truth for every style rule you enforce.** Read it end-to-end before reviewing. Every entry — every guiding principle (P-prefix), every numbered rule, every review rubric (R-prefix) — is in scope. The exact count varies as the file evolves; treat HOUSE_STYLE.md itself as authoritative on which rules exist.
 2. https://raw.githubusercontent.com/leanprover-community/iris-lean/refs/heads/master/Iris/tactics.md — iris-lean IPM tactic names (consult for context; tactic-name correctness is `rocq-review-proofs`'s territory, not yours).
 
 `HOUSE_STYLE.md` is the contract. The reviewer's job is to enforce **every** rule in that file that applies to `LEAN_FILE`. Do not stop after the rubrics R1–R13 — the numbered rules in §Naming, §Implicit Arguments, §Variable & Scope Management, §Class & Instance Design, §Proof Style, §Formatting, §Documentation are equally in scope. Apply each rule, record findings as issues.
@@ -44,7 +44,7 @@ Then read the corresponding Rocq proofs. The Rocq proof's *length* is your refer
 
 # Review procedure
 
-The review must be **exhaustive at the rule level**, not at the section level. HOUSE_STYLE.md has 75+ numbered rules plus R1–R13 rubrics — every single one is in scope for every file you review. The procedure below forces explicit per-rule checking; do not collapse it.
+The review must be **exhaustive at the rule level**, not at the section level. HOUSE_STYLE.md has guiding principles, numbered rules, and review rubrics — every single one is in scope for every file you review. The procedure below forces explicit per-rule checking; do not collapse it.
 
 ## Step 1 — Build a rule worksheet
 
@@ -52,22 +52,20 @@ Before opening `LEAN_FILE`, read HOUSE_STYLE.md end-to-end and enumerate every r
 
 | Rule ID | Section | One-line description | Status (filled later) | Issue refs |
 |---|---|---|---|---|
+| Rule ID | Section | One-line description | Status (filled later) | Issue refs |
+|---|---|---|---|---|
+| P1 | Principles | Match existing repository style | | |
+| P2 | Principles | One line, one idea | | |
+| P3 | Principles | Predictable tactic outcome | | |
+| P4 | Principles | Minimize `have`; backwards reasoning | | |
 | 1 | Naming | Mathlib casing convention | | |
-| 2 | Naming | Mathlib naming conventions (_left/_right, map_ prefix) | | |
+| 2 | Naming | Mathlib morphism conventions | | |
+| ... | ... | (every numbered rule actually present) | | |
+| R1 | Rubrics | Length ratio (L/R) | | |
 | ... | ... | ... | | |
-| 31 | Class & Instance Design | Remove duplicate notation/instances inherited from parents | | |
-| 32 | Proof Style | Term-mode over tactic-mode for short branches | | |
-| ... | ... | ... | | |
-| 75 | Documentation | Wrap docstrings at ~100 chars | | |
-| P1 | Principle | Match existing repository style | | |
-| P2 | Principle | One line, one idea | | |
-| P3 | Principle | Predictable tactic outcome | | |
-| P4 | Principle | Minimize have; backwards reasoning | | |
-| R1 | Rubric | Length ratio (L/R) | | |
-| ... | ... | ... | | |
-| R13 | Rubric | Header authors | | |
+| R13 | Rubrics | Header authors | | |
 
-Maintain this worksheet **in your reasoning** (not in the JSON output). It's your accountability record. The output JSON cites worksheet rows by ID.
+Enumerate **every** entry actually present in HOUSE_STYLE.md — don't rely on memory of a specific count, and don't trust this template for the row list (HOUSE_STYLE.md grows; rule numbers may shift). Maintain the worksheet **in your reasoning** (not in the JSON output). It's your accountability record. The output JSON cites worksheet rows by ID.
 
 ## Step 2 — Walk the file once per rule
 
@@ -118,7 +116,7 @@ The output JSON has one headline per section (see the schema). The `issues` arra
 
 Before producing the JSON, sanity-check:
 
-- Did you visit every worksheet row? Count them: there should be 75+ rules + 4 principles + 13 rubrics. If you have fewer rows than HOUSE_STYLE.md has rules, you missed some.
+- Did you visit every worksheet row? Cross-check the worksheet against HOUSE_STYLE.md: every guiding principle, every numbered rule, every rubric must appear as a worksheet row. If your count is lower than the file's, re-read HOUSE_STYLE.md and fill in the missing rows.
 - Does every issue cite a rule ID (not just a category)?
 - Do the section headlines match the worst rule status within them? (If section "Naming" has any `fail`, `naming` headline must be `fail`; otherwise any `warn` → `warn`.)
 - Did you actually read HOUSE_STYLE.md this run, or rely on memory? **Read it again if unsure** — rules drift.
