@@ -75,7 +75,7 @@ Do **not** suppress stderr. Use `2>&1`.
 
 The bar is **zero `axiom` declarations introduced by `LEAN_FILE`**, period. Not "no new ones beyond a baseline", not "only harmless ones" — none.
 
-Two checks:
+Three checks:
 
 **2a. No `axiom` keyword in the file.**
 ```
@@ -83,8 +83,22 @@ grep -nE '^\s*(public\s+)?axiom\s' "$LEAN_FILE"
 ```
 Any hit is a hard fail.
 
-**2b. No `sorryAx` in any ported decl's axiom set.**
-For each ported decl, run `mcp__lean-lsp__lean_verify <fully-qualified-Lean-name>` (which invokes `#print axioms`). Any occurrence of `sorryAx` is a hard fail. Foundation axioms transitively imported from elsewhere (`Classical.choice`, `Quot.sound`, `propext`) are fine — they're not introduced by this file.
+**2b. Bulk axiom-set audit via `check_axioms_inline.sh`.**
+The lean4-skills plugin ships a script that appends `#print axioms` to every top-level decl in a file, runs Lean, and reports each decl's axiom set with the standard mathlib axioms (`propext`, `Quot.sound`, `Classical.choice`) filtered out:
+
+```
+bash "$LEAN4_SCRIPTS/check_axioms_inline.sh" "$LEAN_FILE"
+```
+
+Read the output. Any decl reporting:
+- `sorryAx` — hard fail (the proof has a `sorry` somewhere in its dependency tree).
+- A custom axiom declared in `LEAN_FILE` itself — hard fail (rule 2a covers this, but 2b confirms).
+- A custom axiom from another iris-lean file — `warn`, with a link to the upstream axiom; the pipeline doesn't fix upstream, but the user should know.
+
+Foundation axioms (`propext`, `Quot.sound`, `Classical.choice`, plus iris-lean's intentional foundation axioms like `iProp_axioms`) are fine.
+
+**2c. Per-decl spot-check via `mcp__lean-lsp__lean_verify`.**
+For any decl flagged by 2b, double-check via `mcp__lean-lsp__lean_verify <fully-qualified-Lean-name>` (which invokes `#print axioms`). The MCP version is authoritative when the script's parser misses something (e.g. nested namespaces, indented decls).
 
 ## 3. `ignores`
 

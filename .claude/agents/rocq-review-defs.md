@@ -55,7 +55,22 @@ Each check produces `pass` / `fail` / `warn` and contributes zero or more entrie
 ## A. Alias correctness
 
 ### A1 — `alias_coverage`
-Parse `ROCQ_FILE` for top-level Rocq decls — `Definition`, `Lemma`, `Theorem`, `Corollary`, `Fact`, `Instance`, `Class`, `Record`, `Inductive`, `CoInductive`, `Fixpoint`, `CoFixpoint`. Skip `Notation`, `Hint`, `Arguments`, `Local …` declarations marked private, and items inside `Local Module` (those are not part of the public API). For each remaining Rocq decl, **classify** as one of three states:
+Enumerate the Rocq decls in `ROCQ_FILE` using the canonical `parse_rocq_file` from `scripts/check_porting.py` — *do not* re-implement parsing:
+
+```bash
+cd "$LEAN_REPO_ROOT"
+python3 -c '
+import sys; sys.path.insert(0, "scripts")
+from check_porting import parse_rocq_file
+text = open("'"$ROCQ_FILE"'").read()
+for name in parse_rocq_file(text):
+    print(name)
+'
+```
+
+This returns fully-qualified names with Module prefixes included and Section prefixes excluded — exactly the form `@[rocq_alias]` and `#rocq_ignore` use. The script handles `Notation`/`Hint`/`Arguments`/`Local Module` filtering correctly. If your enumeration disagrees with the script, the script wins (and surface the discrepancy as a `meta` issue per Self-improvement above).
+
+For each name in this list, **classify** as one of three states:
 
 - **Ported** — `LEAN_FILE` contains `@[rocq_alias <fully-qualified-name>]` whose argument *exactly equals* the Rocq decl's fully-qualified name (Module prefixes included, Section prefixes excluded — see RocqPorting.lean).
 - **Ignored** — `LEAN_FILE` contains `#rocq_ignore <fully-qualified-name> "..."`. Per the porting rules, this means the Rocq concept is **not needed** in iris-lean, not that it's deferred.

@@ -239,7 +239,22 @@ Authors: <AUTHOR_PLACEHOLDER>
 
 1. **Fetch the three canonical references** (`tactics.md`, mathlib naming, mathlib style) via `WebFetch`. Cache them mentally for the run.
 2. **Read** `Iris/Iris/Std/RocqPorting.lean` to recall the exact `@[rocq_alias]` / `#rocq_ignore` syntax.
-3. **Read** the Rocq source `ROCQ_FILE` end-to-end. Make a list (in your reasoning) of every top-level decl: `Definition`/`Lemma`/`Theorem`/`Corollary`/`Fact`/`Instance`/`Class`/`Record`/`Inductive`/`CoInductive`/`Fixpoint`/`CoFixpoint`/`Notation`/`Hint Resolve`/`Module`/`Section`. Classify each as one of:
+3. **Read** the Rocq source `ROCQ_FILE` end-to-end. Then **enumerate every top-level decl using `scripts/check_porting.py`'s `parse_rocq_file`** rather than parsing the file by hand:
+
+   ```bash
+   cd "$LEAN_REPO_ROOT"
+   python3 -c '
+   import sys; sys.path.insert(0, "scripts")
+   from check_porting import parse_rocq_file
+   text = open("'"$ROCQ_FILE"'").read()
+   for name in parse_rocq_file(text):
+       print(name)
+   '
+   ```
+
+   This returns the canonical list of fully-qualified Rocq decl names (Module prefixes included, Section prefixes excluded — exactly the form `@[rocq_alias]` and `#rocq_ignore` expect). Use this list as the authoritative coverage check; don't roll your own regex. If a decl in the file isn't in this list, it's a Notation/Hint/Arguments/etc. that doesn't need an alias — skip it.
+
+   Classify each name in the list as one of:
    - **PORT** — port now (write the def/theorem with alias).
    - **IGNORE** — not needed in iris-lean (write `#rocq_ignore` with reason). See the Ignores section for what qualifies.
    - **MISSING** — depends on something not yet ported. Leave unmarked. The tracking system reports it as `missing`. *Do not* write `#rocq_ignore` for these.
