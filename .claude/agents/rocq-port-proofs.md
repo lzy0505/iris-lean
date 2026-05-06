@@ -104,18 +104,23 @@ For each theorem at `sorry`:
 6. **Check** with `mcp__lean-lsp__lean_diagnostic_messages "$LEAN_FILE"` that you didn't break anything else.
 7. After every few proofs, run `cd "$LEAN_REPO_ROOT/Iris" && lake build` to catch issues that the LSP missed (mostly cross-file problems).
 
-## Search tools (Lean-side)
+## Lookup policy — every Lean lookup goes through the MCP tools
 
-1. **`mcp__lean-lsp__lean_loogle`** — type-pattern search. Covers iris-lean + Mathlib + Batteries in one query, unrate-limited. **Default tool for "what existing lemma matches this shape?"**
+**Every** lookup of an existing Lean definition or lemma — whether in iris-lean, in Mathlib, or in Batteries — goes through one of two MCP tools:
 
-2. **`mcp__lean-lsp__lean_local_search`** — every Lean-side lookup. Decl by name, callers, "does `foo_lemma` exist?", file containing a definition, location of a notation. Index-aware and structured.
+1. **`mcp__lean-lsp__lean_loogle`** — type-pattern search. Use when you know the lemma's shape (`?P → ?P`, `_ ⊢ _ -∗ _`, `Equivalence ?R`, etc.). Covers iris-lean + Mathlib + Batteries in one query, unrate-limited. Default tool for "what existing lemma matches this shape?"
 
-3. `mcp__lean-lsp__lean_hover_info` — inspect a signature.
-4. `mcp__lean-lsp__lean_completions` — IDE autocomplete on incomplete tactic blocks.
-5. `mcp__lean-lsp__lean_multi_attempt` — try several tactic candidates without persisting failed edits.
-6. `mcp__lean-lsp__lean_code_actions` — surfaces the LSP's quick-fix suggestions for a position.
+2. **`mcp__lean-lsp__lean_local_search`** — name/keyword lookup. Use when you know the (partial) name of a decl, want callers, or want to confirm "does `foo_lemma` exist?" Returns ranked structured results.
 
-**`Grep`, `Glob`, `find`, and `fd` are forbidden for finding Lean definitions or lemmas.** Anti-pattern: `find / -path "*lean*/lean/Init/Data/List*" -name "*.lean"` to locate a List lemma. Use `mcp__lean-lsp__lean_loogle` for type patterns and `mcp__lean-lsp__lean_local_search` for names.
+The two axes (type pattern vs name) cover every existing-decl question regardless of which library the answer lives in.
+
+Supporting MCP tools:
+- `mcp__lean-lsp__lean_hover_info` — inspect a candidate's signature.
+- `mcp__lean-lsp__lean_completions` — IDE autocomplete on incomplete tactic blocks.
+- `mcp__lean-lsp__lean_multi_attempt` — try several tactic candidates without persisting failed edits.
+- `mcp__lean-lsp__lean_code_actions` — LSP quick-fix suggestions for a position.
+
+**`Grep`, `Glob`, `find`, and `fd` are forbidden for finding Lean definitions or lemmas.** Anti-pattern: `find / -path "*lean*/lean/Init/Data/List*" -name "*.lean"` to locate a List lemma. Use `lean_loogle` (type pattern) or `lean_local_search` (name) regardless of library.
 
 These tools remain fine for everything else: Rocq `.v` sources, config files, scripts, logs, textual scans within a known file, directory listings, etc. The forbidden case is specifically *discovering Lean decls by filesystem walk*.
 

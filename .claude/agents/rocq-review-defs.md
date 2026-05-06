@@ -36,6 +36,16 @@ The orchestrator spawns **two independent runs of you** at this stage — same i
 2. **Read 2–3 neighbour `.lean` files** in the same target folder. You need them to judge naming hygiene (camelCase vs snake_case in this folder), namespace conventions, ignore-reason phrasing.
 3. **Read the corresponding Rocq files** for those neighbours, so you can see what was ported, what was ignored, and how. This calibrates your judgment for the file under review.
 
+# Lookup policy — every Lean lookup goes through the MCP tools
+
+Whenever a check needs to verify the existence or signature of an existing Lean decl — in iris-lean, Mathlib, or Batteries — use the MCP tools, not filesystem walking:
+
+- **`mcp__lean-lsp__lean_loogle`** for type-pattern lookups. One unrate-limited query covers iris-lean + Mathlib + Batteries.
+- **`mcp__lean-lsp__lean_local_search`** for name/keyword lookups. Same coverage; ranked structured results.
+- `mcp__lean-lsp__lean_hover_info` for inspecting a candidate's full signature.
+
+`Grep`/`Glob`/`find`/`fd` for *discovering Lean decls* is forbidden — it sidesteps the index and misses transitive imports. They remain available for non-Lean files (Rocq `.v`, configs, scripts, logs) and for textual scans of a known file (e.g. counting `@[rocq_alias]` occurrences in `LEAN_FILE`).
+
 # Checks
 
 Each check produces `pass` / `fail` / `warn` and contributes zero or more entries to the `issues` list. **The Stage-2 gate is strict: the orchestrator only proceeds if both reviewer runs return `approve` with empty `issues` arrays.** That means `warn`-level findings still send the file back to Stage 1 — record them honestly. The `pass`/`fail`/`warn` distinction is for the porter's prioritization (which to fix first), not for whether the gate is met.

@@ -58,17 +58,22 @@ Before writing a single line of the new file, read the local conventions:
 
 # Discovery tools
 
-The search tools for **Lean-side** lookups (existing lemmas, names, types) follow this hierarchy:
+## Lookup policy — every Lean lookup goes through the MCP tools
 
-1. **`mcp__lean-lsp__lean_loogle`** — type-pattern search. Covers iris-lean + Mathlib + Batteries in one query, unrate-limited. **Use this for any type-pattern search.** Patterns are standard Loogle syntax — `?P → ?P`, `_ ⊢ _ -∗ _`, `Equivalence ?R`, etc.
+**Every** lookup of an existing Lean definition or lemma — whether in iris-lean, in Mathlib, or in Batteries — goes through one of two MCP tools:
 
-2. **`mcp__lean-lsp__lean_local_search`** — every Lean-side lookup. Decl by name, declaration of a typeclass, file containing a definition, location of a notation, callers of a function — all of it. The MCP version is index-aware and returns ranked structured results.
+1. **`mcp__lean-lsp__lean_loogle`** — type-pattern search. Use this when you know roughly what shape the lemma has (`?P → ?P`, `_ ⊢ _ -∗ _`, `Equivalence ?R`, etc.). The MCP-backed Loogle index covers iris-lean + Mathlib + Batteries in one query and is unrate-limited.
 
-3. `mcp__lean-lsp__lean_hover_info` — inspect a signature.
-4. `mcp__lean-lsp__lean_file_outline` — skim a neighbour file efficiently.
-5. `mcp__lean-lsp__lean_completions` — IDE-style autocomplete on incomplete code.
+2. **`mcp__lean-lsp__lean_local_search`** — name/keyword lookup. Use this when you know the (partial) name of a decl, want to see callers, or want to confirm a decl exists. Returns ranked structured results from the same index.
 
-**`Grep`, `Glob`, `find`, and `fd` are forbidden for finding Lean definitions or lemmas.** Reflexively running `find / -path "*lean*/lean/Init/Data/List*" -name "*.lean"` to locate a List lemma — or `grep -rn "theorem foo_bar" Iris/Iris/` to discover whether a decl exists — defeats the point of having an LSP. Always use `mcp__lean-lsp__lean_loogle` (type pattern) or `mcp__lean-lsp__lean_local_search` (name/keyword) for those queries.
+These two are not interchangeable — Loogle is the type-pattern axis, `lean_local_search` is the name axis — but together they cover every "is there an existing decl I should use?" question regardless of whether the answer lives in iris-lean, Mathlib, or Batteries.
+
+Supporting MCP tools (after a candidate is found):
+- `mcp__lean-lsp__lean_hover_info` — inspect a candidate's signature.
+- `mcp__lean-lsp__lean_file_outline` — skim a neighbour file efficiently.
+- `mcp__lean-lsp__lean_completions` — IDE-style autocomplete on incomplete code.
+
+**`Grep`, `Glob`, `find`, and `fd` are forbidden for finding Lean definitions or lemmas.** Reflexively running `find / -path "*lean*/lean/Init/Data/List*" -name "*.lean"` to locate a List lemma — or `grep -rn "theorem foo_bar" Iris/Iris/` to discover whether a decl exists — defeats the point of having an LSP. Use Loogle or `lean_local_search` for these queries, regardless of which library the decl might live in.
 
 `Grep`, `Glob`, `find`, and `fd` remain available for everything else: scanning Rocq `.v` sources, scanning configs / scripts / logs, listing directories, textual scans within a known file (e.g. counting `#rocq_ignore` lines in `LEAN_FILE`), checking for stray whitespace, etc. The forbidden case is specifically *discovering Lean decls by filesystem walk* when the LSP index is the right tool.
 

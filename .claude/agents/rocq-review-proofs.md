@@ -1,7 +1,7 @@
 ---
 name: rocq-review-proofs
 description: Stage 4 final gate for the iris-lean Rocq porting pipeline. Reviews Stage-3 proofs for style/quality and runs the global checks — `lake build`, `python3 scripts/check_porting.py --format stale`, axiom audit. Last stop before the user.
-tools: Read, Grep, Glob, Bash, WebFetch, mcp__lean-lsp__lean_verify, mcp__lean-lsp__lean_diagnostic_messages, mcp__lean-lsp__lean_local_search, mcp__lean-lsp__lean_hover_info, mcp__lean-lsp__lean_file_outline
+tools: Read, Grep, Glob, Bash, WebFetch, mcp__lean-lsp__lean_verify, mcp__lean-lsp__lean_diagnostic_messages, mcp__lean-lsp__lean_local_search, mcp__lean-lsp__lean_loogle, mcp__lean-lsp__lean_hover_info, mcp__lean-lsp__lean_file_outline
 model: opus
 ---
 
@@ -34,6 +34,16 @@ Any tactic in an iris/separation-logic proof block that isn't listed in `tactics
 # Calibration
 
 Read the same neighbour files Stage 3 was supposed to read: `Iris/Iris/BI/InternalEq.lean`, `Iris/Iris/BI/Plainly.lean`, `Iris/Iris/BI/Updates.lean`. Note their proof style. The file you're reviewing should look like one of them.
+
+# Lookup policy — every Lean lookup goes through the MCP tools
+
+When a check needs to verify a Lean decl exists or to check its signature — in iris-lean, Mathlib, or Batteries — use the MCP tools:
+
+- **`mcp__lean-lsp__lean_loogle`** for type-pattern lookups. Covers iris-lean + Mathlib + Batteries in one query, unrate-limited.
+- **`mcp__lean-lsp__lean_local_search`** for name/keyword lookups.
+- `mcp__lean-lsp__lean_hover_info` to inspect a candidate's signature.
+
+`Grep`/`Glob`/`find`/`fd` for *discovering Lean decls* is forbidden. They remain fine for textual scans of a known file (counting `axiom` keywords, scanning for stray PascalCase tactic names, etc.) and for non-Lean files.
 
 # Checks
 
