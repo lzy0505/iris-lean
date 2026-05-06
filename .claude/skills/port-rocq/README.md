@@ -83,7 +83,7 @@ The skill **does not** auto-commit, auto-push, or auto-merge. Inspect the diff, 
 |---|---|---|
 | Stage 1 returns `"build": "fail"` | Wrong import path, missing folder, or new BI notation that the porter mis-handled | Stops; surfaces the build error |
 | Stage 2 disagreement | One reviewer caught something subtle the other missed (e.g. Module prefix when nested) | Routes to Stage 1 with both perspectives in the feedback |
-| Stage 2 fails 3 rounds | The porter can't satisfy the reviewers — usually means a genuine semantic difference between Rocq and iris-lean | Escalates to user |
+| Stage 2 fails 5 rounds | The porter can't satisfy the reviewers — usually means a genuine semantic difference between Rocq and iris-lean | Escalates to user |
 | Stage 3 returns `"blocked"` | A specific proof can't be ported because the Rocq feature has no iris-lean analog | Escalates with the porter's notes — user decides between "redo with help" or "demote to `#rocq_ignore`" |
 | Stage 4 returns `"escalate"` | Build broke, or `sorryAx` showed up in a transitive dep, or check_porting.py revealed an upstream regression | Stops; user investigates |
 

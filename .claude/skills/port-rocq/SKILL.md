@@ -47,7 +47,7 @@ The path is relative to the iris-rocq root (`/Users/zongyuan/code/iris-rocq/`). 
                 │
                 ▼ orchestrator merges reports (union of issues)
                 │ STRICT: both `approve` AND both issues arrays empty → continue
-                ▼ ANY issue from EITHER reviewer → loop back to Stage 1 (cap 3 rounds)
+                ▼ ANY issue from EITHER reviewer → loop back to Stage 1 (cap 5 rounds)
        Stage 3: rocq-port-proofs
                 │
                 ▼ build must succeed; no sorry; no new axiom
@@ -175,7 +175,7 @@ Both reports come back. **Merge them**:
 
 Only when **both reviewers' verdicts are `approve` AND both reviewers' `issues` arrays are empty AND every merged headline is `pass`** does the orchestrator proceed to Stage 3.
 
-Cap at 3 revision rounds at this gate. After the third failure, escalate to the user with the merged report and the full revision history. The bar is intentionally high: definitions and lemma statements are the leverage point — a wrong statement at this stage cascades into wasted Stage-3 effort and a likely re-port. Better to spend the rounds here.
+Cap at 5 revision rounds at this gate. After the fifth failure, escalate to the user with the merged report and the full revision history. The bar is intentionally high: definitions and lemma statements are the leverage point — a wrong statement at this stage cascades into wasted Stage-3 effort and a likely re-port. Better to spend the rounds here.
 
 ### 5. Stage 3 — Spawn `rocq-port-proofs`
 
@@ -314,7 +314,7 @@ On a clean `approve`:
 | 0 | `LEAN_FILE` exists | Ask user whether to overwrite |
 | 0 | baseline `lake build` fails | Abort, tell user the tree is broken pre-port |
 | 1 | agent returns `"build": "fail"` after 1 attempt | Escalate to user with the error |
-| 2 | gate not met after 3 revision rounds (any issue from either reviewer, not just `fail`) | Escalate to user with the consolidated issue list |
+| 2 | gate not met after 5 revision rounds (any issue from either reviewer, not just `fail`) | Escalate to user with the consolidated issue list |
 | 3 | agent returns `"verdict": "blocked"` | Escalate to user with `blocked_proofs` |
 | 3.5 | `/lean4:golf` breaks the build (internal golf bug, not Stage 3's fault) | Abort pipeline with the golf log; user investigates |
 | 4 | either reviewer returns `"revise"` after 3 rounds | Escalate to user |
