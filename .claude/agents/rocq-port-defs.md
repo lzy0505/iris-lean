@@ -258,6 +258,14 @@ Authors: <AUTHOR_PLACEHOLDER>
    - **PORT** — port now (write the def/theorem with alias).
    - **IGNORE** — not needed in iris-lean (write `#rocq_ignore` with reason). See the Ignores section for what qualifies.
    - **MISSING** — depends on something not yet ported. Leave unmarked. The tracking system reports it as `missing`. *Do not* write `#rocq_ignore` for these.
+
+   **Before classifying anything as MISSING, search for the Lean-named equivalent.** Rocq and Lean often spell the same operation differently — `list_subequiv`, `option_bind_assoc`, `gmap_lookup_insert`, `Forall_app` may all already exist in `Init.Data.List`, `Std.Data.Option`, `Std.Data.HashMap`, Mathlib's `List.*` / `Option.*`, or Batteries — under names you wouldn't guess from the Rocq spelling. The dependency you think is "not yet ported" is often just an unfamiliar name. Do a 30-second sanity check per candidate-MISSING item:
+
+   - **`mcp__lean-lsp__lean_loogle`** with the type pattern of the dep (e.g. `?l₁ ++ ?l₂ = ?l ↔ ?_` for `list_app_eq`, `Forall ?P ?l → ?P ?x` for `Forall_inv`).
+   - **`mcp__lean-lsp__lean_local_search`** with a few likely Lean spellings (`List.append_eq`, `List.Forall.imp`, etc.).
+   - For algebraic-structure deps (CMRA, OFE, Discrete), neighbours in `Iris/Iris/Algebra/` likely already provide them under iris-lean names — check.
+
+   If a search turns up the equivalent, classify as **PORT** and use the Lean name in the body (with the Rocq name in `@[rocq_alias]`). Only items that survive this 30-second check go to MISSING. Cheap upfront — saves a Stage-2 round trip otherwise.
 4. **Read** 2–3 neighbour `.lean` files and their Rocq counterparts. Extract conventions.
 5. **Plan** the namespace/section structure for `LEAN_FILE`.
 6. **Write** `LEAN_FILE`:

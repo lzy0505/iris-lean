@@ -168,7 +168,23 @@ Both reports come back. **Merge them**:
 - For `issues`: take the **union**. If both reviewers flagged the same `decl + check`, deduplicate by keeping the more specific message.
 - **Surface disagreements**: if the two reviewers disagree on whether a particular check passes, include both verdicts in the consolidated feedback so the Stage-1 porter sees both perspectives. Add a synthetic issue: `{"decl": "<scope>", "check": "<check>", "msg": "DISAGREEMENT: reviewer A says <X>, reviewer B says <Y>. Treating as fail. Apply the stricter interpretation."}`.
 
-**Gate to Stage 3 — strict.** Proceed to Stage 3 **only if both reviewers returned `approve` AND the merged `issues` array is empty**. There is no "good enough" state at this gate:
+**`left_missing` spot-check.** Before deciding the gate, walk every entry in `STAGE1_REPORT.left_missing` and spot-check the rationale. The reviewers (focused on alias correctness and statement equivalence) often approve a `left_missing` entry by trusting the porter's "depends on `<X>` which isn't ported yet" reason at face value. But Rocq and Lean spell the same operations differently — `list_subequiv`, `option_bind_assoc`, `gmap_lookup_insert`, `Forall_app`, etc. — and a "missing" dep is often just an unfamiliar Lean name.
+
+For each `left_missing` entry, do a 30-second sanity pass:
+
+- `mcp__lean-lsp__lean_loogle` with a type pattern derived from the entry's `reason`. Example: reason "depends on `list_app_eq` not yet ported" → query `?l₁ ++ ?l₂ = ?l ↔ ?_`.
+- `mcp__lean-lsp__lean_local_search` with the most likely Lean spellings (`List.append_eq`, `List.append_eq_iff`, etc.).
+
+If either turns up an existing decl that matches the dep (in iris-lean, Mathlib, or Batteries), the `left_missing` rationale is wrong — the porter overlooked the Lean-named equivalent. Add a synthetic issue:
+
+```
+{"decl": "<rocq_name>", "check": "left_missing_oversight",
+ "msg": "Porter deferred this as `depends on <X>`, but Loogle/local_search found <Lean.Name> matching the dep. Try porting with the Lean name; the Rocq name goes in @[rocq_alias]."}
+```
+
+Treat this as a `revise`-level finding and loop back to Stage 1 with it. The cost is 30 seconds per entry (so ~5 minutes for a typical file's 10 deferrals); the saving is one full revision round and a re-port later when the dep "appears" downstream. Don't skip this even when the reviewers are both `approve` — they're not specifically auditing this axis.
+
+**Gate to Stage 3 — strict.** Proceed to Stage 3 **only if both reviewers returned `approve` AND the merged `issues` array is empty AND the `left_missing` spot-check produced no new issues**. There is no "good enough" state at this gate:
 
 - Either reviewer reports `revise` → loop back to Stage 1 with the merged issues as `REVISION_FEEDBACK`.
 - Either reviewer reports `approve` but with non-empty `issues` (i.e. `warn`-level findings) → loop back to Stage 1 with those issues as `REVISION_FEEDBACK`. A `warn` is still a suggestion the porter must address.
