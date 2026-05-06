@@ -160,7 +160,7 @@ Follow your full instructions. Return the structured JSON report.
 
 Both reports come back. **Merge them**:
 
-- For each headline field (`alias_coverage`, `alias_qualified`, `alias_dupes`, `stale`, `ignore_justified`, `instance_kind`, `stmt_equivalence`, `binder_shape`, `instance_args`, `notation`, `def_extensional`, `naming`, `tactic_names`):
+- For each headline field (`alias_coverage`, `alias_qualified`, `alias_dupes`, `stale`, `ignore_justified`, `instance_kind`, `stmt_equivalence`, `binder_shape`, `instance_args`, `notation`, `def_extensional`, `naming`, `tactic_names`, `rocq_mirroring_prose`):
   - If both report `pass` → merged is `pass`.
   - If either reports `fail` → merged is `fail`.
   - If one reports `pass` and the other `warn` → merged is `warn`.

@@ -122,7 +122,7 @@ P1.46. **`:=` at the end of the signature line.** Proof body indented below.
 
 ### Documentation
 
-P1.47. **No "Corresponds to Rocq's ..." in docstrings.** Describe behavior in Lean terms; the `@[rocq_alias]` attribute records the Rocq mapping.
+P1.47. **No Rocq-mirroring prose in docstrings or comments.** Don't write "Corresponds to Rocq's `bi.foo_lemma`", "This is the Lean port of `Definition foo` from `frac.v`", or any inline `--` comment that paraphrases what the Rocq source said about a decl. The Rocq↔Lean mapping is recorded by `@[rocq_alias <rocq.name>]` on the decl itself — that *is* the documentation of correspondence. Docstrings and comments describe what the Lean code does, in Lean terms, for a Lean reader who has never seen the Rocq source.
 
 P1.48. **No `abbrev` aliases for Rocq names.** Use `@[rocq_alias]`.
 
@@ -277,6 +277,8 @@ Each unjustified `show` is a `warn`; ≥ 2 in one proof escalate to `fail`.
 ### R9. Inline comments in proofs
 
 iris-lean proof bodies are nearly comment-free. Inline comments inside a `:= by` block are a code smell — they suggest the proof is opaque enough to need explanation, which is itself the problem. Threshold: zero inline proof comments in a typical algebra/BI port. Acceptable: `--` directly above a `theorem`/`def` declaration as a docstring-like blurb. Anything inside a `by` block or between `:=` and the term body is a `warn`.
+
+**Rocq-mirroring comments are a hard `fail`** (per P1.47). An inline comment that paraphrases the Rocq source's prose — `-- in Rocq this is `bi.foo_lemma``, `-- this corresponds to the `apply` step in `Lemma frac_op``, `-- following the Rocq proof, we now case-split` — is forbidden regardless of where it appears. The `@[rocq_alias]` attribute is the place to record correspondence; the comment is redundant noise that ties the Lean reader to a Rocq source they may not have. Flag every such hit individually.
 
 ### R1. Length ratio
 

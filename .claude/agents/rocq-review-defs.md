@@ -165,6 +165,22 @@ Match the local file's capitalization convention. If neighbour files use camelCa
 ### D12 — `tactic_names`
 For every inline `by` block in `LEAN_FILE`, every iris/separation-logic tactic must use the iris-lean lowercase-leading spelling from tactics.md. Rocq-style `iIntros`/`iApply`/`iSplit`/`iModIntro`/`iDestruct`/etc. is a **hard fail**. Use `grep -nE 'iIntros|iApply|iSplit|iModIntro|iDestruct|iCases|iExists|iLeft|iRight|iFrame|iMod|iRevert|iAssert|iExact|iPure|iStartProof' "$LEAN_FILE"` to scan; any hit is a fail.
 
+## E. Documentation hygiene
+
+### E13 — `rocq_mirroring_prose`
+
+Per HOUSE_STYLE.md P1.47 and R9: the Rocq↔Lean mapping is recorded by `@[rocq_alias]`, *not* by prose. Any docstring or inline comment that paraphrases the Rocq source — phrases like "Corresponds to Rocq's `bi.foo_lemma`", "Lean port of `Definition foo` from `frac.v`", "in Rocq this is …", "this corresponds to the Rocq lemma …", "follows the Rocq proof of …" — is a **hard fail**, regardless of whether it's in a `/-- ... -/` docstring, a `/-! ... -/` module docstring, a `/- ... -/` block comment, or an inline `--` comment.
+
+To scan, look for any of these phrasings (textual match in `LEAN_FILE`):
+
+```
+grep -nE 'Corresponds to Rocq|Rocq port|port of \`?(Lemma|Definition|Theorem|Instance)|in Rocq|Rocq.*proof|following Rocq|(Lean|Rocq) version of|corresponds to the .* from `?[a-z_]+\.v`|(\.v)\b' "$LEAN_FILE"
+```
+
+Each hit is a `fail` with `"check": "E13"` citing the line and the offending phrase. The fix is always the same: **delete the comment, leave the `@[rocq_alias]`** — the alias is the documentation of correspondence.
+
+This check fires at Stage 2 (cheap) so the porter doesn't carry the violation through Stage 3 only to see it flagged at Stage 4b. Because the rule is structural (the entire phrasing is forbidden, not just borderline cases), it's worth catching here.
+
 # Output
 
 Produce a single JSON object as your final message. The orchestrator parses it.
@@ -187,6 +203,7 @@ Produce a single JSON object as your final message. The orchestrator parses it.
   "def_extensional":  "pass|fail|warn",
   "naming":           "pass|fail|warn",
   "tactic_names":     "pass|fail",
+  "rocq_mirroring_prose": "pass|fail",
   "issues": [
     {"decl": "Iris.BI.foo", "check": "stmt_equivalence",
      "msg": "Rocq's `bi.foo` quantifies over `n : nat` outside the entailment, the Lean version puts it inside iprop(...) — bind site differs"},

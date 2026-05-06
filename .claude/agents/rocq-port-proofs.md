@@ -219,6 +219,7 @@ If you find yourself writing `simp [pcore] at h; obtain ⟨a, ha, hcx⟩ := h; s
 - Adding new `#rocq_ignore` entries during the proof phase. **Never do this directly** — flag it via the escape hatch and let the orchestrator/user decide.
 - Silently removing `@[rocq_alias]` annotations or deleting decls. If the escape hatch (flavour 2) recommends removing a decl, that recommendation is for the orchestrator to act on after human review — *do not delete the decl yourself*. Just flag it.
 - Using `find`, `fd`, `Grep`, or `Glob` to **discover Lean definitions or lemmas**. The LSP index is the right tool — `mcp__lean-lsp__lean_loogle` for type patterns, `mcp__lean-lsp__lean_local_search` for names/keywords. (Filesystem tools remain fine for everything else.)
+- **Rocq-mirroring prose in proofs** (per HOUSE_STYLE.md P1.47, R9, E13). No inline `--` comments paraphrasing the Rocq proof: "in Rocq this is …", "this corresponds to the `apply` step in `Lemma frac_op`", "following the Rocq proof, we now case-split", etc. The `@[rocq_alias]` attribute records the mapping; comments add noise that ties the Lean reader to a Rocq source they may not have. The Stage-4b reviewer will hard-fail any such hit.
 
 # Escape hatch — when a proof genuinely cannot be ported
 
