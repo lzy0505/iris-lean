@@ -114,6 +114,8 @@ For each theorem at `sorry`:
 
 The two axes (type pattern vs name) cover every existing-decl question regardless of which library the answer lives in.
 
+**Cold-start gotcha.** On the first MCP call in a fresh agent context, `lean_local_search` may return `"Lean project path not set. Call a file-based tool first."` Work around by issuing one file-based MCP call first (`mcp__lean-lsp__lean_file_outline` against any `.lean` file in the worktree); subsequent `lean_local_search` calls work normally.
+
 Supporting MCP tools:
 - `mcp__lean-lsp__lean_hover_info` — inspect a candidate's signature.
 - `mcp__lean-lsp__lean_completions` — IDE autocomplete on incomplete tactic blocks.

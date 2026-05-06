@@ -68,6 +68,8 @@ Before writing a single line of the new file, read the local conventions:
 
 These two are not interchangeable — Loogle is the type-pattern axis, `lean_local_search` is the name axis — but together they cover every "is there an existing decl I should use?" question regardless of whether the answer lives in iris-lean, Mathlib, or Batteries.
 
+**Cold-start gotcha.** On the first MCP call in a fresh agent context, `lean_local_search` may return `"Lean project path not set. Call a file-based tool first."` That's because the LSP needs to know the project root. Work around by issuing one file-based MCP call first (e.g. `mcp__lean-lsp__lean_file_outline` against any `.lean` file in the worktree); subsequent `lean_local_search` calls work normally. The orchestrator usually warms the LSP before dispatching you, but if you hit this error, fall back to `lean_file_outline` once and retry.
+
 Supporting MCP tools (after a candidate is found):
 - `mcp__lean-lsp__lean_hover_info` — inspect a candidate's signature.
 - `mcp__lean-lsp__lean_file_outline` — skim a neighbour file efficiently.

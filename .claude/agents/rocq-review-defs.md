@@ -44,6 +44,8 @@ Whenever a check needs to verify the existence or signature of an existing Lean 
 - **`mcp__lean-lsp__lean_local_search`** for name/keyword lookups. Same coverage; ranked structured results.
 - `mcp__lean-lsp__lean_hover_info` for inspecting a candidate's full signature.
 
+**Cold-start gotcha.** On the first MCP call in a fresh agent context, `lean_local_search` may return `"Lean project path not set. Call a file-based tool first."` Work around by issuing one file-based MCP call first (`mcp__lean-lsp__lean_file_outline` against any `.lean` file in the worktree); subsequent `lean_local_search` calls work normally.
+
 `Grep`/`Glob`/`find`/`fd` for *discovering Lean decls* is forbidden — it sidesteps the index and misses transitive imports. They remain available for non-Lean files (Rocq `.v`, configs, scripts, logs) and for textual scans of a known file (e.g. counting `@[rocq_alias]` occurrences in `LEAN_FILE`).
 
 # Checks

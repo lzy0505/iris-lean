@@ -74,6 +74,8 @@ Both must `approve` for the pipeline to finish. Issues from either go into the m
 
 **Search tools.** Agents use `mcp__lean-lsp__lean_loogle` for type-pattern queries (covers iris-lean + Mathlib + Batteries, unrate-limited) and `mcp__lean-lsp__lean_local_search` in place of `Grep` for any Lean-side lookup. `Grep` is reserved for non-Lean files (Rocq `.v`, configs, scripts). If `mcp__lean-lsp__lean_loogle` returns an error indicating the underlying Loogle service is unreachable, surface that to the user — the orchestrator does not own that infrastructure.
 
+**MCP cold-start gotcha.** `mcp__lean-lsp__lean_local_search` requires the Lean LSP to know the project root. On a fresh session, calling it first returns `"Lean project path not set. Call a file-based tool first."` Work around by issuing one **file-based** MCP call before any `lean_local_search` — typically `mcp__lean-lsp__lean_file_outline` against any `.lean` file in the worktree, e.g. `lean_file_outline "$WORKTREE/Iris/Iris/Algebra.lean"`. After that, `lean_local_search` works for the rest of the session. Do this once, here, before dispatching any agent — the agents inherit the warmed-up LSP state.
+
 ```
 ROCQ_ROOT="/Users/zongyuan/code/iris-rocq"
 LEAN_REPO_ROOT="/Users/zongyuan/code/iris-lean"

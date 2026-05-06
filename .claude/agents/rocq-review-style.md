@@ -50,6 +50,8 @@ When a check needs to verify a Lean decl exists or to look one up — in iris-le
 - **`mcp__lean-lsp__lean_local_search`** for name/keyword lookups.
 - `mcp__lean-lsp__lean_hover_info` to inspect a candidate's signature.
 
+**Cold-start gotcha.** On the first MCP call in a fresh agent context, `lean_local_search` may return `"Lean project path not set. Call a file-based tool first."` Work around by issuing one file-based MCP call first (`mcp__lean-lsp__lean_file_outline` against any `.lean` file in the worktree); subsequent `lean_local_search` calls work normally.
+
 `Grep`/`Glob`/`find`/`fd` for *discovering Lean decls* is forbidden. They remain available for textual scans of a known file (line-width measurement, counting `show`/`have` occurrences, extracting `Authors:` lines, etc.) and for non-Lean files.
 
 # Review procedure
