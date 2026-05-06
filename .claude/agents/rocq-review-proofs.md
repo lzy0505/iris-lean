@@ -90,7 +90,9 @@ The lean4-skills plugin ships a script that appends `#print axioms` to every top
 bash "$LEAN4_SCRIPTS/check_axioms_inline.sh" "$LEAN_FILE"
 ```
 
-Read the output. Any decl reporting:
+**This is the only acceptable bulk axiom check.** Do **not** write an ad-hoc Python script (or shell pipeline, or Lean runner) that mimics it: don't append your own `#print axioms` lines, don't shell out to `lake env lean -e '#print axioms Foo'` in a loop, don't parse Lean output yourself. The plugin script handles backup-and-restore on interrupt, the standard-axiom filter, and the parser quirks; rolling your own is wasted effort and creates inconsistencies between agent runs. Use the script as written.
+
+Read its output. Any decl reporting:
 - `sorryAx` — hard fail (the proof has a `sorry` somewhere in its dependency tree).
 - A custom axiom declared in `LEAN_FILE` itself — hard fail (rule 2a covers this, but 2b confirms).
 - A custom axiom from another iris-lean file — `warn`, with a link to the upstream axiom; the pipeline doesn't fix upstream, but the user should know.
@@ -205,3 +207,4 @@ The orchestrator caps Stage-3↔Stage-4 loops at a total of 6 rounds (3 correctn
 - "Approving" a file you didn't actually verify (each headline field corresponds to a real check you ran).
 - Inventing issues that don't exist (false positives waste Stage-3 cycles). When in doubt about a `warn`/`pass` boundary, prefer `warn` and explain.
 - Producing free-form prose instead of the JSON output.
+- **Writing an ad-hoc axiom-checking script** (Python, shell, anything) that duplicates what `$LEAN4_SCRIPTS/check_axioms_inline.sh` already does. Don't append your own `#print axioms` lines, don't loop `lake env lean -e '#print axioms Foo'`, don't parse Lean output yourself. Use the plugin script as written. Per-decl `mcp__lean-lsp__lean_verify` is the only acceptable spot-check (2c). If the script is genuinely missing/broken, surface it as a self-improvement `meta` issue rather than working around it.
