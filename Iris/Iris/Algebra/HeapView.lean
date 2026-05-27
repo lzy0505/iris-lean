@@ -9,6 +9,7 @@ public import Iris.Algebra.Heap
 public import Iris.Algebra.View
 public import Iris.Algebra.DFrac
 public import Iris.Algebra.Frac
+public import Iris.Algebra.BigOp
 
 /-!
 # Heap Views
@@ -476,6 +477,180 @@ theorem update_frag_acquire [IsSplitFraction F] :
   exists q1
 
 end heapUpdates
+
+section heapUpdatesBig
+
+open scoped Iris.Std.PartialMap
+open Iris.Algebra Iris.Algebra.BigOpM Iris.Algebra.MonoidOps
+
+variable {F K V : Type _} {H : Type _ → Type _} [UFraction F] [LawfulFiniteMap H K] [CMRA V]
+variable [DecidableEq K]
+variable {m1 m0 : H V}
+
+/-- Batch deletion: an authoritative `m1` together with `[^op map]` of fragments for keys in `m0`
+updates to `m1 \ m0`, mirroring Rocq's `gmap_view_delete_big`. -/
+theorem update_delete_big (m0 : H V) :
+    (Auth (F := F) (.own one) m1 •
+        ([^ CMRA.op map] k ↦ v ∈ m0, Frag k (.own one) v) : HeapView F K V H) ~~>
+      Auth (.own one) (m1 \ m0) := by
+  induction m0 using LawfulFiniteMap.induction_on (M := H) generalizing m1 with
+  | hequiv ma mb hab ih =>
+    have hbig :
+        ([^ CMRA.op map] k ↦ v ∈ ma, Frag (H := H) k (.own (one : F)) v) ≡
+        ([^ CMRA.op map] k ↦ v ∈ mb, Frag k (.own (one : F)) v) :=
+      Iris.Algebra.BigOpM.bigOpM_equiv_of_perm _ hab
+    have hdiff : (m1 \ ma : H V) ≡ m1 \ mb :=
+      eqv_of_Equiv (Std.LawfulPartialMap.difference_equiv_of_perm (m := m1) hab)
+    refine Update.equiv_left ?_ (Update.equiv_right ?_ (ih (m1 := m1)))
+    · exact CMRA.op_right_eqv _ hbig
+    · exact OFE.NonExpansive.eqv (f := Auth (.own (one : F))) hdiff
+  | hemp =>
+    have hdiff_empty : (Auth (.own (one : F)) m1 : HeapView F K V H) ≡
+        Auth (.own one) (m1 \ (∅ : H V)) :=
+      OFE.NonExpansive.eqv (f := Auth (.own (one : F)))
+        (eqv_of_Equiv (Std.LawfulPartialMap.difference_empty (m := m1))).symm
+    have hlhs_empty :
+        (Auth (F := F) (.own one) m1 •
+            ([^ CMRA.op map] k ↦ v ∈ (∅ : H V),
+              Frag (H := H) k (.own (one : F)) v) : HeapView F K V H) ≡
+          Auth (.own one) m1 := by
+      rw [show ([^ CMRA.op map] k ↦ v ∈ (∅ : H V),
+              Frag (H := H) k (.own (one : F)) v) = (UCMRA.unit : HeapView F K V H) from
+            Iris.Algebra.BigOpM.bigOpM_empty _]
+      exact CMRA.unit_right_id
+    exact Update.equiv_left hlhs_empty.symm (Update.equiv_right hdiff_empty Update.id)
+  | hins i x m0' hfresh ih =>
+    have hbig :
+        ([^ CMRA.op map] k ↦ v ∈ Std.PartialMap.insert m0' i x,
+            Frag (H := H) k (.own (one : F)) v) ≡
+          Frag i (.own one) x • ([^ CMRA.op map] k ↦ v ∈ m0', Frag k (.own one) v) :=
+      Iris.Algebra.BigOpM.bigOpM_insert_equiv
+        (fun k v => Frag (H := H) k (.own (one : F)) v) _ hfresh
+    have hdiff : (m1 \ Std.PartialMap.insert m0' i x : H V) ≡ Std.PartialMap.delete m1 i \ m0' :=
+      eqv_of_Equiv (Std.LawfulPartialMap.difference_insert (M := H) hfresh)
+    -- Reassociate `Auth • (Frag i x • bigOpM m0' frag)` into `(Auth • Frag i x) • bigOpM m0' frag`,
+    -- apply `update_one_delete` to consume the first Frag, then use the IH on (delete m1 i).
+    refine Update.equiv_left ?_
+      <| Update.trans
+          (Update.op (xy₁ := update_one_delete (m1 := m1) (k := i) (v1 := x))
+            (xy₂ := Update.id (x := ([^ CMRA.op map] k ↦ v ∈ m0', Frag k (.own one) v))))
+          (Update.equiv_right ?_ (ih (m1 := Std.PartialMap.delete m1 i)))
+    · exact CMRA.assoc.symm.trans (CMRA.op_right_eqv _ hbig.symm)
+    · exact OFE.NonExpansive.eqv (f := Auth (.own (one : F))) hdiff.symm
+
+/-- Batch allocation: starting from an authoritative `m1` and a disjoint, valid `m0`, allocate all
+of `m0` into the heap and produce a bigOpM of fragments. Mirrors Rocq's `gmap_view_alloc_big`. -/
+theorem update_alloc_big (m0 : H V)
+    (Hdisj : m1 ##ₘ m0) (Hval : ∀ k v, Std.PartialMap.get? m0 k = some v → ✓ v) :
+    (Auth (F := F) (.own one) m1 : HeapView F K V H) ~~>
+      Auth (.own one) (m0 ∪ m1) •
+        ([^ CMRA.op map] k ↦ v ∈ m0, Frag k (.own one) v) := by
+  induction m0 using LawfulFiniteMap.induction_on (M := H) generalizing m1 with
+  | hequiv ma mb hab ih =>
+    have hbig :
+        ([^ CMRA.op map] k ↦ v ∈ ma, Frag (H := H) k (.own (one : F)) v) ≡
+        ([^ CMRA.op map] k ↦ v ∈ mb, Frag k (.own (one : F)) v) :=
+      Iris.Algebra.BigOpM.bigOpM_equiv_of_perm _ hab
+    have hunion : (ma ∪ m1 : H V) ≡ mb ∪ m1 :=
+      eqv_of_Equiv (Std.LawfulPartialMap.union_equiv_of_perm_left (m := m1) hab)
+    have Hdisj' : m1 ##ₘ ma := fun k ⟨h1, h2⟩ => Hdisj k ⟨h1, hab k ▸ h2⟩
+    have Hval' : ∀ k v, Std.PartialMap.get? ma k = some v → ✓ v :=
+      fun k v hk => Hval k v (hab k ▸ hk)
+    refine Update.equiv_right ?_ (ih (m1 := m1) Hdisj' Hval')
+    exact OFE.Equiv.op (OFE.NonExpansive.eqv (f := Auth (.own (one : F))) hunion) hbig
+  | hemp =>
+    have hunion_empty : (((∅ : H V) ∪ m1) : H V) ≡ m1 :=
+      eqv_of_Equiv (fun k => by
+        rw [show ((∅ : H V) ∪ m1) = PartialMap.union (∅ : H V) m1 from rfl,
+          PartialMap.union, get?_merge, show get? (∅ : H V) k = none from get?_empty _]
+        cases get? m1 k <;> rfl)
+    have hlhs :
+        (Auth (.own (one : F)) ((∅ : H V) ∪ m1) •
+            ([^ CMRA.op map] k ↦ v ∈ (∅ : H V),
+              Frag (H := H) k (.own (one : F)) v) : HeapView F K V H) ≡
+          Auth (.own one) m1 := by
+      rw [show ([^ CMRA.op map] k ↦ v ∈ (∅ : H V),
+              Frag (H := H) k (.own (one : F)) v) = (UCMRA.unit : HeapView F K V H) from
+            Iris.Algebra.BigOpM.bigOpM_empty _]
+      exact CMRA.unit_right_id.trans
+        (OFE.NonExpansive.eqv (f := Auth (.own (one : F))) hunion_empty)
+    exact Update.equiv_right hlhs.symm Update.id
+  | hins i x m0' hfresh ih =>
+    have hfresh_m1 : Std.PartialMap.get? m1 i = none := by
+      rcases hh : Std.PartialMap.get? m1 i with _ | v
+      · rfl
+      · exact absurd ⟨by rw [hh]; simp,
+          by rw [get?_insert_eq (rfl : i = i)]; simp⟩ (Hdisj i)
+    have Hdisj' : m1 ##ₘ m0' := fun k ⟨h1, h2⟩ => by
+      apply Hdisj k ⟨h1, ?_⟩
+      by_cases hik : i = k
+      · subst hik; rw [get?_insert_eq (rfl : i = i)]; simp
+      · rw [get?_insert_ne hik]; exact h2
+    have Hval' : ∀ k v, Std.PartialMap.get? m0' k = some v → ✓ v := fun k v hk =>
+      Hval k v <| by
+        have hik : i ≠ k := fun heq => by subst heq; rw [hk] at hfresh; cases hfresh
+        rw [get?_insert_ne hik]; exact hk
+    have Hvx : ✓ x := Hval i x (get?_insert_eq (rfl : i = i))
+    have hfresh_union : Std.PartialMap.get? (m0' ∪ m1) i = none := by
+      rw [show ((m0' ∪ m1) : H V) = PartialMap.union m0' m1 from rfl,
+        PartialMap.union, get?_merge, hfresh, hfresh_m1]
+      rfl
+    have hbig :
+        ([^ CMRA.op map] k ↦ v ∈ Std.PartialMap.insert m0' i x,
+            Frag (H := H) k (.own (one : F)) v) ≡
+          Frag i (.own one) x • ([^ CMRA.op map] k ↦ v ∈ m0', Frag k (.own one) v) :=
+      Iris.Algebra.BigOpM.bigOpM_insert_equiv
+        (fun k v => Frag (H := H) k (.own (one : F)) v) _ hfresh
+    have hunion : (Std.PartialMap.insert (m0' ∪ m1) i x : H V) ≡
+        Std.PartialMap.insert m0' i x ∪ m1 :=
+      eqv_of_Equiv (Std.LawfulPartialMap.union_insert_assoc (M := H))
+    refine Update.equiv_right ?_
+      <| Update.trans (ih (m1 := m1) Hdisj' Hval')
+        (Update.op (xy₁ := update_one_alloc hfresh_union DFrac.valid_own_one Hvx)
+          (xy₂ := Update.id (x := ([^ CMRA.op map] k ↦ v ∈ m0', Frag k (.own one) v))))
+    -- Goal: (Auth (insert (m0' ∪ m1) i x) • Frag i x) • bigOpM m0' frag ≡
+    --       Auth (insert m0' i x ∪ m1) • bigOpM (insert m0' i x) frag
+    refine .trans CMRA.assoc.symm ?_
+    refine .trans (OFE.Equiv.op
+      (OFE.NonExpansive.eqv (f := Auth (.own (one : F))) hunion)
+      hbig.symm) ?_
+    rfl
+
+/-- Batch replacement: the fragments of `m0` are simultaneously replaced by those of `m1`, given
+`dom m0 = dom m1` and validity of every value in `m1`. Mirrors Rocq's `gmap_view_replace_big`. -/
+theorem update_replace_big {m : H V} (m1 : H V) (m0 : H V)
+    (Hdom : Std.PartialMap.dom m0 = Std.PartialMap.dom m1)
+    (Hval : ∀ k v, Std.PartialMap.get? m1 k = some v → ✓ v) :
+    (Auth (F := F) (.own one) m •
+        ([^ CMRA.op map] k ↦ v ∈ m0, Frag k (.own one) v) : HeapView F K V H) ~~>
+      Auth (.own one) (m1 ∪ m) •
+        ([^ CMRA.op map] k ↦ v ∈ m1, Frag k (.own one) v) := by
+  have hdomIff : ∀ k, (Std.PartialMap.get? m0 k).isSome ↔ (Std.PartialMap.get? m1 k).isSome :=
+    fun k => Iff.of_eq (congrFun Hdom k)
+  have hdisj : m1 ##ₘ (m \ m0) := by
+    intro k ⟨h1, h2⟩
+    rw [Std.LawfulPartialMap.get?_difference] at h2
+    simp [(hdomIff k).mpr h1] at h2
+  have hunion_eq : (m1 ∪ (m \ m0) : H V) ≡ m1 ∪ m := by
+    refine eqv_of_Equiv (fun k => ?_)
+    show Std.PartialMap.get? (PartialMap.union m1 (m \ m0)) k =
+      Std.PartialMap.get? (PartialMap.union m1 m) k
+    rw [Std.LawfulPartialMap.get?_union, Std.LawfulPartialMap.get?_union,
+      Std.LawfulPartialMap.get?_difference]
+    rcases hm1k : Std.PartialMap.get? m1 k with _ | _
+    · have hm0k : (Std.PartialMap.get? m0 k).isSome = false := by
+        rcases hh : Std.PartialMap.get? m0 k with _ | _
+        · rfl
+        · have : (Std.PartialMap.get? m1 k).isSome := (hdomIff k).mp (by rw [hh]; simp)
+          rw [hm1k] at this; cases this
+      simp [Option.orElse, hm0k]
+    · simp [Option.orElse]
+  refine Update.equiv_right
+    (OFE.Equiv.op_l (OFE.NonExpansive.eqv (f := Auth (.own (one : F))) hunion_eq))
+    (Update.trans (update_delete_big m0)
+      (update_alloc_big m1 (Std.PartialMap.disjoint_comm hdisj) Hval))
+
+end heapUpdatesBig
 
 section heapViewFunctor
 

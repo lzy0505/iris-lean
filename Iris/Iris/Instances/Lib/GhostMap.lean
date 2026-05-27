@@ -5,10 +5,17 @@ public import Iris.Std.HeapInstances
 public import Iris.BI.Lib.Fractional
 public import Iris.Algebra.BigOp
 public import Iris.BI.BigOp.BigOp
+public import Iris.BI.BigOp.BigSepMUpdates
 
 namespace Iris
 
 open Iris Std HeapView PartialMap LawfulPartialMap Iris.Algebra BI ProofMode
+
+-- Local @[grind] annotations on PartialMap lemmas so `grind` can discharge the pure
+-- map-pointwise equalities that arise after the `OFE.Equiv.of_eq` bridge.
+attribute [local grind =] get?_empty get?_insert_eq get?_insert_ne
+  get?_delete_eq get?_delete_ne Std.LawfulPartialMap.get?_map
+  Std.LawfulPartialMap.get?_union Std.LawfulPartialMap.get?_difference
 
 class GhostMapG (GF : BundledGFunctors) (F: outParam (Type _))
     (K V: Type _)(H : outParam <| Type _ → Type _)
@@ -62,7 +69,7 @@ instance (γ : GName)(k: K)(v: V)
     have := frag_add_op_equiv.symm.trans this
     have := (@iOwn_ne GF _ _ GhostMapG.elem γ).eqv this
     have := (BI.equiv_iff (PROP := IProp GF)).mp this
-    exact this.symm.trans <| iOwn_op (E := hgm.elem)
+    exact this.symm.trans <| iOwn_op (E := GhostMapG.elem)
 
 @[rocq_alias ghost_map_elem_as_fractional]
 instance (γ : GName) (k : K) (v : V) (q : F) :
@@ -79,9 +86,8 @@ theorem ghost_map_elem_valid (γ : GName) (k : K) (dq: DFrac F) (v: V) :
   unfold ghost_map_elem
   iintro H
   ihave H := iOwn_cmraValid $$ H
-  icases internalCmraValid_discrete (A := HeapView _ _ _ _) $$ H with %H
-  ipure_intro
-  exact (HeapView.frag_valid_iff.mp H).1
+  icases internalCmraValid_discrete $$ H with %H
+  ipure_intro; exact (HeapView.frag_valid_iff.mp H).1
 
 @[rocq_alias ghost_map_elem_valid_2]
 theorem ghost_map_elem_valid_2 (γ : GName) (k : K) (dq1: DFrac F) (dq2: DFrac F) (v1: V) (v2: V) :
@@ -182,16 +188,12 @@ theorem ghost_map_elem_unpersist [IsSplitFraction F] (γ : GName) (k : K) (v : V
   iexists q
   iexact Hel
 
--- * lemmas about [ghost_map_auth]
-
 @[rocq_alias ghost_map_auth_timeless]
-instance (γ : GName) (dq : DFrac F) (m : H V) :
-    BI.Timeless (PROP := IProp GF) (γ ↪●MAP{dq} m) :=
+instance (γ : GName) (dq : DFrac F) (m : H V) : Timeless (PROP := IProp GF) (γ ↪●MAP{dq} m) :=
   iOwn_timeless
 
 @[rocq_alias ghost_map_persistent]
-instance (γ : GName) (m : H V) :
-    BI.Timeless (PROP := IProp GF) (γ ↪●MAP{.discard} m) :=
+instance (γ : GName) (m : H V) : Timeless (PROP := IProp GF) (γ ↪●MAP{.discard} m) :=
   iOwn_timeless
 
 @[rocq_alias ghost_map_auth_fractional]
@@ -242,32 +244,28 @@ theorem ghost_map_auth_unpersist [IsSplitFraction F] γ (m : H V) :
     ⊢@{IProp GF} (γ ↪●MAP{.discard} m) ==∗ ∃ q, γ ↪●MAP{.own q} m := by
   unfold ghost_map_auth
   iintro Hauth
-  imod iOwn_updateP HeapView.auth_dfrac_acquire $$ Hauth with ⟨%a, %Ha, Hauth⟩
+  imod iOwn_updateP HeapView.auth_dfrac_acquire $$ Hauth with ⟨%_, %Ha, Hauth⟩
   obtain ⟨q, rfl⟩ := Ha
   imodintro
-  iexists q
+  iexists _
   iexact Hauth
 
--- * lemmas about the interaction of [ghost_map_auth] with the elements
-
-/-- Bridge two `ghost_map_auth γ dq ·` propositions when the underlying maps agree pointwise. -/
-private theorem ghost_map_auth_equiv_of_pointwise
-    {γ : GName} {dq : DFrac F} {m₁ m₂ : H V} (h : ∀ j, get? m₁ j = get? m₂ j) :
-    (γ ↪●MAP{dq} m₁ : IProp GF) ⊣⊢ (γ ↪●MAP{dq} m₂) := by
-  unfold ghost_map_auth
-  apply BI.equiv_iff.mp
-  refine OFE.NonExpansive.eqv (f := iOwn (E := hgm.elem) γ) ?_
-  refine OFE.NonExpansive.eqv (f := HeapView.Auth dq) (fun j => ?_)
-  simp [get?_map, h j]
-
 /-- Primitive bridge at the `iOwn (HeapView.Auth dq ·)` level when the underlying carrier
-agrees pointwise. -/
+agrees pointwise. Two `NonExpansive.eqv` applications (for `HeapView.Auth dq` and `iOwn γ`)
+plus `BI.equiv_iff.mp` to get an `⊣⊢`. -/
 private theorem iOwn_heapView_auth_equiv_of_pointwise
     {γ : GName} {dq : DFrac F} {X Y : H (Agree (LeibnizO V))}
     (h : X ≡ Y) :
     (iOwn (E := hgm.elem) γ (HeapView.Auth dq X) : IProp GF) ⊣⊢
     iOwn (E := hgm.elem) γ (HeapView.Auth dq Y) :=
   BI.equiv_iff.mp (OFE.NonExpansive.eqv (OFE.NonExpansive.eqv h))
+
+/-- Bridge two `ghost_map_auth γ dq ·` propositions when the underlying maps agree pointwise. -/
+private theorem ghost_map_auth_equiv_of_pointwise
+    {γ : GName} {dq : DFrac F} {m₁ m₂ : H V} (h : ∀ j, get? m₁ j = get? m₂ j) :
+    (γ ↪●MAP{dq} m₁ : IProp GF) ⊣⊢ (γ ↪●MAP{dq} m₂) :=
+  iOwn_heapView_auth_equiv_of_pointwise (fun j => by
+    refine OFE.Equiv.of_eq ?_; grind)
 
 @[rocq_alias ghost_map_lookup]
 theorem ghost_map_lookup {γ} {dq : DFrac F} {m : H V} {k : K} {dq' : DFrac F} {v : V} :
@@ -277,7 +275,7 @@ theorem ghost_map_lookup {γ} {dq : DFrac F} {m : H V} {k : K} {dq' : DFrac F} {
   ihave Hop := iOwn_cmraValid_op $$ [$Hauth $Hel]
   icases internalCmraValid_discrete (A := HeapView _ _ _ _) $$ Hop with %Hop
   ipure_intro
-  obtain ⟨av', _, _, Hlookup, _, Hincl⟩ := HeapView.auth_op_frag_valid_total_discrete_iff Hop
+  obtain ⟨_, _, _, Hlookup, _, Hincl⟩ := HeapView.auth_op_frag_valid_total_discrete_iff Hop
   rw [get?_map] at Hlookup
   match h : get? m k, Hlookup with
   | some b, Hlookup =>
@@ -294,9 +292,7 @@ instance ghost_map_lookup_combine_sep_gives_1 {γ : GName} {dq : DFrac F} {m : H
   combine_sep_gives := by
     iintro ⟨Hauth, Hel⟩
     ihave %H := ghost_map_lookup $$ Hauth Hel
-    imodintro
-    ipure_intro
-    exact H
+    ipure_intro; exact H
 
 @[rocq_alias ghost_map_lookup_combine_gives_2]
 instance ghost_map_lookup_combine_sep_gives_2 {γ : GName} {dq : DFrac F} {m : H V}
@@ -306,7 +302,6 @@ instance ghost_map_lookup_combine_sep_gives_2 {γ : GName} {dq : DFrac F} {m : H
   combine_sep_gives :=
     sep_comm.mp.trans ghost_map_lookup_combine_sep_gives_1.combine_sep_gives
 
-/-- Validity of `toAgree`-encoded singletons. Derived by `idemp`-reflection. -/
 private theorem toAgree_LeibnizO_valid (v : V) : ✓ (toAgree (LeibnizO.mk v)) :=
   CMRA.valid_op_left
     (Iris.Agree.toAgree_op_valid_iff_equiv.mpr (OFE.Equiv.rfl : LeibnizO.mk v ≡ LeibnizO.mk v))
@@ -316,24 +311,20 @@ theorem ghost_map_insert {γ} {m : H V} (k : K) (v : V) (Hfresh : get? m k = non
     ⊢@{IProp GF} (γ ↪●MAP m) ==∗ (γ ↪●MAP insert m k v) ∗ γ ↪◯MAP[k] v := by
   unfold ghost_map_auth ghost_map_elem
   iintro Hauth
-  imod iOwn_update (HeapView.update_one_alloc (k := k) (dq := DFrac.own One.one)
-      (by rw [get?_map, Hfresh]; rfl)
+  imod iOwn_update (HeapView.update_one_alloc (by rw [get?_map, Hfresh]; rfl)
       DFrac.valid_own_one (toAgree_LeibnizO_valid v)) $$ Hauth with Hauth
   icases iOwn_op $$ Hauth with ⟨Hauth', Hfrag⟩
-  imodintro
   iframe
-  · iapply (iOwn_heapView_auth_equiv_of_pointwise (fun j => ?_)).mp $$ Hauth'
-    by_cases hjk : k = j
-    · simp [get?_insert_eq hjk, get?_map]
-    · simp [get?_insert_ne hjk, get?_map]
+  iapply (iOwn_heapView_auth_equiv_of_pointwise (fun j => ?_)).mp $$ Hauth'
+  refine OFE.Equiv.of_eq ?_
+  by_cases hjk : k = j <;> grind
 
 @[rocq_alias ghost_map_insert_persist]
 theorem ghost_map_insert_persist {γ} {m : H V} (k : K) (v : V) (Hfresh : get? m k = none) :
     ⊢@{IProp GF} (γ ↪●MAP m) ==∗ (γ ↪●MAP insert m k v) ∗ (γ ↪◯MAP[k]{.discard} v) := by
   iintro Hauth
   imod ghost_map_insert k v Hfresh $$ Hauth with ⟨Hauth, Helem⟩
-  imod ghost_map_elem_persist γ k (DFrac.own (One.one : F)) v $$ Helem with Helem
-  imodintro
+  imod ghost_map_elem_persist $$ Helem with Helem
   iframe
 
 @[rocq_alias ghost_map_delete]
@@ -345,9 +336,8 @@ theorem ghost_map_delete {γ} {m : H V} {k : K} {v : V} :
   imod iOwn_update HeapView.update_one_delete $$ Hop with Hauth
   imodintro
   iapply (iOwn_heapView_auth_equiv_of_pointwise (fun j => ?_)).mp $$ Hauth
-  by_cases hjk : k = j
-  · simp [get?_delete_eq hjk, get?_map]
-  · simp [get?_delete_ne hjk, get?_map]
+  refine OFE.Equiv.of_eq ?_
+  by_cases hjk : k = j <;> grind
 
 @[rocq_alias ghost_map_update]
 theorem ghost_map_update {γ} {m : H V} {k : K} {v : V} (w : V) :
@@ -360,9 +350,8 @@ theorem ghost_map_update {γ} {m : H V} {k : K} {v : V} (w : V) :
   imodintro
   iframe
   · iapply (iOwn_heapView_auth_equiv_of_pointwise (fun j => ?_)).mp $$ Hauth'
-    by_cases hjk : k = j
-    · simp [get?_insert_eq hjk, get?_map]
-    · simp [get?_insert_ne hjk, get?_map]
+    refine OFE.Equiv.of_eq ?_
+    by_cases hjk : k = j <;> grind
 
 end lemmas
 
@@ -371,18 +360,15 @@ section big_op_lemmas
 variable {F K V : Type _} {H : Type _ → Type _} [UFraction F] [LawfulFiniteMap H K]
 variable [hgm: GhostMapG GF F K V H]
 
---  Big-op versions of above lemmas
 @[rocq_alias ghost_map_lookup_big]
 theorem ghost_map_lookup_big {γ} {dq : DFrac F} {m : H V} {dq' : DFrac F}
     (m0 : H V) :
     ⊢@{IProp GF} (γ ↪●MAP{dq} m) -∗
       ([∗map] k ↦ v ∈ m0, γ ↪◯MAP[k]{dq'} v) -∗ ⌜m0 ⊆ m⌝ := by
   iintro Hauth Hfrag
-  iapply BI.pure_mono (φ1 := ∀ k v, get? m0 k = some v → get? m k = some v)
-    (φ2 := m0 ⊆ m) (fun h k v hk => h k v hk)
+  simp only [Subset, submap]
   iintro %k %v %Hm0
-  icases BigSepM.bigSepM_lookup (Φ := fun k v => iprop(γ ↪◯MAP[k]{dq'} v))
-    Hm0 $$ Hfrag with Helem
+  icases BigSepM.bigSepM_lookup Hm0 $$ Hfrag with Helem
   iapply ghost_map_lookup $$ Hauth Helem
 
 /-- Bridge between a raw `iOwn (HeapView.Auth ⋯ X)` and `ghost_map_auth γ q m` when their
@@ -395,172 +381,107 @@ private theorem iOwn_ghost_map_auth_equiv_of_pointwise
       γ ↪●MAP{.own q} m := by
   unfold ghost_map_auth
   refine iOwn_heapView_auth_equiv_of_pointwise
-    (Y := Iris.Std.PartialMap.map (fun x => toAgree ⟨x⟩) m) (fun j => ?_)
-  rw [get?_map]
-  exact h j
+    (Y := Iris.Std.PartialMap.map (fun x => toAgree ⟨x⟩) m) (fun j => by grind)
 
 variable [DecidableEq K]
 
 @[rocq_alias ghost_map_elems_unseal]
 theorem ghost_map_elems_unseal (γ : GName) (m : H V) (dq : DFrac F) :
     ⊢@{IProp GF} ([∗map] k ↦ v ∈ m, γ ↪◯MAP[k]{dq} v) ==∗
-      iOwn (E := hgm.elem) γ ([^ CMRA.op map] k ↦ v ∈ m,
-        Frag (V := Agree (LeibnizO V)) k dq (toAgree ⟨v⟩)) := by
+      iOwn (E := GhostMapG.elem) γ ([^ CMRA.op map] k ↦ v ∈ m, Frag k dq (toAgree ⟨v⟩)) := by
   induction m using LawfulFiniteMap.induction_on (M := H) with
   | hequiv m₁ m₂ heqv hP =>
-    have hlhs :
-        (([∗map] k ↦ v ∈ m₁, γ ↪◯MAP[k]{dq} v) : IProp GF) ⊣⊢
-        ([∗map] k ↦ v ∈ m₂, γ ↪◯MAP[k]{dq} v) :=
-      BI.equiv_iff.mp (Iris.Algebra.BigOpM.bigOpM_equiv_of_perm _ heqv)
-    have hrhs :
-        ([^ CMRA.op map] k ↦ v ∈ m₁, Frag (H := H) (V := Agree (LeibnizO V)) k dq (toAgree ⟨v⟩)) ≡
-        ([^ CMRA.op map] k ↦ v ∈ m₂, Frag (H := H) (V := Agree (LeibnizO V)) k dq (toAgree ⟨v⟩)) :=
-      Iris.Algebra.BigOpM.bigOpM_equiv_of_perm _ heqv
     iintro Hbig
-    icases hlhs.mpr $$ Hbig with Hbig
-    imod hP $$ Hbig with Hrest
+    imod hP $$ [Hbig] with Hrest
+    iapply (Iris.Algebra.BigOpM.bigOpM_equiv_of_perm _ heqv) $$ Hbig
     imodintro
-    iapply (BI.equiv_iff.mp (iOwn_ne.eqv hrhs)).mp $$ Hrest
+    iapply (equiv_iff.mp <| iOwn_ne.eqv <| Iris.Algebra.BigOpM.bigOpM_equiv_of_perm _ heqv).mp $$ Hrest
   | hemp =>
     rw [show ([^ CMRA.op map] k ↦ v ∈ (PartialMap.empty : H V),
             Frag (H := H) (V := Agree (LeibnizO V)) k dq (toAgree ⟨v⟩)) =
           (UCMRA.unit : HeapView F K (Agree (LeibnizO V)) H) from
         Iris.Algebra.BigOpM.bigOpM_empty (fun k v => Frag k dq (toAgree (⟨v⟩ : LeibnizO V)))]
     iintro _
-    iapply iOwn_unit (E := hgm.elem) (γ := γ) (ε := UCMRA.unit)
+    iapply iOwn_unit
   | hins i x m' hfresh ihP =>
     iintro Hbig
-    icases (BigSepM.bigSepM_insert (Φ := fun k v => iprop(γ ↪◯MAP[k]{dq} v)) hfresh).mp $$ Hbig
-      with ⟨Helem, Hrest⟩
+    icases (BigSepM.bigSepM_insert hfresh).mp $$ Hbig with ⟨Helem, Hrest⟩
     imod ihP $$ Hrest with Hrest
     imodintro
-    have hElem :
-        (γ ↪◯MAP[i]{dq} x : IProp GF) ⊣⊢
-        iOwn (E := hgm.elem) γ
-          (Frag (V := Agree (LeibnizO V)) (H := H) i dq (toAgree (⟨x⟩ : LeibnizO V))) :=
-      BIBase.BiEntails.rfl
-    icases hElem.mp $$ Helem with Helem
+    unfold ghost_map_elem
     ihave Hop := iOwn_op.mpr $$ [$Helem $Hrest]
     iapply (BI.equiv_iff.mp (iOwn_ne.eqv
       (Iris.Algebra.BigOpM.bigOpM_insert_equiv _ _ hfresh).symm)).mp $$ Hop
 
-/-- Insert-shaped induction skeleton shared by the various big-op insert lemmas. Given a
-per-element "allocate one fresh key as `Φ k v`" step, lift it to a whole disjoint sub-map. -/
-private theorem ghost_map_insert_big_induct (γ : GName) (Φ : K → V → IProp GF)
-    (h_step : ∀ {m_acc : H V} (i : K) (x : V), get? m_acc i = none →
-        ⊢@{IProp GF} (γ ↪●MAP m_acc) ==∗ (γ ↪●MAP (insert m_acc i x)) ∗ Φ i x)
-    (m m' : H V) (Hdisj : m' ##ₘ m) :
-    (γ ↪●MAP m : IProp GF) ⊢ |==> ((γ ↪●MAP (m' ∪ m)) ∗ [∗map] k ↦ v ∈ m', Φ k v) := by
-  revert Hdisj
-  refine LawfulFiniteMap.induction_on
-    (P := fun m' =>
-      m' ##ₘ m →
-      (γ ↪●MAP m : IProp GF) ⊢ |==> ((γ ↪●MAP (m' ∪ m)) ∗ [∗map] k ↦ v ∈ m', Φ k v))
-    ?_ ?_ ?_ m'
-  · intro m₁ m₂ heqv hP Hdisj
-    have hdisj' : m₁ ##ₘ m :=
-      fun k ⟨h1, h2⟩ => Hdisj k ⟨(heqv k) ▸ h1, h2⟩
-    have hunion :=
-      ghost_map_auth_equiv_of_pointwise (GF := GF) (γ := γ) (dq := DFrac.own (One.one : F))
-        (m₁ := m₁ ∪ m) (m₂ := m₂ ∪ m)
-        (fun j => by
-          show get? (union m₁ m) j = get? (union m₂ m) j
-          rw [get?_union, get?_union, heqv j])
-    have hbig :
-        ([∗map] k ↦ v ∈ m₁, Φ k v : IProp GF) ⊣⊢ ([∗map] k ↦ v ∈ m₂, Φ k v) :=
+/-- Reverse of `ghost_map_elems_unseal`: `iOwn (bigOpM Frag m)` resolves to a `[∗map]` of
+ghost-map elements (modulo a `|==>` needed in the empty case to escape `iOwn UCMRA.unit`). -/
+private theorem ghost_map_elems_reseal (γ : GName) (m : H V) (dq : DFrac F) :
+    (iOwn (E := GhostMapG.elem) γ
+        ([^ CMRA.op map] k ↦ v ∈ m, Frag (H := H) k dq (toAgree ⟨v⟩)) : IProp GF) ⊢
+      |==> ([∗map] k ↦ v ∈ m, γ ↪◯MAP[k]{dq} v) := by
+  induction m using LawfulFiniteMap.induction_on (M := H) with
+  | hequiv m₁ m₂ heqv hP =>
+    have hlhs : ([^ CMRA.op map] k ↦ v ∈ m₁,
+          Frag (H := H) (V := Agree (LeibnizO V)) k dq (toAgree ⟨v⟩)) ≡
+        ([^ CMRA.op map] k ↦ v ∈ m₂,
+          Frag (H := H) (V := Agree (LeibnizO V)) k dq (toAgree ⟨v⟩)) :=
+      Iris.Algebra.BigOpM.bigOpM_equiv_of_perm _ heqv
+    have hrhs : ([∗map] k ↦ v ∈ m₁, (γ ↪◯MAP[k]{dq} v) : IProp GF) ⊣⊢
+        ([∗map] k ↦ v ∈ m₂, (γ ↪◯MAP[k]{dq} v)) :=
       BI.equiv_iff.mp (Iris.Algebra.BigOpM.bigOpM_equiv_of_perm _ heqv)
-    iintro Hauth
-    iapply (hP hdisj').trans (BIUpdate.mono (BI.sep_mono hunion.mp hbig.mp)) $$ Hauth
-  · intro _
-    iintro Hauth
+    exact (BI.equiv_iff.mp (iOwn_ne.eqv hlhs.symm)).mp.trans
+      (hP.trans (BIUpdate.mono hrhs.mp))
+  | hemp =>
+    rw [show ([^ CMRA.op map] k ↦ v ∈ (PartialMap.empty : H V),
+            Frag (H := H) (V := Agree (LeibnizO V)) k dq (toAgree ⟨v⟩)) =
+          (UCMRA.unit : HeapView F K (Agree (LeibnizO V)) H) from
+        Iris.Algebra.BigOpM.bigOpM_empty (fun k v => Frag k dq (toAgree (⟨v⟩ : LeibnizO V)))]
+    iintro _
     imodintro
-    isplitl [Hauth]
-    · iapply (ghost_map_auth_equiv_of_pointwise (GF := GF) (γ := γ) (dq := DFrac.own (One.one : F))
-        (m₁ := (∅ : H V) ∪ m) (m₂ := m)
-        (fun j => by
-          show get? (union (∅ : H V) m) j = _
-          rw [get?_union, show get? (∅ : H V) j = none from get?_empty _]; rfl)).mpr $$ Hauth
-    · iapply (BigSepM.bigSepM_empty (Φ := Φ) (M := H)).mpr
-      iemp_intro
-  · intro i x m'' hfresh ihP Hdisj
-    have hfresh_in_m : get? m i = none := by
-      cases h : get? m i with
-      | none => rfl
-      | some v =>
-        exfalso
-        refine Hdisj i ⟨?_, ?_⟩
-        · rw [get?_insert_eq (rfl : i = i)]; rfl
-        · rw [h]; rfl
-    have hdisj' : m'' ##ₘ m := fun k ⟨h1, h2⟩ => by
-      by_cases hik : i = k
-      · subst hik
-        refine Hdisj i ⟨?_, h2⟩
-        rw [get?_insert_eq (rfl : i = i)]
-        rfl
-      · refine Hdisj k ⟨?_, h2⟩
-        rw [get?_insert_ne hik]
-        exact h1
-    have hinner :
-        ((γ ↪●MAP (m'' ∪ m)) ∗ [∗map] k ↦ v ∈ m'', Φ k v : IProp GF) ⊢
-        |==> ((γ ↪●MAP (insert m'' i x ∪ m)) ∗
-          [∗map] k ↦ v ∈ insert m'' i x, Φ k v) := by
-      iintro ⟨Hauth, Hbig⟩
-      have hfresh_union : get? (m'' ∪ m) i = none := by
-        show get? (union m'' m) i = none
-        rw [get?_union, hfresh, hfresh_in_m]; rfl
-      imod h_step i x hfresh_union $$ Hauth with Hres
-      icases Hres with ⟨Hauth', Helem⟩
-      imodintro
-      have hunion :=
-        ghost_map_auth_equiv_of_pointwise (GF := GF) (γ := γ) (dq := DFrac.own (One.one : F))
-          (m₁ := insert (m'' ∪ m) i x)
-          (m₂ := insert m'' i x ∪ m)
-          (fun j => by
-            show get? (insert (union m'' m) i x) j = get? (union (insert m'' i x) m) j
-            by_cases hij : i = j
-            · rw [get?_insert_eq hij, get?_union, get?_insert_eq hij]; rfl
-            · rw [get?_insert_ne hij, get?_union, get?_union, get?_insert_ne hij])
-      isplitl [Hauth']
-      · iapply hunion.mp $$ Hauth'
-      · iapply (BigSepM.bigSepM_insert (Φ := Φ) hfresh).mpr
-        iframe
-    exact (ihP hdisj').trans <| (BIUpdate.mono hinner).trans BIUpdate.trans
-
-/-- Allocate the elements of `m` one-by-one starting from `Auth γ 1 ∅`. -/
-private theorem ghost_map_alloc_aux (γ : GName) (m : H V) :
-    (γ ↪●MAP (∅ : H V) : IProp GF) ⊢
-      iprop(|==> ((γ ↪●MAP m) ∗ [∗map] k ↦ v ∈ m, γ ↪◯MAP[k] v)) := by
-  have h :=
-    ghost_map_insert_big_induct (GF := GF) γ (fun k v => iprop(γ ↪◯MAP[k] v))
-      (fun {m_acc} i x hfresh => ghost_map_insert (γ := γ) (m := m_acc) i x hfresh)
-      (∅ : H V) m (disjoint_empty_right _)
-  have hunion :=
-    ghost_map_auth_equiv_of_pointwise (GF := GF) (γ := γ) (dq := DFrac.own (One.one : F))
-      (m₁ := m ∪ (∅ : H V)) (m₂ := m)
-      (fun j => by
-        show get? (union m (∅ : H V)) j = _
-        rw [get?_union, show get? (∅ : H V) j = none from get?_empty _]
-        cases get? m j <;> rfl)
-  exact h.trans (BIUpdate.mono (BI.sep_mono_l hunion.mp))
+    iapply BigSepM.bigSepM_empty.mpr
+    iemp_intro
+  | hins i x m' hfresh ihP =>
+    refine .trans ((BI.equiv_iff.mp (iOwn_ne.eqv
+      (Iris.Algebra.BigOpM.bigOpM_insert_equiv
+        (fun k v => Frag (H := H) (V := Agree (LeibnizO V)) k dq (toAgree ⟨v⟩))
+        _ hfresh))).mp.trans iOwn_op.mp) ?_
+    refine (BI.sep_mono_r ihP).trans <| bupd_frame_l.trans <| BIUpdate.mono ?_
+    exact (BigSepM.bigSepM_insert (Φ := fun k v => iprop(γ ↪◯MAP[k]{dq} v)) hfresh).mpr
 
 @[rocq_alias ghost_map_alloc_strong]
 theorem ghost_map_alloc_strong (P : GName → Prop) (m : H V)
     (HP : ∀ N, ∃ k, N ≤ k ∧ P k) :
     ⊢@{IProp GF} |==> ∃ γ, ⌜P γ⌝ ∗ (γ ↪●MAP m) ∗ [∗map] k ↦ v ∈ m, γ ↪◯MAP[k] v := by
-  imod iOwn_alloc_strong (E := hgm.elem)
-      (HeapView.Auth (.own (One.one : F)) (∅ : H (Agree (LeibnizO V)))) P HP
+  imod iOwn_alloc_strong (E := GhostMapG.elem)
+      (HeapView.Auth (.own (One.one : F))
+        (Iris.Std.PartialMap.map (fun x : V => toAgree (LeibnizO.mk x)) (∅ : H V))) P HP
       (HeapView.auth_valid_iff.mpr DFrac.valid_own_one) with ⟨%γ, %HPγ, Hauth⟩
-  ihave Hauth := (iOwn_ghost_map_auth_equiv_of_pointwise (m := (∅ : H V))
-    (fun j => by
-      rw [show get? (∅ : H (Agree (LeibnizO V))) j = none from get?_empty _,
-        show get? (∅ : H V) j = none from get?_empty _]; rfl)).mp $$ Hauth
-  imod ghost_map_alloc_aux γ m $$ Hauth with Hres
-  icases Hres with ⟨Hauth, Hbig⟩
-  imodintro
-  iexists γ
-  isplit
+  imod iOwn_update
+    (.equiv_right
+      (.op
+        (OFE.NonExpansive.eqv (f := HeapView.Auth (.own (One.one : F)))
+          (eqv_of_Equiv fun k => by
+            show Std.PartialMap.get? (PartialMap.union
+                (Iris.Std.PartialMap.map (fun x : V => toAgree (LeibnizO.mk x)) m)
+                (Iris.Std.PartialMap.map (fun x : V => toAgree (LeibnizO.mk x)) (∅ : H V))) k =
+              Std.PartialMap.get?
+                (Iris.Std.PartialMap.map (fun x : V => toAgree (LeibnizO.mk x)) m) k
+            rw [Std.LawfulPartialMap.get?_union, Std.LawfulPartialMap.get?_map,
+              Std.LawfulPartialMap.get?_map,
+              show Std.PartialMap.get? (∅ : H V) k = none from
+                Std.LawfulPartialMap.get?_empty _]
+            cases Std.PartialMap.get? m k <;> rfl))
+        (BigOpM.bigOpM_map_equiv (fun x : V => toAgree (LeibnizO.mk x))
+          (fun k v => HeapView.Frag (H := H) k (.own (One.one : F)) v) m))
+      (HeapView.update_alloc_big (Iris.Std.PartialMap.map (fun x : V => toAgree (LeibnizO.mk x)) m)
+        (LawfulPartialMap.disjoint_map.mpr (Std.LawfulPartialMap.disjoint_empty_left m))
+        (LawfulPartialMap.all_map.mpr (fun _ v _ => toAgree_LeibnizO_valid v))))
+    $$ Hauth with Hauth
+  icases iOwn_op $$ Hauth with ⟨Hauth, Hfrag⟩
+  imod ghost_map_elems_reseal γ m (.own (One.one : F)) $$ Hfrag with Hfrag
+  imodintro; iexists γ; isplit
   · ipure_intro; exact HPγ
-  · isplitl [Hauth] <;> iassumption
+  · unfold ghost_map_auth; iframe
 
 @[rocq_alias ghost_map_alloc_strong_empty]
 theorem ghost_map_alloc_strong_empty (P : GName → Prop) (HP : ∀ N, ∃ k, N ≤ k ∧ P k) :
@@ -576,8 +497,8 @@ theorem ghost_map_alloc (m : H V) :
   imod ghost_map_alloc_strong (fun _ => True) m (fun N => ⟨N, Nat.le_refl _, trivial⟩)
     with ⟨%γ, _, Hauth, Hbig⟩
   imodintro
-  iexists γ
-  isplitl [Hauth] <;> iassumption
+  iexists _
+  iframe
 
 @[rocq_alias ghost_map_alloc_empty]
 theorem ghost_map_alloc_empty :
@@ -590,101 +511,87 @@ theorem ghost_map_insert_big {γ} {m : H V} (m' : H V) (Hdisj : m' ##ₘ m) :
     ⊢@{IProp GF} (γ ↪●MAP m) ==∗
       (γ ↪●MAP (m' ∪ m)) ∗ [∗map] k ↦ v ∈ m', γ ↪◯MAP[k] v := by
   iintro Hauth
-  iapply ghost_map_insert_big_induct γ (fun k v => iprop(γ ↪◯MAP[k] v))
-    (fun {m_acc} i x hfresh => ghost_map_insert (γ := γ) (m := m_acc) i x hfresh)
-    m m' Hdisj $$ Hauth
+  unfold ghost_map_auth
+  imod iOwn_update
+    (.equiv_right
+      (.op
+        (OFE.NonExpansive.eqv (f := HeapView.Auth (.own (One.one : F)))
+          (eqv_of_Equiv
+            (LawfulPartialMap.map_union (f := fun x : V => toAgree (LeibnizO.mk x)))).symm)
+        (BigOpM.bigOpM_map_equiv (fun x : V => toAgree (LeibnizO.mk x))
+          (fun k v => HeapView.Frag (H := H) k (.own (One.one : F)) v) m'))
+      (HeapView.update_alloc_big (Iris.Std.PartialMap.map (fun x : V => toAgree (LeibnizO.mk x)) m')
+        (LawfulPartialMap.disjoint_map.mpr (PartialMap.disjoint_comm Hdisj))
+        (LawfulPartialMap.all_map.mpr (fun _ v _ => toAgree_LeibnizO_valid v))))
+    $$ Hauth with Hauth
+  icases iOwn_op $$ Hauth with ⟨Hauth, Hfrag⟩
+  imod ghost_map_elems_reseal γ m' (.own (One.one : F)) $$ Hfrag with Hfrag
+  imodintro; iframe
 
 @[rocq_alias ghost_map_insert_persist_big]
 theorem ghost_map_insert_persist_big {γ} {m : H V} (m' : H V) (Hdisj : m' ##ₘ m) :
     ⊢@{IProp GF} (γ ↪●MAP m) ==∗
       (γ ↪●MAP (m' ∪ m)) ∗ [∗map] k ↦ v ∈ m', γ ↪◯MAP[k]{.discard} v := by
   iintro Hauth
-  iapply ghost_map_insert_big_induct γ (fun k v => iprop(γ ↪◯MAP[k]{.discard} v))
-    (fun {m_acc} i x hfresh => ghost_map_insert_persist (γ := γ) (m := m_acc) i x hfresh)
-    m m' Hdisj $$ Hauth
-
-/-- From `Auth γ 1 m` + `[∗map] m0 frag`, derive `|==> Auth γ 1 (m \ m0)` by inducting on `m0`. -/
-private theorem ghost_map_delete_big_aux (γ : GName) (m0 : H V) :
-    ∀ m : H V,
-      ((γ ↪●MAP m) ∗ [∗map] k ↦ v ∈ m0, γ ↪◯MAP[k] v : IProp GF) ⊢
-        |==> γ ↪●MAP (m \ m0) := by
-  refine LawfulFiniteMap.induction_on
-    (P := fun m0 =>
-      ∀ m : H V,
-        ((γ ↪●MAP m) ∗ [∗map] k ↦ v ∈ m0, γ ↪◯MAP[k] v : IProp GF) ⊢
-          |==> γ ↪●MAP (m \ m0))
-    ?_ ?_ ?_ m0
-  · intro m₁ m₂ heqv hP m
-    have hbig :
-        ([∗map] k ↦ v ∈ m₁, (γ ↪◯MAP[k] v) : IProp GF) ⊣⊢
-        ([∗map] k ↦ v ∈ m₂, (γ ↪◯MAP[k] v)) :=
-      BI.equiv_iff.mp (Iris.Algebra.BigOpM.bigOpM_equiv_of_perm _ heqv)
-    have hdiff :=
-      ghost_map_auth_equiv_of_pointwise (GF := GF) (γ := γ) (dq := DFrac.own (One.one : F))
-        (m₁ := m \ m₁) (m₂ := m \ m₂)
-        (fun j => by rw [get?_difference, get?_difference, heqv j])
-    iintro ⟨Hauth, Hbig⟩
-    iapply (BI.sep_mono_r hbig.mpr).trans
-      ((hP m).trans (BIUpdate.mono hdiff.mp)) $$ [$Hauth $Hbig]
-  · intro m
-    iintro ⟨Hauth, _⟩
-    imodintro
-    iapply (ghost_map_auth_equiv_of_pointwise (GF := GF) (γ := γ) (dq := DFrac.own (One.one : F))
-      (m₁ := m) (m₂ := m \ (∅ : H V))
-      (fun j => by
-        rw [get?_difference, show get? (∅ : H V) j = none from get?_empty _]; rfl)).mp $$ Hauth
-  · intro i x m0 hfresh ihP m
-    iintro ⟨Hauth, Hbig⟩
-    icases (BigSepM.bigSepM_insert (Φ := fun k v => iprop(γ ↪◯MAP[k] v)) hfresh).mp $$ Hbig
-      with ⟨Helem, Hbig⟩
-    ihave %Hlookup := ghost_map_lookup $$ Hauth Helem
-    imod ghost_map_delete $$ Hauth Helem with Hauth
-    have hdiff :=
-      ghost_map_auth_equiv_of_pointwise (GF := GF) (γ := γ) (dq := DFrac.own (One.one : F))
-        (m₁ := delete m i \ m0)
-        (m₂ := m \ insert m0 i x)
-        (fun j => by
-          rw [get?_difference, get?_difference]
-          by_cases hij : i = j
-          · subst hij
-            rw [get?_insert_eq (rfl : i = i), get?_delete_eq (rfl : i = i)]
-            simp
-          · rw [get?_insert_ne hij, get?_delete_ne hij])
-    iapply (ihP (delete m i)).trans (BIUpdate.mono hdiff.mp) $$ [$Hauth $Hbig]
+  imod ghost_map_insert_big m' Hdisj $$ Hauth with ⟨Hauth, Helem⟩
+  iframe
+  iapply BigSepM.bigSepM_bupd
+  iapply (BigSepM.bigSepM_mono (Φ := fun k v => iprop(γ ↪◯MAP[k] v))
+    (Ψ := fun k v => iprop(|==> γ ↪◯MAP[k]{.discard} v))
+    (m := m') (fun _ => BI.wand_entails (ghost_map_elem_persist γ _ _ _))) $$ Helem
 
 @[rocq_alias ghost_map_delete_big]
 theorem ghost_map_delete_big {γ} {m : H V} (m0 : H V) :
     ⊢@{IProp GF} (γ ↪●MAP m) -∗ ([∗map] k ↦ v ∈ m0, γ ↪◯MAP[k] v) ==∗ γ ↪●MAP (m \ m0) := by
   iintro Hauth Hfrag
-  iapply ghost_map_delete_big_aux γ m0 m $$ [$Hauth $Hfrag]
+  imod ghost_map_elems_unseal γ m0 _ $$ Hfrag with Hfrag
+  unfold ghost_map_auth
+  ihave Hop := iOwn_op.mpr $$ [$Hauth $Hfrag]
+  iapply iOwn_update
+    (.equiv_left
+      (CMRA.op_right_eqv _ (BigOpM.bigOpM_map_equiv (fun x : V => toAgree (LeibnizO.mk x))
+        (fun k v => HeapView.Frag (H := H) k (.own (One.one : F)) v) m0))
+      (.equiv_right
+        (OFE.NonExpansive.eqv (f := HeapView.Auth (.own (One.one : F)))
+          (eqv_of_Equiv
+            (LawfulPartialMap.map_difference (f := fun x : V => toAgree (LeibnizO.mk x)))).symm)
+        (HeapView.update_delete_big
+          (Iris.Std.PartialMap.map (fun x : V => toAgree (LeibnizO.mk x)) m0))))
+    $$ Hop
 
 @[rocq_alias ghost_map_update_big]
 theorem ghost_map_update_big {γ} {m : H V} (m0 m1 : H V) (Hdom : dom m0 = dom m1) :
     ⊢@{IProp GF} (γ ↪●MAP m) -∗ ([∗map] k ↦ v ∈ m0, γ ↪◯MAP[k] v) ==∗
       (γ ↪●MAP (m1 ∪ m)) ∗ [∗map] k ↦ v ∈ m1, γ ↪◯MAP[k] v := by
   iintro Hauth Hfrag
-  have hisSome : ∀ j, (get? m0 j).isSome ↔ (get? m1 j).isSome :=
-    fun j => Iff.of_eq (congrFun Hdom j)
-  have hdisj : m1 ##ₘ (m \ m0) := by
-    intro k ⟨h1, h2⟩
-    rw [get?_difference] at h2
-    simp [(hisSome k).mpr h1] at h2
-  imod ghost_map_delete_big m0 $$ Hauth Hfrag with Hauth
-  imod ghost_map_insert_big m1 hdisj $$ Hauth with Hres
-  icases Hres with ⟨Hauth, Hbig⟩
-  imodintro
-  isplitl [Hauth]
-  · iapply (ghost_map_auth_equiv_of_pointwise (GF := GF) (γ := γ) (dq := DFrac.own (One.one : F))
-      (m₁ := m1 ∪ (m \ m0)) (m₂ := m1 ∪ m) (fun j => by
-        show get? (union m1 (m \ m0)) j = get? (union m1 m) j
-        rw [get?_union, get?_union, get?_difference]
-        cases hm1 : get? m1 j with
-        | none =>
-          have hm0 : get? m0 j = none :=
-            Option.not_isSome_iff_eq_none.mp fun h => by
-              have := (hisSome j).mp h; rw [hm1] at this; cases this
-          simp [hm0]
-        | some _ => rfl)).mp $$ Hauth
-  · iexact Hbig
+  imod ghost_map_elems_unseal γ m0 _ $$ Hfrag with Hfrag
+  unfold ghost_map_auth
+  ihave Hop := iOwn_op.mpr $$ [$Hauth $Hfrag]
+  have hDomMap :
+      Std.PartialMap.dom (Iris.Std.PartialMap.map (fun x : V => toAgree (LeibnizO.mk x)) m0) =
+      Std.PartialMap.dom (Iris.Std.PartialMap.map (fun x : V => toAgree (LeibnizO.mk x)) m1) := by
+    funext k
+    simp only [Std.PartialMap.dom, Std.LawfulPartialMap.get?_map, Option.isSome_map]
+    exact congrFun Hdom k
+  imod iOwn_update
+    (.equiv_left
+      (CMRA.op_right_eqv _ (BigOpM.bigOpM_map_equiv (fun x : V => toAgree (LeibnizO.mk x))
+        (fun k v => HeapView.Frag (H := H) k (.own (One.one : F)) v) m0))
+      (.equiv_right
+        (.op
+          (OFE.NonExpansive.eqv (f := HeapView.Auth (.own (One.one : F)))
+            (eqv_of_Equiv
+              (LawfulPartialMap.map_union (f := fun x : V => toAgree (LeibnizO.mk x)))).symm)
+          (BigOpM.bigOpM_map_equiv (fun x : V => toAgree (LeibnizO.mk x))
+            (fun k v => HeapView.Frag (H := H) k (.own (One.one : F)) v) m1))
+        (HeapView.update_replace_big
+          (Iris.Std.PartialMap.map (fun x : V => toAgree (LeibnizO.mk x)) m1)
+          (Iris.Std.PartialMap.map (fun x : V => toAgree (LeibnizO.mk x)) m0)
+          hDomMap
+          (LawfulPartialMap.all_map.mpr (fun _ v _ => toAgree_LeibnizO_valid v)))))
+    $$ Hop with Hres
+  icases iOwn_op $$ Hres with ⟨Hauth, Hfrag⟩
+  imod ghost_map_elems_reseal γ m1 (.own (One.one : F)) $$ Hfrag with Hfrag
+  imodintro; iframe
 
 end big_op_lemmas

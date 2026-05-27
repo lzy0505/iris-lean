@@ -9,6 +9,7 @@ import Batteries.Data.List.Perm
 import Iris.Std.FromMathlib
 public import Iris.Std.GenSets
 public import Iris.Std.GenSets
+meta import Iris.Std.RocqPorting
 
 /-! ## Partial Maps
 
@@ -602,6 +603,25 @@ theorem disjoint_difference_right {m₁ m₂ : M V} :
   simp only [h_in_m2, ↓reduceIte] at h_in_diff
   cases h_in_diff
 
+theorem difference_empty {m : M V} : (m \ (∅ : M V) : M V) ≡ₘ m := by
+  intro k
+  rw [get?_difference, show get? (∅ : M V) k = none from get?_empty _]
+  rfl
+
+theorem difference_equiv_of_perm {m m₁ m₂ : M V} (h : m₁ ≡ₘ m₂) :
+    (m \ m₁ : M V) ≡ₘ m \ m₂ := by
+  intro k
+  rw [get?_difference, get?_difference, h k]
+
+theorem difference_insert {m m₀ : M V} [DecidableEq K] {i : K} {x : V} (hi : get? m₀ i = none) :
+    (m \ insert m₀ i x : M V) ≡ₘ delete m i \ m₀ := by
+  intro k
+  by_cases hik : i = k
+  · subst hik
+    rw [get?_difference, get?_difference, get?_insert_eq rfl, get?_delete_eq rfl, hi]
+    simp
+  · rw [get?_difference, get?_difference, get?_insert_ne hik, get?_delete_ne hik]
+
 theorem union_difference_cancel {m₁ m₂ : M V} (h : m₂ ⊆ m₁) :
     union m₂ (m₁ \ m₂) ≡ₘ m₁ := by
   intro k
@@ -612,6 +632,25 @@ theorem union_difference_cancel {m₁ m₂ : M V} (h : m₂ ⊆ m₁) :
   | some v =>
     simp [Option.merge]
     exact (h k v hm2).symm
+
+theorem union_empty_right {m : M V} : (union m (∅ : M V) : M V) ≡ₘ m := by
+  intro k
+  rw [PartialMap.union, get?_merge, show get? (∅ : M V) k = none from get?_empty _]
+  cases get? m k <;> rfl
+
+theorem union_equiv_of_perm_left {m m₁ m₂ : M V} (h : m₁ ≡ₘ m₂) :
+    union m₁ m ≡ₘ union m₂ m := by
+  intro k
+  simp only [PartialMap.union, get?_merge, h k]
+
+theorem union_insert_assoc {m m₀ : M V} [DecidableEq K] {i : K} {x : V} :
+    insert (union m₀ m) i x ≡ₘ union (insert m₀ i x) m := by
+  intro k
+  by_cases hik : i = k
+  · subst hik
+    cases h : get? m i <;>
+      simp [get?_insert_eq rfl, PartialMap.union, get?_merge, Option.merge, h]
+  · simp [get?_insert_ne hik, PartialMap.union, get?_merge]
 
 theorem get?_union {m₁ m₂ : M V} {k : K} :
     get? (union m₁ m₂) k = (get? m₁ k).orElse (fun _ => get? m₂ k) := by
@@ -641,6 +680,44 @@ theorem map_id {m : M V} :
   intro k
   rw [get?_map]
   cases get? m k <;> simp
+
+@[rocq_alias map_fmap_empty]
+theorem map_empty {f : V → V'} : (PartialMap.map f (empty : M V) : M V') ≡ₘ empty := by
+  intro k
+  rw [get?_map, show get? (empty : M V) k = none from get?_empty k,
+    show get? (empty : M V') k = none from get?_empty k]
+  rfl
+
+@[rocq_alias map_fmap_union]
+theorem map_union {f : V → V'} {m₁ m₂ : M V} :
+    (PartialMap.map f (union m₁ m₂) : M V') ≡ₘ union (PartialMap.map f m₁) (PartialMap.map f m₂) := by
+  intro k
+  rw [get?_map, get?_union, get?_union, get?_map, get?_map]
+  cases get? m₁ k <;> cases get? m₂ k <;> rfl
+
+@[rocq_alias map_fmap_difference]
+theorem map_difference {f : V → V'} {m₁ m₂ : M V} :
+    (PartialMap.map f (m₁ \ m₂) : M V') ≡ₘ PartialMap.map f m₁ \ PartialMap.map f m₂ := by
+  intro k
+  rw [get?_map, get?_difference, get?_difference, get?_map, get?_map]
+  cases get? m₂ k <;> cases get? m₁ k <;> rfl
+
+@[rocq_alias map_disjoint_fmap]
+theorem disjoint_map {f : V → V'} {m₁ m₂ : M V} :
+    PartialMap.map f m₁ ##ₘ PartialMap.map f m₂ ↔ m₁ ##ₘ m₂ := by
+  constructor <;> intro h k ⟨h₁, h₂⟩ <;>
+    exact h k ⟨by simp_all [get?_map], by simp_all [get?_map]⟩
+
+@[rocq_alias map_Forall_fmap]
+theorem all_map {f : V → V'} {m : M V} {P : K → V' → Prop} :
+    PartialMap.all P (PartialMap.map f m) ↔ PartialMap.all (fun k v => P k (f v)) m := by
+  constructor
+  · intro h k v hk
+    exact h k (f v) (by rw [get?_map, hk]; rfl)
+  · intro h k v' hk
+    rw [get?_map] at hk
+    obtain ⟨v, hv, rfl⟩ := Option.map_eq_some_iff.mp hk
+    exact h k v hv
 
 theorem get?_filterMap {f : V → Option V} {m : M V} {k : K} :
     get? (filterMap f m) k = (get? m k).bind f := by

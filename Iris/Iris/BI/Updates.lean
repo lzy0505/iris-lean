@@ -166,6 +166,14 @@ theorem bupd_forall {Φ : A → PROP} :
     (|==> «forall» fun x : A => Φ x) ⊢ «forall» fun x : A => iprop(|==> Φ x) :=
   forall_intro (mono <| forall_elim ·)
 
+open Iris.Algebra BigOpM
+@[rocq_alias big_sepM_bupd]
+theorem bigSepM_bupd {K : Type _} {V : Type _} {M : Type _ → Type _} [LawfulFiniteMap M K]
+{Φ : K → V → PROP} {m : M V} :
+  ([∗map] k ↦ x ∈ m, |==> Φ k x) ⊢ |==> [∗map] k ↦ x ∈ m, Φ k x :=
+  BigOpM.bigOpM_gen_proper (R := fun a b => a ⊢ |==> b) intro
+    (fun h1 h2 => (sep_mono h1 h2).trans bupd_sep) (fun _ => .rfl)
+
 theorem bupd_except0 {P : PROP} : ◇ (|==> P) ⊢ (|==> ◇ P) :=
   or_elim (or_intro_l.trans intro) (mono or_intro_r)
 
