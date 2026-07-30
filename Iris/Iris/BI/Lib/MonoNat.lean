@@ -101,6 +101,12 @@ theorem auth_lb_own_valid (γ : GName) (dq : DFrac) (n m : MaxNat) :
   ipureintro
   exact (both_dfrac_valid dq n m).mp Hvalid
 
+instance combineSepGivesMonoNat (γ : GName) (dq : DFrac) (n m : MaxNat) :
+    ProofMode.CombineSepGives (PROP := IProp GF) (γ ↪●MN{dq} n) (γ ↪◯MN m) iprop(⌜✓ dq ∧ m ≤ n⌝) where
+  combine_sep_gives := by
+    iintro ⟨H1, H2⟩
+    icases auth_lb_own_valid γ dq n m $$ H1 H2 with $
+
 @[rocq_alias mono_nat_lb_own_get]
 theorem lb_own_get (γ : GName) (dq : DFrac) (n : MaxNat) :
   ⊢@{IProp GF} (γ ↪●MN{dq} n) -∗ (γ ↪◯MN n) := by
@@ -145,7 +151,8 @@ theorem own_alloc {GF : BundledGFunctors} [MonoNatG GF] (n : MaxNat) :
     iframe
 
 @[rocq_alias mono_nat_own_update]
-theorem own_update {GF : BundledGFunctors} [MonoNatG GF] (γ : GName) (n n' : MaxNat) (h : n ≤ n') :
+theorem own_update {GF : BundledGFunctors} [MonoNatG GF] {γ : GName} {n : MaxNat} (n' : MaxNat)
+  (h : n ≤ n') :
   ⊢@{IProp GF} (γ ↪●MN n) ==∗ (γ ↪●MN n') ∗ (γ ↪◯MN n') := by
   iintro H
   ihave >Hauth : |==> (γ ↪●MN n') $$ [H]

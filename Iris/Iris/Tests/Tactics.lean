@@ -1651,6 +1651,7 @@ end leftright
 -- cases
 namespace cases
 
+
 /-- Tests `icases` for simple renaming -/
 example [BI PROP] (P : PROP) : P ⊢ P := by
   iintro HP
