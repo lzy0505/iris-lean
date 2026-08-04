@@ -79,7 +79,7 @@ theorem incr_mono_spec l n :
   icases Hl with ⟨%γ, #_, Hγf⟩
   wp_bind (! _)
   unfold mcounter_inv
-  iinv N with ⟨%c, >⟨Hγ, Hl⟩⟩ -- FIXME: typeclass problem: have to mark parameters of IrisGS_gen as outParam
+  iinv N with ⟨%c, >⟨Hγ, Hl⟩⟩
   · exact ⟨by simp, by infer_instance⟩
   wp_load
   imodintro
@@ -104,8 +104,8 @@ theorem incr_mono_spec l n :
       iframe
       sorry
     wp_pures
-    imodintro -- FIXME: this is not needed in Rocq before iapply
     iapply HΦ
+    imodintro
     unfold mcounter mcounter_inv
     iexists γ
     iframe #
