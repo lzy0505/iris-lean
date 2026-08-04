@@ -26,6 +26,10 @@ namespace Counter
 
 open Std ProofMode Auth
 
+/- `MaxNat` is an `abbrev` for `Nat`, so its `Add` instance (which is `max`, the CMRA op) also
+applies to `Nat` and shadows `instAddNat`. Erase it here so that `+` means addition. -/
+attribute [-instance] instAddMaxNat
+
 @[rocq_alias heap_lang.newcounter]
 def newcounter := hl_val% λ _, ref(#0)
 @[rocq_alias heap_lang.incr]
@@ -95,14 +99,14 @@ theorem incr_mono_spec l n :
   · subst c'
     icombine Hγ Hγf gives ⟨-, %_⟩
     imod MonoNat.own_update (1 + c) $$ Hγ with ⟨Hγ, Hγf⟩
-    · sorry
+    · simp
     wp_cmpxchg_suc
     imodintro
     isplitl [Hl Hγ]
     · inext
       iexists (1 + c)
+      push_cast
       iframe
-      sorry
     wp_pures
     iapply HΦ
     imodintro
@@ -110,7 +114,7 @@ theorem incr_mono_spec l n :
     iexists γ
     iframe #
     iapply MonoNat.lb_own_le $$ Hγf
-    sorry
+    grind
   · wp_cmpxchg_fail
     · grind
     imodintro
