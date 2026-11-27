@@ -29,21 +29,19 @@ private theorem autoverse : ⊢
   exact fun _ => trivial
 
 example : ⊢ |==> ∃ (γ0 γ1 : GName) (s0 s1 : String),
-    ⌜γ0 ≠ γ1⌝ ∗ iOwn (E := E0) γ0 (toAgree ⟨s0⟩) ∗
+    iOwn (E := E0) γ0 (toAgree ⟨s0⟩) ∗
     iOwn (E := E0) γ1 (toAgree ⟨s1⟩) := by
   let v0 : F0.ap (IProp GF) := toAgree ⟨"string0"⟩
   let v1 : F0.ap (IProp GF) := toAgree ⟨"string1"⟩
 
   -- Allocate the resources
   imod iOwn_alloc v1 (fun _ => trivial) with ⟨%γ1, Hγ1⟩
-  imod iOwn_alloc_cofinite v0 [γ1] (fun _ => trivial) with ⟨%γ0, %h, Hγ0⟩
+  imod iOwn_alloc v0 (fun _ => trivial) with ⟨%γ0, Hγ0⟩
   imodintro
 
   -- Complete the Iris proof
   iexists γ0, γ1, "string0", "string1"
-  iframe Hγ0 Hγ1
-  ipureintro
-  exact fun heq => h (by simp [heq])
+  iframe
 
 example [RFunctorContractive F] [E : ElemG GF F] (hslots : E0.τ ≠ E.τ)
     {a : F0.ap (IProp GF)} {b : F.ap (IProp GF)} (ha : ✓ a) (hb : ✓ b) :
