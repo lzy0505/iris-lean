@@ -106,13 +106,13 @@ instance instAsFractionalOwn (γ : GName) (q : Qp) :
   as_fractional_fractional := instFractionalOwn γ
 
 @[rocq_alias cinv_own_excl_alloc]
-theorem own_excl_alloc (P : GName → Prop) (HP : PredInfinite P) :
+theorem own_excl_alloc (P : GName → Prop) (HP : GName.UnboundedIn W.inv.τ P) :
     ⊢ |==> ∃ γ, ⌜P γ⌝ ∗ excl γ ∗ own γ (1 : Qp) := by
   imod iOwn_alloc_strong (E := W.inv)
     ((some (Excl.excl ()), none) • (none, some (DFrac.own 1)) :
       CInvF (IProp GF) (IProp GF)) P ?_
     ⟨trivial, DFrac.valid_own_one⟩ with ⟨%γ, %HPγ, Hown⟩
-  · exact HP.exists_ge
+  · exact HP
   · imodintro
     iexists γ
     -- NOTE: Ideally, iframe would discharge this pure goal
@@ -158,7 +158,8 @@ nonrec theorem cinv_iff {N : Namespace} {γ : GName} {P Q : IProp GF} :
     · iframe
 
 @[rocq_alias cinv_alloc_strong]
-theorem alloc_strong (P : GName → Prop) (HP : PredInfinite P) (E : CoPset) (N : Namespace) :
+theorem alloc_strong (P : GName → Prop) (HP : GName.UnboundedIn W.inv.τ P)
+    (E : CoPset) (N : Namespace) :
     ⊢ |={E}=> ∃ γ, ⌜P γ⌝ ∗ own γ (1 : Qp) ∗
       ∀ Q, ▷ Q ={E}=∗ cinv N γ Q := by
   imod own_excl_alloc P HP with ⟨%γ, %HPγ, Hexcl, Hown⟩
@@ -173,7 +174,8 @@ theorem alloc_strong (P : GName → Prop) (HP : PredInfinite P) (E : CoPset) (N 
   iframe
 
 @[rocq_alias cinv_alloc_strong_open]
-theorem alloc_strong_open (P : GName → Prop) (HP : PredInfinite P) (E : CoPset) (N : Namespace)
+theorem alloc_strong_open (P : GName → Prop) (HP : GName.UnboundedIn W.inv.τ P)
+    (E : CoPset) (N : Namespace)
   (Hsub : ↑N ⊆ E) :
     ⊢ |={E}=> ∃ γ, ⌜P γ⌝ ∗ own γ (1 : Qp) ∗
       ∀ (Q : IProp GF), |={E, E \ ↑N}=> cinv N γ Q ∗ (▷ Q ={E \ ↑N, E}=∗ True) := by
@@ -197,7 +199,7 @@ theorem alloc_strong_open (P : GName → Prop) (HP : PredInfinite P) (E : CoPset
 theorem alloc_cofinite (G : List GName) (E : CoPset) (N : Namespace) :
     ⊢ |={E}=> ∃ γ, ⌜γ ∉ G⌝ ∗ own γ (1 : Qp) ∗
       ∀ Q, ▷ Q ={E}=∗ cinv N γ Q :=
-  alloc_strong (· ∉ G) (PredInfinite.not_mem G) E N
+  alloc_strong (· ∉ G) (.not_mem W.inv.τ G) E N
 
 @[rocq_alias cinv_alloc]
 theorem alloc (E : CoPset) (N : Namespace) (P : IProp GF) :
@@ -213,7 +215,7 @@ theorem alloc (E : CoPset) (N : Namespace) (P : IProp GF) :
 theorem alloc_open (E : CoPset) (N : Namespace) (P : IProp GF) (Hsub : ↑N ⊆ E) :
     ⊢ |={E, E \ ↑N}=> ∃ γ, cinv N γ P ∗ own γ (1 : Qp) ∗
       (▷ P ={E \ ↑N, E}=∗ True) := by
-  imod alloc_strong_open (fun _ => True) PredInfinite.true E N Hsub
+  imod alloc_strong_open (fun _ => True) (.true W.inv.τ) E N Hsub
     with ⟨%γ, _, Hown, Hmake⟩
   imod Hmake $$ %P with ⟨HI, Hclose⟩
   imodintro

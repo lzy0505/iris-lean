@@ -262,11 +262,12 @@ local bi (IProp GF)
 
 open IProp OFE Iris.UPred GenMap
 
+/-- Embed a resource at a local key in the map for the chosen functor. -/
 @[rocq_alias iRes_singleton]
-def iSingleton {GF} F [RFunctorContractive F] [E : ElemG GF F] (γ : GName)
+def iSingleton {GF} F [RFunctorContractive F] [E : ElemG GF F] (key : Nat)
     (v : F.ap (IProp GF)) : IResUR GF :=
   fun τ' =>
-    if H : τ' = E.τ then GenMap.singleton γ (H ▸ (unfoldi (E.bundle v)))
+    if H : τ' = E.τ then GenMap.singleton key (H ▸ (unfoldi (E.bundle v)))
     else GenMap.empty
 
 variable {GF F} [RFunctorContractive F] [E : ElemG GF F]
@@ -274,7 +275,7 @@ variable {GF F} [RFunctorContractive F] [E : ElemG GF F]
 theorem iResUR_op_eval (c1 c2 : IResUR GF) : (c1 • c2) τ' γ' = (c1 τ' γ') • (c2 τ' γ') := by
   simp [op, optionOp]
 
-instance IResUR.lookup_ne {τ : GType} {γ : GName} :
+instance IResUR.lookup_ne {τ : GType} {γ : Nat} :
     NonExpansive (fun r : IResUR GF => (r τ).car γ) where
   ne {_ _ _} H := H τ γ
 
@@ -310,20 +311,20 @@ theorem iSingleton_op (x y : F.ap (IProp GF)) : (iSingleton F γ x) • iSinglet
     · simp only [iSingleton, ↓reduceDIte, singleton_map_none heq]; rfl
   next h => simp [iSingleton, h, op, GenMap.empty_map_lookup]
 
-theorem iSingleton_free_at_ne {γ : GName} {v : F.ap (IProp GF)} {γ' : GName} (h : γ' ≠ γ) :
+theorem iSingleton_free_at_ne {γ : Nat} {v : F.ap (IProp GF)} {γ' : Nat} (h : γ' ≠ γ) :
     (iSingleton F γ v E.τ).car γ' = none := by
   simp [iSingleton]
   exact singleton_map_none h
 
-theorem iSingleton_ne_eq_unit {γ : GName} {v : F.ap (IProp GF)} {τ' : GType} (h : τ' ≠ E.τ) :
+theorem iSingleton_ne_eq_unit {γ : Nat} {v : F.ap (IProp GF)} {τ' : GType} (h : τ' ≠ E.τ) :
     (iSingleton F γ v τ').car = (unit : GenMap _).car := by
   funext γ'; simp only [iSingleton, unit]
   split
   next heq => subst heq; contradiction
   next => apply GenMap.empty_map_lookup
 
-theorem iSingleton_op_ne_free {γ : GName} {v : F.ap (IProp GF)}
-    {m : GenMap (GF.api E.τ (IPre GF))} {γ' : GName} (h_ne : γ' ≠ γ) (h_free : m.car γ' = none) :
+theorem iSingleton_op_ne_free {γ : Nat} {v : F.ap (IProp GF)}
+    {m : GenMap (GF.api E.τ (IPre GF))} {γ' : Nat} (h_ne : γ' ≠ γ) (h_free : m.car γ' = none) :
     ((iSingleton F γ v E.τ) • m).car γ' = none := by
   simp [op, optionOp, iSingleton, h_free]
   rw [singleton_map_none h_ne]
@@ -452,7 +453,7 @@ theorem validN_mf_at_ne_of_iSingleton_op {mf : IResUR GF} {y : F.ap (IProp GF)}
 theorem extract_frame_validN {τ : GType} {n : Nat}
     {mz' : IResUR GF}
     (h_valid : ✓{n} (mz' τ).car)
-    {γ : GName} {v : GF.api τ (IPre GF)} (h_at : (mz' τ).car γ = some v) :
+    {γ : Nat} {v : GF.api τ (IPre GF)} (h_at : (mz' τ).car γ = some v) :
     ✓{n} v := by
   have := h_valid γ
   simp [ValidN, optionValidN, h_at] at this
@@ -548,7 +549,7 @@ end iSingleton
 @[rocq_alias own, irreducible]
 def iOwn {GF F} [RFunctorContractive F] [E : ElemG GF F] (γ : GName)
     (v : F.ap (IProp GF)) : IProp GF :=
-  UPred.ownM <| iSingleton F γ v
+  if γ.slot = E.τ then UPred.ownM (iSingleton F γ.key v) else iprop(False)
 
 #rocq_ignore own_def "`iOwn` is defined directly without `seal`/`unseal`."
 #rocq_ignore own_aux "`iOwn` is defined directly without `seal`/`unseal`."
@@ -560,20 +561,41 @@ open IProp OFE Iris.UPred BI GenMap ProofMode
 
 variable {GF F} [RFunctorContractive F] [E : ElemG GF F]
 
+theorem iOwn_slot {γ : GName} {a : F.ap (IProp GF)} :
+    iOwn γ a ⊢ ⌜γ.slot = E.τ⌝ := by
+  unfold iOwn
+  split
+  · exact pure_intro (by assumption)
+  · exact false_elim
+
+theorem iOwn_slot_conflict {F' : OFunctorPre} [RFunctorContractive F'] [E' : ElemG GF F']
+    {γ : GName} {a : F.ap (IProp GF)} {b : F'.ap (IProp GF)} (h : E.τ ≠ E'.τ) :
+    iOwn γ a ∗ iOwn γ b ⊢ False := by
+  iintro ⟨Ha, Hb⟩
+  ihave %ha := iOwn_slot $$ Ha
+  ihave %hb := iOwn_slot $$ Hb
+  exact (h (ha.symm.trans hb)).elim
+
 @[rocq_alias own_ne]
 instance iOwn_ne : NonExpansive (iOwn τ : F.ap (IProp GF) → IProp GF) where
-  ne {n x1 x2} H := by unfold iOwn; exact NonExpansive.ne (NonExpansive.ne H)
+  ne {n x1 x2} H := by
+    by_cases h : GName.slot τ = E.τ
+    · simp only [iOwn, ite_eq_left h]; exact NonExpansive.ne (NonExpansive.ne H)
+    · simp only [iOwn, ite_eq_right h]; exact .rfl
 
 #rocq_ignore own_proper "OFE is Leibniz; use equality"
 #rocq_ignore own_mono' "Use iOwn_mono."
 
 @[rocq_alias own_op]
 theorem iOwn_op {a1 a2 : F.ap (IProp GF)} : iOwn γ (a1 • a2) ⊣⊢ iOwn γ a1 ∗ iOwn γ a2 := by
-  unfold iOwn
-  rw [← iSingleton_op]
-  exact UPred.ownM_op _ _
+  by_cases h : GName.slot γ = E.τ
+  · simp only [iOwn, ite_eq_left h]
+    rw [← iSingleton_op]
+    exact UPred.ownM_op _ _
+  · simp only [iOwn, ite_eq_right h]
+    exact false_sep.symm
 
-theorem iSingleton_ord_mono {γ : GName} {a1 a2 : F.ap (IProp GF)} (H : a2 ≼ₒ a1) :
+theorem iSingleton_ord_mono {γ : Nat} {a1 a2 : F.ap (IProp GF)} (H : a2 ≼ₒ a1) :
     iSingleton F γ a2 ≼ₒ iSingleton F γ a1 := by
   have hu : unfoldi (E.bundle a2) ≼ₒ unfoldi (E.bundle a1) :=
     ((RFunctor.map (IProp.fold GF) (IProp.unfold GF)).comp E.bundleC).mono_ord H
@@ -584,8 +606,10 @@ theorem iSingleton_ord_mono {γ : GName} {a1 a2 : F.ap (IProp GF)} (H : a2 ≼�
   · exact ord_refl _
 
 theorem iOwn_ord_mono {a1 a2 : F.ap (IProp GF)} (H : a2 ≼ₒ a1) : iOwn γ a1 ⊢ iOwn γ a2 := by
-  unfold iOwn
-  exact UPred.ownM_ord_mono (iSingleton_ord_mono H)
+  by_cases h : GName.slot γ = E.τ
+  · simp only [iOwn, ite_eq_left h]
+    exact UPred.ownM_ord_mono (iSingleton_ord_mono H)
+  · simp only [iOwn, ite_eq_right h]; exact .rfl
 
 @[rocq_alias own_mono]
 theorem iOwn_mono {a1 a2 : F.ap (IProp GF)} (H : a2 ≼ a1) : iOwn γ a1 ⊢ iOwn γ a2 := by
@@ -594,8 +618,10 @@ theorem iOwn_mono {a1 a2 : F.ap (IProp GF)} (H : a2 ≼ a1) : iOwn γ a1 ⊢ iOw
 
 @[rocq_alias own_valid]
 theorem iOwn_cmraValid {a : F.ap (IProp GF)} : iOwn γ a ⊢ ✓ a := by
-  unfold iOwn
-  exact (UPred.ownM_valid _).trans iSingleton_cmraValid
+  by_cases h : GName.slot γ = E.τ
+  · simp only [iOwn, ite_eq_left h]
+    exact (UPred.ownM_valid _).trans iSingleton_cmraValid
+  · simp only [iOwn, ite_eq_right h]; exact false_elim
 
 @[rocq_alias own_valid_2]
 theorem iOwn_cmraValid_op {a1 a2 : F.ap (IProp GF)} :
@@ -612,19 +638,25 @@ theorem iOwn_valid_l {a : F.ap (IProp GF)} : iOwn γ a ⊢ ✓ a ∗ iOwn γ a :
 @[rocq_alias own_core_persistent]
 instance {a : F.ap (IProp GF)} [CoreId a] : BI.Persistent (iOwn γ a) where
   persistent := by
-    simp [iOwn]
-    refine (UPred.persistently_ownM_core _).trans ?_
-    refine persistently_mono ?_
-    rw [core_eqv_self]
+    by_cases h : GName.slot γ = E.τ
+    · simp only [iOwn, ite_eq_left h]
+      refine (UPred.persistently_ownM_core _).trans ?_
+      refine persistently_mono ?_
+      rw [core_eqv_self]
+    · simp only [iOwn, ite_eq_right h]; exact false_elim
 
 @[rocq_alias own_timeless]
 instance iOwn_timeless {a : F.ap (IProp GF)} [OFE.DiscreteE a] : BI.Timeless (iOwn γ a) := by
-  unfold iOwn
-  exact _root_.UPred.ownM_timeless (iSingleton F γ a)
+  by_cases h : GName.slot γ = E.τ
+  · simp only [iOwn, ite_eq_left h]; exact _root_.UPred.ownM_timeless (iSingleton F γ.key a)
+  · simp only [iOwn, ite_eq_right h]; exact ⟨or_intro_l⟩
 
 @[rocq_alias later_own]
 theorem later_iOwn {a : F.ap (IProp GF)} : ▷ iOwn γ a ⊢ ◇ ∃ b, iOwn γ b ∧ ▷ (a ≡ b) := by
-  unfold iOwn
+  by_cases h : GName.slot γ = E.τ
+  case neg =>
+    simp only [iOwn, ite_eq_right h]; exact or_intro_l
+  simp only [iOwn, ite_eq_left h]
   iintro Hlater
   icases UPred.later_ownM _ $$ Hlater with ⟨%r, Hown, Heq⟩
   imod (later_mono internalEq.symm).trans later_internalEq_iSingleton $$ Heq with ⟨%b, %r', Hr, Hab⟩
@@ -679,8 +711,8 @@ theorem iSingleton_op_validN_notfree {mf : IResUR GF} {y : F.ap (IProp GF)} :
 theorem IResUR.valid_exists_fresh {mf : IResUR GF} (_Hv : ✓{n} mf) : ∃ a : Nat, (mf (ElemG.τ GF F)).car a = none :=
   (mf (ElemG.τ GF F)).exists_fresh
 
-theorem alloc_update_unit {f : GName → F.ap (IProp GF)} :
-    (∀ (γ : GName), ✓ f γ) →
+theorem alloc_update_unit {f : Nat → F.ap (IProp GF)} :
+    (∀ (γ : Nat), ✓ f γ) →
     unit ~~>: fun (y : IResUR GF) => ∃ γ, y = iSingleton F γ (f γ) := by
   intros Hf_valid
   apply UpdateP.total.mpr
@@ -690,70 +722,49 @@ theorem alloc_update_unit {f : GName → F.ap (IProp GF)} :
   refine ⟨iSingleton F γ (f γ), ⟨γ, rfl⟩, ?_⟩
   apply validN_iSingleton_op Hvalid (Hf_valid _).validN Hfresh
 
-@[rocq_alias own_alloc_dep]
-theorem iOwn_alloc_dep (f : GName → F.ap (IProp GF)) (Ha : ∀ γ, ✓ (f γ)) :
-    ⊢ |==> ∃ γ, iOwn γ (f γ) := by
-  unfold iOwn
-  refine .trans (Q := iprop(|==> ∃ m, ⌜∃ γ, m = iSingleton F γ (f γ)⌝ ∧ UPred.ownM m)) ?_ (BIUpdate.mono ?_)
-  · refine .trans (@UPred.ownM_unit (IResUR GF) _ _ iprop(emp)) ?_
-    refine .trans intuitionistically_elim ?_
-    apply UPred.bupd_ownM_updateP
-    apply alloc_update_unit Ha
-  · refine BI.exists_elim (fun m => BI.pure_elim_left (fun ⟨γ, Hm⟩ => ?_))
-    subst Hm
-    exact BI.exists_intro_trans γ .rfl
-
-@[rocq_alias own_alloc]
-theorem iOwn_alloc (a : F.ap (IProp GF)) : ✓ a → ⊢ |==> ∃ γ, iOwn γ a :=
-  fun Ha => iOwn_alloc_dep _ (fun _ => Ha)
-
-/-- Allocation with a dependent function and a predicate on the ghost name.
-The predicate P must be satisfied by arbitrarily large naturals. -/
+/-- Allocation with a predicate that has arbitrarily large witnesses in the functor's slot. -/
 @[rocq_alias own_alloc_strong_dep]
 theorem iOwn_alloc_strong_dep (f : GName → F.ap (IProp GF)) (P : GName → Prop)
-    (HP : ∀ N, ∃ k, N ≤ k ∧ P k)
+    (HP : GName.UnboundedIn E.τ P)
     (Hf : ∀ γ, P γ → ✓ (f γ)) :
     ⊢ |==> ∃ γ, ⌜P γ⌝ ∗ iOwn γ (f γ) := by
-  unfold iOwn
-  refine .trans (Q := iprop(|==> ∃ m, ⌜∃ γ, P γ ∧ m = iSingleton F γ (f γ)⌝ ∧ UPred.ownM m)) ?_ (BIUpdate.mono ?_)
+  refine .trans (Q := iprop(|==> ∃ m,
+    ⌜∃ k, P ⟨E.τ, k⟩ ∧ m = iSingleton F k (f ⟨E.τ, k⟩)⌝ ∧ UPred.ownM m))
+      ?_ (BIUpdate.mono ?_)
   · refine .trans (@UPred.ownM_unit (IResUR GF) _ _ iprop(emp)) ?_
     refine .trans intuitionistically_elim ?_
     apply UPred.bupd_ownM_updateP
     apply UpdateP.total.mpr
     intros n mf Hvalid
     replace Hvalid : ✓{n} mf := validN_ne unit_left_id.dist Hvalid
-    obtain ⟨γ, Hfresh, HPγ⟩ := (mf (ElemG.τ GF F)).exists_fresh_sat HP
-    refine ⟨iSingleton F γ (f γ), ⟨γ, HPγ, rfl⟩, ?_⟩
-    apply validN_iSingleton_op Hvalid (Hf γ HPγ).validN Hfresh
-  · refine BI.exists_elim (fun m => BI.pure_elim_left (fun ⟨γ, HPγ, Hm⟩ => ?_))
+    obtain ⟨k, Hfresh, HPk⟩ := (mf E.τ).exists_fresh_sat HP
+    refine ⟨iSingleton F k (f ⟨E.τ, k⟩), ⟨k, HPk, rfl⟩, ?_⟩
+    apply validN_iSingleton_op Hvalid (Hf _ HPk).validN Hfresh
+  · refine BI.exists_elim (fun m => BI.pure_elim_left (fun ⟨k, HPk, Hm⟩ => ?_))
     subst Hm
-    exact BI.exists_intro_trans γ (BI.persistent_entails_right (BI.pure_intro HPγ))
+    refine BI.exists_intro_trans ⟨E.τ, k⟩ ?_
+    simp only [iOwn, ↓reduceIte]
+    exact BI.persistent_entails_right (BI.pure_intro HPk)
 
-private theorem list_not_mem_of_gt_max (G : List Nat) (k : Nat) (hk : G.foldr max 0 < k) :
-    k ∉ G := by
-  intro hmem
-  induction G with
-  | nil => simp at hmem
-  | cons x xs ih =>
-    simp [List.foldr] at hk
-    rcases List.mem_cons.mp hmem with rfl | hmem
-    · omega
-    · exact ih (by omega) hmem
+@[rocq_alias own_alloc_dep]
+theorem iOwn_alloc_dep (f : GName → F.ap (IProp GF)) (Ha : ∀ γ, ✓ (f γ)) :
+    ⊢ |==> ∃ γ, iOwn γ (f γ) := by
+  exact (iOwn_alloc_strong_dep f (fun _ => True) (.true E.τ) (fun γ _ => Ha γ)).trans
+    (BIUpdate.mono <| BI.exists_mono fun _ => BI.sep_elim_right)
 
-private theorem list_fresh_above (G : List Nat) (N : Nat) :
-    ∃ k, N ≤ k ∧ k ∉ G :=
-  ⟨max N (G.foldr max 0 + 1), Nat.le_max_left ..,
-    list_not_mem_of_gt_max G _ (by omega)⟩
+@[rocq_alias own_alloc]
+theorem iOwn_alloc (a : F.ap (IProp GF)) : ✓ a → ⊢ |==> ∃ γ, iOwn γ a :=
+  fun Ha => iOwn_alloc_dep _ (fun _ => Ha)
 
 @[rocq_alias own_alloc_cofinite_dep]
 theorem iOwn_alloc_cofinite_dep (f : GName → F.ap (IProp GF)) (G : List GName)
     (Hf : ∀ γ, γ ∉ G → ✓ (f γ)) :
     ⊢ |==> ∃ γ, ⌜γ ∉ G⌝ ∗ iOwn γ (f γ) :=
-  iOwn_alloc_strong_dep f (· ∉ G) (list_fresh_above G) Hf
+  iOwn_alloc_strong_dep f (· ∉ G) (.not_mem E.τ G) Hf
 
 @[rocq_alias own_alloc_strong]
 theorem iOwn_alloc_strong (a : F.ap (IProp GF)) (P : GName → Prop)
-    (HP : ∀ N, ∃ k, N ≤ k ∧ P k) (Ha : ✓ a) :
+    (HP : GName.UnboundedIn E.τ P) (Ha : ✓ a) :
     ⊢ |==> ∃ γ, ⌜P γ⌝ ∗ iOwn γ a :=
   iOwn_alloc_strong_dep (fun _ => a) P HP (fun _ _ => Ha)
 
@@ -808,8 +819,11 @@ theorem singleton_updateP {a : F.ap (IProp GF)} (Hupd : a ~~>: P) :
 
 @[rocq_alias own.own_updateP]
 theorem iOwn_updateP {P γ a} (Hupd : a ~~>: P) : iOwn γ a ⊢ |==> ∃ a' : F.ap (IProp GF), ⌜P a'⌝ ∗ iOwn γ a' := by
-  unfold iOwn
-  refine .trans (Q := iprop(|==> ∃ m, ⌜ ∃ a', m = (iSingleton F γ a') ∧ P a' ⌝ ∧ UPred.ownM m)) ?_ ?_
+  by_cases h : GName.slot γ = E.τ
+  case neg =>
+    simp only [iOwn, ite_eq_right h]; exact false_elim
+  simp only [iOwn, ite_eq_left h]
+  refine .trans (Q := iprop(|==> ∃ m, ⌜ ∃ a', m = (iSingleton F γ.key a') ∧ P a' ⌝ ∧ UPred.ownM m)) ?_ ?_
   · apply UPred.bupd_ownM_updateP
     apply singleton_updateP Hupd
   · refine BIUpdate.mono (BI.exists_elim (fun m => BI.pure_elim_left (fun ⟨a', Hm, HP⟩ => ?_)))
@@ -839,18 +853,19 @@ theorem iOwn_update_op_op {γ} {a1 a2 a3 a' : F.ap (IProp GF)} (Hupd : (a1 • a
   BI.sep_assoc.symm.1.trans ((BI.sep_mono_left iOwn_op.mpr).trans (iOwn_update_op Hupd))
 
 @[rocq_alias own_unit]
-theorem iOwn_unit {γ} {ε : F.ap (IProp GF)} [Hε : IsUnit ε] : ⊢ |==> iOwn γ ε := by
-  unfold iOwn
+theorem iOwn_unit {γ} {ε : F.ap (IProp GF)} [Hε : IsUnit ε]
+    (h : GName.slot γ = E.τ) : ⊢ |==> iOwn γ ε := by
+  simp only [iOwn, ite_eq_left h]
   apply (UPred.ownM_unit _).trans
   apply BI.intuitionistically_elim.trans
-  refine .trans (UPred.bupd_ownM_updateP unit (iSingleton F γ ε = ·) ?_) ?_
+  refine .trans (UPred.bupd_ownM_updateP unit (iSingleton F γ.key ε = ·) ?_) ?_
   · apply UpdateP.total.mpr
     intros n mf Hv
-    refine ⟨iSingleton F γ ε, rfl, ?_⟩
+    refine ⟨iSingleton F γ.key ε, rfl, ?_⟩
     replace Hv := validN_ne unit_left_id.dist Hv
     apply iSingleton_op_validN_at_γ Hv
     unfold iSingleton; simp [ValidN, op, GenMap.singleton_map_in]
-    rcases h_at : (mf E.τ).car γ with (⟨⟩ | v) <;> simp
+    rcases h_at : (mf E.τ).car γ.key with (⟨⟩ | v) <;> simp
     · exact IProp.unfoldi_bundle_validN Hε.unit_valid.validN
     · have h_unit : IsUnit (IProp.unfoldi (E.bundle ε)) := IProp.unfoldi_bundle_unit
       apply validN_ne h_unit.unit_left_id.dist.symm
@@ -994,73 +1009,93 @@ open IProp OFE BI
 @[rocq_alias iRes_project]
 def iResProject {GF} F [RFunctorContractive F] [E : ElemG GF F] (γ : GName)
     (x : IResUR GF) : Option (F.ap (IProp GF)) :=
-  ((x E.τ).car γ).map fun v => E.unbundle (foldi v)
+  if γ.slot = E.τ then ((x E.τ).car γ.key).map fun v => E.unbundle (foldi v) else none
 
 variable {GF F} [RFunctorContractive F] [E : ElemG GF F]
 
 @[rocq_alias iRes_project_op]
 theorem iResProject_op (x y : IResUR GF) :
     iResProject F γ (x • y) = iResProject F γ x • iResProject F γ y := by
-  simp only [iResProject, iResUR_op_eval]
-  rcases (x E.τ).car γ with _ | x1 <;> rcases (y E.τ).car γ with _ | y1 <;> simp [op, optionOp]
-  rw [foldi_op, unbundle_op]
+  by_cases h : GName.slot γ = E.τ
+  · simp only [iResProject, ite_eq_left h, iResUR_op_eval]
+    rcases (x E.τ).car γ.key with _ | x1 <;> rcases (y E.τ).car γ.key with _ | y1 <;>
+      simp [op, optionOp]
+    rw [foldi_op, unbundle_op]
+  · simp only [iResProject, ite_eq_right h]; rfl
 
 @[rocq_alias iRes_project_ne]
 instance iResProject_ne : NonExpansive (iResProject F γ (GF := GF)) where
-  ne {_ _ _} H := Option.map_ne (fun _ _ h => ElemG.unbundle.ne.ne (foldi.ne.ne h)) (H E.τ γ)
+  ne {_ _ _} H := by
+    by_cases h : GName.slot γ = E.τ
+    · simp only [iResProject, ite_eq_left h]
+      exact Option.map_ne (fun _ _ h => ElemG.unbundle.ne.ne (foldi.ne.ne h)) (H E.τ γ.key)
+    · simp only [iResProject, ite_eq_right h]; exact .rfl
 
 @[rocq_alias iRes_project_singleton]
-theorem iResProject_iSingleton (a : F.ap (IProp GF)) :
-    iResProject F γ (iSingleton F γ a) = some a := by
-  simp [iResProject, iSingleton, GenMap.singleton_map_in, foldi_unfoldi, ElemG.unbundle_bundle]
+theorem iResProject_iSingleton (a : F.ap (IProp GF)) (h : γ.slot = E.τ) :
+    iResProject F γ (iSingleton F γ.key a) = some a := by
+  simp [iResProject, h, iSingleton, GenMap.singleton_map_in, foldi_unfoldi, ElemG.unbundle_bundle]
 
 @[rocq_alias iRes_project_below]
 theorem iResProject_below {z : IResUR GF} {c : F.ap (IProp GF)}
-    (h : iResProject F γ z = some c) : iSingleton F γ c ≼ z := by
-  simp only [iResProject, Option.map_eq_some_iff] at h
+    (h : iResProject F γ z = some c) : iSingleton F γ.key c ≼ z := by
+  have hslot : γ.slot = E.τ := by
+    apply Classical.byContradiction
+    intro hn
+    simp [iResProject, hn] at h
+  simp only [iResProject, ite_eq_left hslot, Option.map_eq_some_iff] at h
   obtain ⟨v, hv, rfl⟩ := h
   exact ⟨_, (iSingleton_op_alter hv).symm⟩
 
 theorem iResProject_ord_monoN {n} {x y : IResUR GF} (h : x ≼ₒ{n} y) :
-    iResProject F γ x ≼ₒ{n} iResProject F γ y :=
-  (Option.mapC (E.unbundleC.comp (RFunctor.map (IProp.unfold GF) (IProp.fold GF)))).monoN_ord
-    (h E.τ γ)
+    iResProject F γ x ≼ₒ{n} iResProject F γ y := by
+  by_cases hslot : GName.slot γ = E.τ
+  · simp only [iResProject, ite_eq_left hslot]
+    exact (Option.mapC (E.unbundleC.comp (RFunctor.map (IProp.unfold GF) (IProp.fold GF)))).monoN_ord
+      (h E.τ γ.key)
+  · simp only [iResProject, ite_eq_right hslot]; exact ordN_refl _
 
-theorem iResProject_ord_above {z : IResUR GF} {c : F.ap (IProp GF)} :
-    iSingleton F γ c ≼ₒ z ⊢ some c ≼ₒ iResProject F γ z := by
+theorem iResProject_ord_above {z : IResUR GF} {c : F.ap (IProp GF)} (hslot : γ.slot = E.τ) :
+    iSingleton F γ.key c ≼ₒ z ⊢ some c ≼ₒ iResProject F γ z := by
   sbi_unfold
-  exact fun _ h => iResProject_iSingleton (F := F) c ▸ iResProject_ord_monoN h
+  exact fun _ h => iResProject_iSingleton (F := F) c hslot ▸ iResProject_ord_monoN h
 
 @[rocq_alias iRes_project_above]
-theorem iResProject_above {z : IResUR GF} {c : F.ap (IProp GF)} :
-    iSingleton F γ c ≼ z ⊢ some c ≼ iResProject F γ z := by
+theorem iResProject_above {z : IResUR GF} {c : F.ap (IProp GF)} (hslot : γ.slot = E.τ) :
+    iSingleton F γ.key c ≼ z ⊢ some c ≼ iResProject F γ z := by
   refine (internalCmraIncluded_map (iResProject F γ) iResProject_op).trans ?_
-  rw [iResProject_iSingleton]
+  rw [iResProject_iSingleton _ hslot]
 
 theorem iResProject_none_ord_false {z : IResUR GF} (a : F.ap (IProp GF))
-    (hz : iResProject F γ z = none) : iSingleton F γ a ≼ₒ z ⊢ False := by
-  refine iResProject_ord_above.trans ?_
+    (hslot : γ.slot = E.τ) (hz : iResProject F γ z = none) :
+    iSingleton F γ.key a ≼ₒ z ⊢ False := by
+  refine (iResProject_ord_above hslot).trans ?_
   rw [hz]
   exact some_ordI_none
 
 /-- Nothing is owned at `γ` when the projection there is `none`. -/
 theorem iResProject_none_incl_false {z : IResUR GF} (a : F.ap (IProp GF))
-    (hz : iResProject F γ z = none) : iSingleton F γ a ≼ z ⊢ False := by
-  refine iResProject_above.trans ?_
+    (hslot : γ.slot = E.τ) (hz : iResProject F γ z = none) :
+    iSingleton F γ.key a ≼ z ⊢ False := by
+  refine (iResProject_above hslot).trans ?_
   rw [hz]
   exact option_includedI.mp
 
 theorem iOwn_ord_forall {B : Type _} [Inhabited B] (γ : GName) (f : B → F.ap (IProp GF)) :
     (∀ b, iOwn γ (f b)) ⊢ ∃ c, iOwn γ c ∗ ∀ b, some (f b) ≼ₒ some c := by
-  have hforall : (∀ b, UPred.ownM (iSingleton F γ (f b))) ⊢
-      ∃ z, UPred.ownM z ∧ ∀ b, iSingleton F γ (f b) ≼ₒ z :=
+  have hforall : (∀ b, UPred.ownM (iSingleton F γ.key (f b))) ⊢
+      ∃ z, UPred.ownM z ∧ ∀ b, iSingleton F γ.key (f b) ≼ₒ z :=
     UPred.ownM_ord_forall _
-  unfold iOwn
+  by_cases h : GName.slot γ = E.τ
+  case neg =>
+    simp only [iOwn, ite_eq_right h]
+    exact (forall_elim default).trans false_elim
+  simp only [iOwn, ite_eq_left h]
   iintro Hown
   icases hforall $$ Hown with ⟨%z, Hown, #Hincl⟩
   rcases hc : iResProject F γ z with _ | c
   · iexfalso
-    iapply iResProject_none_ord_false (f default) hc
+    iapply iResProject_none_ord_false (f default) h hc
     iexact Hincl
   · iexists c
     isplitl [Hown]
@@ -1068,7 +1103,7 @@ theorem iOwn_ord_forall {B : Type _} [Inhabited B] (γ : GName) (f : B → F.ap 
       iexact Hown
     · iintro %b
       rw [← hc]
-      iapply iResProject_ord_above
+      iapply iResProject_ord_above h
       iexact Hincl
 
 theorem iOwn_ord_forall_total [OrderRefl (F.ap (IProp GF))] {B : Type _} [Inhabited B]

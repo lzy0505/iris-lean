@@ -48,10 +48,11 @@ instance token_timeless (γ : GName) : Timeless (token (GF := GF) γ) := by
   infer_instance
 
 @[rocq_alias token_alloc_strong]
-theorem token_alloc_strong (P : GName → Prop) (HP : PredInfinite P) :
+theorem token_alloc_strong (P : GName → Prop)
+    (HP : GName.UnboundedIn (TokenG.elemG (GF := GF)).τ P) :
     ⊢ |==> ∃ γ, ⌜P γ⌝ ∗ token γ := by
   unfold token
-  exact iOwn_alloc_strong _ P HP.exists_ge trivial
+  exact iOwn_alloc_strong _ P HP trivial
 
 @[rocq_alias token_alloc]
 theorem token_alloc : ⊢ |==> ∃ γ, token γ := by

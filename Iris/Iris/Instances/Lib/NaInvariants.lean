@@ -55,6 +55,9 @@ variable {GF : BundledGFunctors} [InvGS_gen hlc GF] [W : NaInvG GF]
 def own (p : NaInvPoolName) (E : CoPset) : IProp GF :=
   iOwn (E := W.inv) p (.valid E, .valid ∅)
 
+theorem own_slot (p : NaInvPoolName) (E : CoPset) : own p E ⊢ ⌜GName.slot p = W.inv.τ⌝ :=
+  iOwn_slot
+
 @[rocq_alias na_inv]
 nonrec def inv (p : NaInvPoolName) (N : Namespace) (P : IProp GF) : IProp GF :=
   iprop(∃ i, ⌜i ∈ (↑N : CoPset)⌝ ∧
@@ -148,13 +151,15 @@ theorem own_acc {E2 E1 : CoPset} {tid : NaInvPoolName} (Hsub : E2 ⊆ E1) :
   isplitl [H1] <;> iassumption
 
 @[rocq_alias na_own_empty]
-theorem own_empty (p : NaInvPoolName) : ⊢ |==> own p ∅ := iOwn_unit (E := W.inv)
+theorem own_empty (p : NaInvPoolName) (h : GName.slot p = W.inv.τ) :
+    ⊢ |==> own p ∅ := iOwn_unit (E := W.inv) h
 
 @[rocq_alias na_inv_alloc]
-nonrec theorem inv_alloc {p : NaInvPoolName} {E : CoPset} {N : Namespace} {P : IProp GF} :
+nonrec theorem inv_alloc {p : NaInvPoolName} {E : CoPset} {N : Namespace} {P : IProp GF}
+    (h : GName.slot p = W.inv.τ) :
     ⊢ ▷ P ={E}=∗ inv p N P := by
   iintro HP
-  imod (iOwn_unit (E := W.inv) (γ := p) (ε := (.valid ∅, .valid ∅))) with Hempty
+  imod (iOwn_unit (E := W.inv) (γ := p) (ε := (.valid ∅, .valid ∅)) h) with Hempty
   have Hupd : (.valid (∅ : CoPset), .valid (∅ : PosSet)) ~~>:
       fun y : NaInvF.ap (IProp GF) => ∃ i, y = (.valid ∅, .valid {i}) ∧ i ∈ (↑N : CoPset) :=
     .prod (P := (· = .valid ∅)) (.id rfl) (alloc_empty_updateP_strong' (fresh_name · N))

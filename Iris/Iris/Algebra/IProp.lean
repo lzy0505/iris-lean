@@ -10,6 +10,7 @@ public import Iris.Algebra.OFE
 public import Iris.Algebra.UPred
 public import Iris.Algebra.GenMap
 public import Iris.Algebra.COFESolver
+public import Iris.Std.Infinite
 public import Init.Data.Vector
 
 @[expose] public section
@@ -43,8 +44,43 @@ def BundledGFunctors.set (GF : BundledGFunctors) (i : Nat) (FB : GFunctor) :
 #rocq_ignore gFunctors.singleton "`BundledGFunctors` is a function `GType → GFunctor`; no list combinators."
 #rocq_ignore gFunctors.app "`BundledGFunctors` is a function `GType → GFunctor`; no list combinators."
 
+/-- A ghost name identifies a functor slot and a key within that slot. -/
 @[rocq_alias gname]
-abbrev GName := Nat
+structure GName where
+  slot : GType
+  key : Nat
+  deriving DecidableEq, Inhabited
+
+instance : InfiniteType GName where
+  enum := GName.mk 0
+  enum_inj _ _ h := congrArg GName.key h
+
+instance : Ord GName where
+  compare := compareLex (compareOn GName.slot) (compareOn GName.key)
+
+instance : Std.TransOrd GName := inferInstanceAs (Std.TransCmp (compareLex _ _))
+
+instance : Std.LawfulEqOrd GName where
+  eq_of_compare {a b} h := by
+    change compareLex (compareOn GName.slot) (compareOn GName.key) a b = .eq at h
+    simp only [compareLex_eq_eq, compareOn] at h
+    cases a
+    cases b
+    exact GName.mk.injEq .. |>.mpr ⟨Std.LawfulEqOrd.eq_of_compare h.1,
+      Std.LawfulEqOrd.eq_of_compare h.2⟩
+
+/-- A predicate with arbitrarily large local keys in the given functor slot. -/
+def GName.UnboundedIn (τ : GType) (P : GName → Prop) : Prop :=
+  ∀ N, ∃ k, N ≤ k ∧ P ⟨τ, k⟩
+
+theorem GName.UnboundedIn.true (τ : GType) : GName.UnboundedIn τ (fun _ => True) :=
+  fun N => ⟨N, Nat.le_refl N, trivial⟩
+
+theorem GName.UnboundedIn.not_mem (τ : GType) (G : List GName) :
+    GName.UnboundedIn τ (· ∉ G) := by
+  intro N
+  obtain ⟨k, hk, hfree⟩ := (PredInfinite.not_mem (G.map GName.key)).exists_ge N
+  exact ⟨k, hk, fun h => hfree (List.mem_map_of_mem h)⟩
 
 #rocq_ignore gnameO "Use `LeibnizO GName`."
 

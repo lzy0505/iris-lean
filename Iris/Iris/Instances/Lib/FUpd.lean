@@ -144,12 +144,13 @@ instance {GF : BundledGFunctors} [InvGS_gen hlc GF] : BIUpdateFUpdate (IProp GF)
     iassumption
 
 @[rocq_alias uPred_bi_bupd_lc]
-instance uPred_bi_bupd_lc {GF : BundledGFunctors} [LcGS hlc GF] : BIBUpdLaterCredits (IProp GF) where
+instance uPred_bi_bupd_lc {GF : BundledGFunctors} [LC : LcGS hlc GF] :
+    BIBUpdLaterCredits (IProp GF) where
   lc_zero := by
     rw [uPred_lc_unseal]
     cases hlc with
     | hasNoLC => simp only [uPred_lc]; itrivial
-    | hasLC => exact iOwn_unit (ε := UORA.unit)
+    | hasLC => exact iOwn_unit (ε := UORA.unit) LC.lc_name_slot
 
 end Instances
 

@@ -217,10 +217,11 @@ theorem lb_own_le (γ : GName) {l : List α} (l' : List α) (h : l' <+: l) :
   exact MonoList.lb_mono_ord (h.map _)
 
 @[rocq_alias mono_list_lb_own_nil]
-theorem lb_own_nil (γ : GName) : ⊢ |==> (γ ↪◯ML ([] : List α)) := by
+theorem lb_own_nil (γ : GName) (h : γ.slot = (MonoListG.elem (GF := GF) (α := α)).τ) :
+    ⊢ |==> (γ ↪◯ML ([] : List α)) := by
   unfold lb_own
   rw [List.map_nil]
-  iapply iOwn_unit
+  iapply iOwn_unit h
 
 @[rocq_alias mono_list_idx_own_get]
 theorem idx_own_get (γ : GName) {l : List α} (i : Nat) (a : α) (h : l[i]? = some a) :

@@ -52,6 +52,8 @@ class WsatGS (GF : BundledGFunctors) extends WsatGpreS GF where
   invariant_name : GName
   enabled_name : GName
   disabled_name : GName
+  enabled_name_slot : enabled_name.slot = enabled.τ
+  disabled_name_slot : disabled_name.slot = disabled.τ
 
 #rocq_ignore «wsatGS.wsatΣ» "Superseded by the `WsatGpreS` typeclass on `BundledGFunctors`."
 #rocq_ignore «wsatGS.subG_wsatΣ» "Superseded by Lean's direct `ElemG` typeclass synthesis."
@@ -110,7 +112,8 @@ section ownE
 variable {GF : BundledGFunctors} [W : WsatGS GF]
 
 @[rocq_alias ownE_empty]
-theorem ownE_empty : ⊢ |==> ownE (W := W) ∅ := iOwn_unit (ε := UORA.unit)
+theorem ownE_empty : ⊢ |==> ownE (W := W) ∅ :=
+  iOwn_unit (ε := UORA.unit) W.enabled_name_slot
 
 @[rocq_alias ownE_op]
 theorem ownE_op {E1 E2} (Hdisj : E1 ## E2) : ownE (E1 ∪ E2) ⊣⊢ ownE E1 ∗ ownE E2 := by
@@ -154,7 +157,8 @@ section ownD
 variable {GF : BundledGFunctors} [W : WsatGS GF]
 
 @[rocq_alias ownD_empty]
-theorem ownD_empty : ⊢ |==> ownD ∅ := iOwn_unit (ε := UORA.unit)
+theorem ownD_empty : ⊢ |==> ownD ∅ :=
+  iOwn_unit (ε := UORA.unit) W.disabled_name_slot
 
 @[rocq_alias ownD_op]
 theorem ownD_op {E1 E2} (Hdisj : E1 ## E2) : ownD (E1 ∪ E2) ⊣⊢ ownD E1 ∗ ownD E2 := by
@@ -355,6 +359,8 @@ theorem wsat_alloc [instWp : WsatGpreS GF] :
   imod (iOwn_alloc (E := instWp.inv) (Auth (.own 1) ∅) auth_one_valid) with ⟨%γ, H⟩
   imod (iOwn_alloc (E := instWp.enabled) (valid ⊤) ⟨⟩) with ⟨%γe, He⟩
   imod (iOwn_alloc (E := instWp.disabled) (valid ∅) ⟨⟩) with ⟨%γd, Hd⟩
+  ihave %he := iOwn_slot $$ He
+  ihave %hd := iOwn_slot $$ Hd
   imodintro
   let W : WsatGS GF := {
     inv := instWp.inv,
@@ -363,6 +369,8 @@ theorem wsat_alloc [instWp : WsatGpreS GF] :
     invariant_name := γ,
     enabled_name := γe,
     disabled_name := γd
+    enabled_name_slot := he
+    disabled_name_slot := hd
   }
   iexists W
   isplitr [He]

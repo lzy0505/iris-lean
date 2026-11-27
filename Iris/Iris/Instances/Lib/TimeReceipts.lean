@@ -28,6 +28,7 @@ attribute [reducible, instance] TimeReceiptGpreS.elem
 @[rocq_alias time_receiptGS]
 class TimeReceiptGS (GF : BundledGFunctors) extends TimeReceiptGpreS GF where
   name : GName
+  name_slot : name.slot = elem.τ
 
 #rocq_ignore «time_receiptΣ» "Superseded by the `TimeReceiptGpreS` typeclass on `BundledGFunctors`."
 #rocq_ignore «subG_time_receiptΣ» "Superseded by Lean's direct `ElemG` typeclass synthesis."
@@ -96,11 +97,11 @@ theorem pers_split (n₁ n₂ : Nat) : ⧖□ (max n₁ n₂) ⊣⊢ ⧖□ n₁
 
 @[rocq_alias time_receipt_excl_zero]
 theorem excl_zero : ⊢ |==> ⧖+ 0 :=
-  iOwn_unit (ε := UORA.unit)
+  iOwn_unit (ε := UORA.unit) TR.name_slot
 
 @[rocq_alias time_receipt_pers_zero]
 theorem pers_zero : ⊢ |==> ⧖□ 0 :=
-  iOwn_unit (ε := UORA.unit)
+  iOwn_unit (ε := UORA.unit) TR.name_slot
 
 @[rocq_alias time_receipt_excl_weaken]
 theorem excl_weaken {n₁ : Nat} (n₂ : Nat) (h : n₂ ≤ n₁) : ⊢ ⧖+ n₁ -∗ ⧖+ n₂ := by
@@ -194,7 +195,8 @@ theorem supply_alloc {GF : BundledGFunctors} [TimeReceiptGpreS GF] (n : Nat) :
     ⊢ |==> ∃ _ : TimeReceiptGS GF, supply (n + n) ∗ ⧖+ n := by
   imod iOwn_alloc (E := TimeReceiptGpreS.elem) _
     ((auth_op_fragExcl_valid_iff (n + n) n).mpr (Nat.le_refl _)) with ⟨%γ, Hauth, Htr⟩
-  iexists ⟨γ⟩
+  ihave %hslot := iOwn_slot $$ Hauth
+  iexists ⟨γ, hslot⟩
   unfold supply excl
   iframe
 

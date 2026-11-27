@@ -137,14 +137,15 @@ theorem lb_own_le (γ : GName) (n n' : MaxNat) (h : n' ≤ n) :
   exact MonoNat.lb_mono_ord _ _ h
 
 @[rocq_alias mono_nat_lb_own_0]
-theorem lb_own_0 {GF : BundledGFunctors} [MonoNatG GF] (γ : GName) :
+theorem lb_own_0 {GF : BundledGFunctors} [G : MonoNatG GF] (γ : GName)
+    (h : γ.slot = G.elem.τ) :
   ⊢ |==> (γ ↪◯MN 0) := by
   unfold lb_own
-  iapply iOwn_unit
+  iapply iOwn_unit h
 
 @[rocq_alias mono_nat_own_alloc_strong]
-theorem own_alloc_strong (P : Nat → Prop) n
-  (hP : ∀ N, ∃ k, N ≤ k ∧ P k) :
+theorem own_alloc_strong (P : GName → Prop) n
+  (hP : GName.UnboundedIn (MonoNatG.elem (GF := GF)).τ P) :
   ⊢ |==> ∃ γ, ⌜P γ⌝ ∗ (γ ↪●MN n) ∗ γ ↪◯MN n := by
   unfold auth_own lb_own
   imod iOwn_alloc_strong (F := MonoNatRF) ((●MN n) • (◯MN n)) P hP with ⟨%γ, ⟨H1, H2⟩⟩
@@ -158,7 +159,7 @@ theorem own_alloc_strong (P : Nat → Prop) n
 theorem own_alloc {GF : BundledGFunctors} [MonoNatG GF] (n : MaxNat) :
   ⊢ |==> (∃ γ, (γ ↪●MN n) ∗ (γ ↪◯MN n)) := by
   imod (own_alloc_strong (fun _ => True) n) with ⟨%γ, ⟨-, H⟩⟩
-  · intro n; exists n; simp
+  · exact .true _
   · iexists γ
     imodintro
     iframe

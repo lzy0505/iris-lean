@@ -57,6 +57,7 @@ attribute [reducible, instance] LcGpreS.lc_elem
 @[rocq_alias lcGS]
 class LcGS (hlc : outParam HasLC) (GF : BundledGFunctors) extends LcGpreS GF where
   lc_name : GName
+  lc_name_slot : lc_name.slot = lc_elem.τ
 
 #rocq_ignore «lcΣ» "Superseded by the `LcGpreS` typeclass on `BundledGFunctors`."
 #rocq_ignore «subG_lcΣ» "Superseded by Lean's direct `ElemG` typeclass synthesis."
@@ -445,8 +446,9 @@ end Internal
 theorem lc_alloc [H : LcGpreS GF] n : ⊢ |==> ∃ _ : LcGS .hasLC GF, lc_supply n ∗ £ n := by
   imod (iOwn_alloc (E := H.lc_elem) ((● n) • (◯ n)) (auth_both_valid.mpr ⟨fun _ => .rfl, ⟨⟩⟩))
     with ⟨%γLC, HOwn⟩
+  ihave %hslot := iOwn_slot $$ HOwn
   icases iOwn_op $$ HOwn with ⟨HAuth, HFrag⟩
-  let LC : LcGS .hasLC GF := { lc_elem := H.lc_elem, lc_name := γLC }
+  let LC : LcGS .hasLC GF := { lc_elem := H.lc_elem, lc_name := γLC, lc_name_slot := hslot }
   iexists LC
   imodintro
   simp only [lc_supply, uPred_lc_unseal, uPred_lc]
@@ -455,7 +457,8 @@ theorem lc_alloc [H : LcGpreS GF] n : ⊢ |==> ∃ _ : LcGS .hasLC GF, lc_supply
 @[rocq_alias le_upd.lc_alloc_no_lc]
 theorem lc_alloc_no_lc [H : LcGpreS GF] n :
     ⊢ ∃ _ : LcGS .hasNoLC GF, lc_supply 0 ∗ £ n := by
-  let LC : LcGS .hasNoLC GF := { lc_elem := H.lc_elem, lc_name := default }
+  let LC : LcGS .hasNoLC GF :=
+    { lc_elem := H.lc_elem, lc_name := ⟨H.lc_elem.τ, 0⟩, lc_name_slot := rfl }
   iexists LC
   simp only [lc_supply, uPred_lc_unseal, uPred_lc]
   itrivial

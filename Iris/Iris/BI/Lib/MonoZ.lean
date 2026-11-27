@@ -129,10 +129,10 @@ theorem lb_own_le (γ : GName) (n n' : Int) (h : n' ≤ n) (h0 : 0 ≤ n') :
   iapply MonoNat.lb_own_le (h := by simp only [MaxNat.le_toNat]; omega) $$ H
 
 @[rocq_alias mono_Z_lb_own_0]
-theorem lb_own_0 (γ : GName) : ⊢ |==> (γ ↪◯MZ 0) := by
+theorem lb_own_0 (γ : GName) (h : γ.slot = (MonoNatG.elem (GF := GF)).τ) : ⊢ |==> (γ ↪◯MZ 0) := by
   unfold lb_own
   simp only [Int.toNat_zero]
-  imod MonoNat.lb_own_0 with H
+  imod MonoNat.lb_own_0 γ h with H
   imodintro
   iframe H
   ipureintro

@@ -64,9 +64,10 @@ instance (γ : GName) (a : A) (q : Qp) :
   as_fractional_fractional := ghost_var_fractional γ a
 
 @[rocq_alias ghost_var_alloc_strong]
-theorem ghost_var_alloc_strong (a : A) (P : GName → Prop) (HP : PredInfinite P) :
+theorem ghost_var_alloc_strong (a : A) (P : GName → Prop)
+    (HP : GName.UnboundedIn (GhostVarG.elemG (GF := GF) (A := A)).τ P) :
     ⊢ |==> ∃ γ, ⌜P γ⌝ ∗ γ ↪VAR a :=
-  iOwn_alloc_strong _ _ HP.exists_ge (mk_valid.mpr valid_own_one)
+  iOwn_alloc_strong _ _ HP (mk_valid.mpr valid_own_one)
 
 @[rocq_alias ghost_var_alloc]
 theorem ghost_var_alloc (a : A) : ⊢ |==> ∃ γ, γ ↪VAR a :=

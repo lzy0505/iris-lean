@@ -72,16 +72,16 @@ instance saved_anything_as_fractional (γ : GName) (x : F.ap (IProp GF)) (q : Qp
 
 @[rocq_alias saved_anything_alloc_strong]
 theorem saved_anything_alloc_strong (x : F.ap (IProp GF)) (I : GName → Prop) (dq : DFrac)
-    (Hdq : ✓ dq) (HI : PredInfinite I) :
+    (Hdq : ✓ dq) (HI : GName.UnboundedIn (SavedAnythingG.elemG (GF := GF) (F := F)).τ I) :
     ⊢ |==> ∃ γ, ⌜I γ⌝ ∗ saved_anything_own γ dq x := by
   unfold saved_anything_own
-  exact iOwn_alloc_strong _ I HI.exists_ge ⟨Hdq, toAgree_valid⟩
+  exact iOwn_alloc_strong _ I HI ⟨Hdq, toAgree_valid⟩
 
 @[rocq_alias saved_anything_alloc_cofinite]
 theorem saved_anything_alloc_cofinite (x : F.ap (IProp GF)) (G : List GName) (dq : DFrac)
     (Hdq : ✓ dq) :
     ⊢ |==> ∃ γ, ⌜γ ∉ G⌝ ∗ saved_anything_own γ dq x :=
-  saved_anything_alloc_strong x (· ∉ G) dq Hdq (PredInfinite.not_mem G)
+  saved_anything_alloc_strong x (· ∉ G) dq Hdq (.not_mem _ G)
 
 @[rocq_alias saved_anything_alloc]
 theorem saved_anything_alloc (x : F.ap (IProp GF)) (dq : DFrac) (Hdq : ✓ dq) :
@@ -213,7 +213,8 @@ instance saved_prop_as_fractional (γ : GName) (P : IProp GF) (q : Qp) :
 
 @[rocq_alias saved_prop_alloc_strong]
 theorem saved_prop_alloc_strong (I : GName → Prop) (P : IProp GF) (dq : DFrac)
-    (Hdq : ✓ dq) (HI : PredInfinite I) :
+    (Hdq : ✓ dq)
+    (HI : GName.UnboundedIn (SavedAnythingG.elemG (GF := GF) (F := LaterOF IdOF)).τ I) :
     ⊢ |==> ∃ γ, ⌜I γ⌝ ∗ saved_prop_own γ dq P :=
   saved_anything_alloc_strong _ I dq Hdq HI
 
@@ -316,7 +317,9 @@ instance saved_pred_as_fractional (γ : GName) (Φ : A → IProp GF) (q : Qp) :
 
 @[rocq_alias saved_pred_alloc_strong]
 theorem saved_pred_alloc_strong (I : GName → Prop) (Φ : A → IProp GF) (dq : DFrac)
-    (Hdq : ✓ dq) (HI : PredInfinite I) :
+    (Hdq : ✓ dq)
+    (HI : GName.UnboundedIn
+      (SavedAnythingG.elemG (GF := GF) (F := DiscreteFunOF (fun _ : A => LaterOF IdOF))).τ I) :
     ⊢ |==> ∃ γ, ⌜I γ⌝ ∗ saved_pred_own γ dq Φ :=
   saved_anything_alloc_strong _ I dq Hdq HI
 

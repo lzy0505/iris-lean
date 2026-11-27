@@ -92,7 +92,8 @@ instance (γ : GName) (k : K) (v : V) : AsFractional (PROP := IProp GF) (γ ↪�
   as_fractional_fractional := ghost_map_elem_fractional γ k v
 
 @[rocq_alias ghost_map_elems_unseal]
-theorem ghost_map_elems_unseal [DecidableEq K] γ (m : H V) dq :
+theorem ghost_map_elems_unseal [DecidableEq K] (γ : GName) (m : H V) dq
+    (hslot : γ.slot = (GhostMapG.elem (GF := GF) (K := K) (V := V) (H := H)).τ) :
     ([∗map] k ↦ v ∈ m, γ ↪◯MAP[k]{dq} v) ==∗
     iOwn (GF := GF) (E := GhostMapG.elem) γ ([^ op map] k ↦ v ∈ m,
       Frag k dq (toAgree (⟨v⟩: DiscreteO V))) := by
@@ -100,7 +101,7 @@ theorem ghost_map_elems_unseal [DecidableEq K] γ (m : H V) dq :
   by_cases h : m = ∅
   · subst h
     simp only [BigOpM.bigOpM_empty]
-    iapply iOwn_unit (γ := γ) (ε := unit)
+    iapply iOwn_unit (γ := γ) (ε := unit) hslot
   · imodintro
     iapply bigOpM_iOwn _ _ _ h
     unfold ghost_map_elem
@@ -201,7 +202,7 @@ theorem ghost_map_elem_unpersist (γ : GName) (k : K) (v : V) :
 
 @[rocq_alias ghost_map_alloc_strong]
 theorem ghost_map_alloc_strong [DecidableEq K] (P : GName → Prop) (m : H V) :
-  (∀ N, ∃ k, N ≤ k ∧ P k) →
+  GName.UnboundedIn (GhostMapG.elem (GF := GF) (K := K) (V := V) (H := H)).τ P →
   ⊢ |==> ∃ γ, ⌜P γ⌝ ∗ (γ ↪●MAP m) ∗ [∗map] k ↦ v ∈ m, γ ↪◯MAP[k] v := by
   unfold ghost_map_elem ghost_map_auth
   iintro %Hinf
@@ -220,7 +221,7 @@ theorem ghost_map_alloc_strong [DecidableEq K] (P : GName → Prop) (m : H V) :
 
 @[rocq_alias ghost_map_alloc_strong_empty]
 theorem ghost_map_alloc_strong_empty [DecidableEq K] (P : GName → Prop)
-    (Hinf : ∀ N, ∃ k, N ≤ k ∧ P k) :
+    (Hinf : GName.UnboundedIn (GhostMapG.elem (GF := GF) (K := K) (V := V) (H := H)).τ P) :
     ⊢ |==> ∃ γ, ⌜P γ⌝ ∗ (γ ↪●MAP (∅ : H V)) := by
   imod ghost_map_alloc_strong P (∅ : H V) Hinf with ⟨%γ, H1, H2, -⟩
   iexists γ
@@ -230,7 +231,7 @@ theorem ghost_map_alloc_strong_empty [DecidableEq K] (P : GName → Prop)
 theorem ghost_map_alloc [DecidableEq K] (m : H V) :
     ⊢ |==> ∃ γ, (γ ↪●MAP m) ∗ [∗map] k ↦ v ∈ m, γ ↪◯MAP[k] v := by
   imod (ghost_map_alloc_strong (fun _ => True) m) with ⟨%γ, -, H1, H2⟩
-  · intro N; exists N; simp
+  · exact .true _
   · iexists γ
     iframe H1 H2
 
@@ -439,7 +440,9 @@ theorem ghost_map_insert_persist_big [DecidableEq K] {γ m} (m' : H V) (Hdisj : 
 theorem ghost_map_delete_big [DecidableEq K] {γ m} (m0 : H V) :
     ⊢ (γ ↪●MAP m) -∗ ([∗map] k ↦v ∈ m0, γ ↪◯MAP[k] v) ==∗ (γ ↪●MAP (m \ m0)) := by
   iintro H1 H2
-  imod ghost_map_elems_unseal $$ H2 with H2
+  ihave %hslot := (show (γ ↪●MAP m) ⊢ ⌜γ.slot = (GhostMapG.elem (K := K) (V := V)).τ⌝
+    from iOwn_slot) $$ H1
+  imod ghost_map_elems_unseal _ _ _ hslot $$ H2 with H2
   unfold ghost_map_auth
   iapply iOwn_update_op $$ [$H1 $H2]
   rw [← congrArg (op _) (BigOpM.bigOpM_map_eq _ _ m0)]
@@ -452,7 +455,9 @@ theorem ghost_map_update_big [DecidableEq K] {γ m} (m0 m1 : H V) (Heq : dom m0 
     ⊢ (γ ↪●MAP m) -∗ ([∗map] k ↦v ∈ m0, γ ↪◯MAP[k] v) ==∗
     (γ ↪●MAP (m1 ∪ m)) ∗ [∗map] k ↦ v ∈ m1, γ ↪◯MAP[k] v := by
   iintro H1 H2
-  imod ghost_map_elems_unseal $$ H2 with H2
+  ihave %hslot := (show (γ ↪●MAP m) ⊢ ⌜γ.slot = (GhostMapG.elem (K := K) (V := V)).τ⌝
+    from iOwn_slot) $$ H1
+  imod ghost_map_elems_unseal _ _ _ hslot $$ H2 with H2
   by_cases h : m1 = ∅
   · imodintro
     isplitl [H1]
